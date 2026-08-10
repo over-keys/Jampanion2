@@ -385,15 +385,20 @@ function installIntegrationCss() {
       body.jampanion-playback .score-header h1,
       body.jampanion-playback .rehearsal-mark,
       body.jampanion-playback .bar { cursor:default !important; }
-      body.jampanion-embedded .app-shell {
-        height:auto !important;
-        min-height:0 !important;
-      }
       body.jampanion-embedded .chart-viewport {
+        min-width:0 !important;
+      }
+      @media (max-width: 700px) {
+        body.jampanion-embedded .app-shell {
+          height:auto !important;
+          min-height:0 !important;
+        }
+        body.jampanion-embedded .chart-viewport {
         height:auto !important;
         min-height:0 !important;
         overflow:visible !important;
         padding-bottom:0 !important;
+        }
       }
       .jamp-edit-input {
         position:fixed; z-index:99999; box-sizing:border-box; min-width:72px;
