@@ -16,6 +16,10 @@ let editingEnabled = true;
 let nativeSongs = new Map();
 let observer;
 let mobileControlsScrollCleanup;
+let embeddedLayoutObserver;
+let embeddedLayoutMutationObserver;
+let embeddedLayoutTimer;
+let embeddedFrameContentHeight = 0;
 let libraryTimer;
 let lastLibrarySignature = "";
 let editInput;
@@ -84,6 +88,8 @@ function installParentBridgeListener() {
                 void dotNet?.invokeMethodAsync("ChartEdited", String(data.message || "Chart updated"));
             } else if (data.name === "spaceShortcut") {
                 void dotNet?.invokeMethodAsync("HandleSpaceShortcut");
+            } else if (data.name === "layoutChanged") {
+                applyEmbeddedFrameHeight(data.value?.height);
             }
         }
     });
@@ -227,10 +233,66 @@ export function initializeMobileControlsScrollHint() {
     update();
 }
 
+function applyEmbeddedFrameHeight(height) {
+    const numericHeight = Math.ceil(Number(height) || 0);
+    if (numericHeight > 0) embeddedFrameContentHeight = numericHeight;
+    if (!frame) return;
+    const mobile = window.matchMedia?.("(max-width: 700px)").matches === true;
+    if (!mobile) {
+        frame.style.removeProperty("height");
+        frame.style.removeProperty("min-height");
+        return;
+    }
+    const targetHeight = Math.max(160, embeddedFrameContentHeight);
+    if (targetHeight <= 0) return;
+    frame.style.height = `${targetHeight}px`;
+    frame.style.minHeight = `${targetHeight}px`;
+}
+
+function installEmbeddedLayoutObserver() {
+    if ((embeddedLayoutObserver || embeddedLayoutMutationObserver) || !embeddedMode || window.parent === window) return;
+    const notify = () => {
+        clearTimeout(embeddedLayoutTimer);
+        embeddedLayoutTimer = setTimeout(() => {
+            const toolbarHeight = doc?.querySelector(".toolbar")?.getBoundingClientRect().height || 0;
+            const chartHeight = doc?.querySelector(".chart-scale-frame")?.getBoundingClientRect().height || 0;
+            const fallbackHeight = Math.max(
+                doc?.body?.scrollHeight || 0,
+                doc?.documentElement?.scrollHeight || 0
+            );
+            const height = Math.ceil(toolbarHeight + chartHeight + 8) || fallbackHeight;
+            if (height > 0) postToParent({ type: "event", name: "layoutChanged", value: { height } });
+        }, 0);
+    };
+    if (window.ResizeObserver) {
+        embeddedLayoutObserver = new ResizeObserver(notify);
+        for (const element of [
+            doc?.documentElement,
+            doc?.body,
+            doc?.querySelector(".chart-scale-frame"),
+            doc?.querySelector(".chart-page")
+        ].filter(Boolean)) {
+            embeddedLayoutObserver.observe(element);
+        }
+    }
+    if (window.MutationObserver && doc?.body) {
+        embeddedLayoutMutationObserver = new MutationObserver(notify);
+        embeddedLayoutMutationObserver.observe(doc.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["class", "style"]
+        });
+    }
+    window.addEventListener("resize", notify, { passive: true });
+    notify();
+}
+
 export async function initializeEmbeddedViewer() {
     embeddedMode = true;
     win = window;
     doc = document;
+    doc.body.classList.add("jampanion-embedded");
     await waitForLocalViewer();
     if (!initialized) {
         try { installIntegrationCss(); } catch (error) { console.warn("Integration CSS setup failed", error); }
@@ -239,6 +301,7 @@ export async function initializeEmbeddedViewer() {
         try { startLibraryWatcher(); } catch (error) { console.warn("Library watcher setup failed", error); }
         try { installEmbeddedShortcuts(); } catch (error) { console.warn("Embedded shortcut setup failed", error); }
         installEmbeddedBridgeListener();
+        installEmbeddedLayoutObserver();
         initialized = true;
         void loadNativeSongs().then(() => {
             try {
@@ -322,6 +385,16 @@ function installIntegrationCss() {
       body.jampanion-playback .score-header h1,
       body.jampanion-playback .rehearsal-mark,
       body.jampanion-playback .bar { cursor:default !important; }
+      body.jampanion-embedded .app-shell {
+        height:auto !important;
+        min-height:0 !important;
+      }
+      body.jampanion-embedded .chart-viewport {
+        height:auto !important;
+        min-height:0 !important;
+        overflow:visible !important;
+        padding-bottom:0 !important;
+      }
       .jamp-edit-input {
         position:fixed; z-index:99999; box-sizing:border-box; min-width:72px;
         height:34px; padding:3px 7px; border:2px solid #1f5f74; border-radius:5px;
