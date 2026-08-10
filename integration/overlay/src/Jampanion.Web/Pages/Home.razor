@@ -2,14 +2,14 @@
 @inherits IntegratedHomeLogic
 @implements IAsyncDisposable
 
-<PageTitle>Jampanion</PageTitle>
+<PageTitle>Jampanion2</PageTitle>
 <link rel="stylesheet" href="css/jazz-integration.css?v=20" />
 
 <div class="jamp-shell @(IsPlaying ? "is-playing" : string.Empty)">
     <aside class="jamp-sidebar">
         <div class="jamp-mobile-controls">
             <section class="jamp-brand-row">
-                <strong>Jampanion</strong>
+                <strong>Jampanion2</strong>
                 <button class="tiny" @onclick="OpenNewSong" disabled="@(IsPlaying || IsLoading)">New</button>
             </section>
 

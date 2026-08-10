@@ -34,6 +34,11 @@ grep -q 'node "$ROOT/scripts/customize-viewer.mjs" "$VIEWER/index.html"' "$ROOT/
 grep -q 'initializeEmbeddedViewer' "$ROOT/scripts/customize-viewer.mjs"
 ! grep -q 'toolbar-main.*display:none' "$HOST"
 grep -q 'customize-viewer.mjs.*VIEWER/index.html' "$ROOT/scripts/build-integrated.sh"
+grep -q 'customize-help.mjs.*VIEWER/help.html' "$ROOT/scripts/build-integrated.sh"
+grep -q 'id="jampanion"' "$ROOT/scripts/customize-help.mjs"
+grep -q 'test-help-contract.mjs.*VIEWER/help.html' "$ROOT/scripts/build-integrated.sh"
+grep -q 'customize-shell.mjs' "$ROOT/scripts/build-integrated.sh"
+grep -q 'test-shell-contract.mjs' "$ROOT/scripts/build-integrated.sh"
 
 # Native IndexedDB loading is asynchronous and must not block ChartReady.
 grep -q 'void loadNativeSongs().then' "$HOST"

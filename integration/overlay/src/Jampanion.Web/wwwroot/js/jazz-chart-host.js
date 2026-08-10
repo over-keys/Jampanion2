@@ -420,10 +420,11 @@ function installIntegrationCss() {
       .jamp-context-menu hr { border:0; border-top:1px solid #e3e7e9; margin:4px 2px; }
       .jamp-context-menu .selected::after { content:'✓'; float:right; font-weight:700; }
       .jamp-section-style {
-        position:absolute; z-index:8; left:-5px; top:-22px;
-        min-width:34px; height:22px; margin:0; padding:0;
-        color:#53636a; font:700 22px/22px Arial,Helvetica,sans-serif;
-        letter-spacing:-.02em; text-align:center; white-space:nowrap;
+        position:absolute; z-index:8; left:0; top:-18px;
+        box-sizing:border-box; width:100%; max-width:100%; min-width:0;
+        height:18px; margin:0; padding:0; overflow:visible;
+        color:#53636a; font:700 16px/16px Arial,Helvetica,sans-serif;
+        letter-spacing:-.04em; text-align:center; white-space:nowrap;
         pointer-events:none;
       }
     `;
@@ -859,6 +860,7 @@ function annotateRenderedBars() {
         elements[index].dataset.sourceIndex = String(sourceIndex);
         elements[index].dataset.displayIndex = String(index);
     }
+    const styledSectionBadges = [];
     for (const row of doc.querySelectorAll("#chartPage .system-row")) {
         const bar = row.querySelector(".bar:not(.spacer)");
         const lead = row.querySelector(".system-lead");
@@ -884,18 +886,64 @@ function annotateRenderedBars() {
         const ariaLabel = `Section style ${styleName}`;
         if (badge.getAttribute("aria-label") !== ariaLabel) badge.setAttribute("aria-label", ariaLabel);
         if (!current) lead.appendChild(badge);
+        styledSectionBadges.push({ badge, lead });
+    }
+    const commonFontSize = commonSectionStyleBadgeFontSize(styledSectionBadges);
+    for (const { badge, lead } of styledSectionBadges) {
+        fitSectionStyleBadge(badge, lead, commonFontSize);
     }
 }
 
 function sectionStyleAbbreviation(style) {
     switch (String(style || "")) {
-        case "Swing": return "Sw";
-        case "JazzBallad": return "Ba";
-        case "BossaNova": return "Bo";
-        case "AfroCubanLatin": return "La";
-        case "JazzWaltz": return "Wz";
+        case "Swing": return "Swing";
+        case "JazzBallad": return "Ballad";
+        case "BossaNova": return "Bossa";
+        case "AfroCubanLatin": return "Latin";
+        case "JazzWaltz": return "Waltz";
         default: return "";
     }
+}
+
+function commonSectionStyleBadgeFontSize(entries) {
+    const maximumFontSize = 22;
+    let fittedFontSize = maximumFontSize;
+    for (const { badge, lead } of entries) {
+        const availableWidth = Math.max(1, lead.clientWidth || lead.offsetWidth);
+        badge.style.width = "max-content";
+        badge.style.maxWidth = "none";
+        badge.style.fontSize = `${maximumFontSize}px`;
+        badge.style.lineHeight = `${maximumFontSize}px`;
+        badge.style.height = `${maximumFontSize}px`;
+        const naturalWidth = Math.max(1, badge.offsetWidth);
+        fittedFontSize = Math.min(
+            fittedFontSize,
+            maximumFontSize * Math.max(1, availableWidth - 1) / naturalWidth
+        );
+    }
+    return Math.min(maximumFontSize, Math.max(10, fittedFontSize));
+}
+
+function fitSectionStyleBadge(badge, lead, fontSize) {
+    const availableWidth = Math.max(1, lead.clientWidth || lead.offsetWidth);
+    const fittedFontSize = Math.max(10, Number(fontSize) || 10);
+    const mark = lead.querySelector(".rehearsal-mark");
+    const markCenter = mark
+        ? mark.offsetLeft + (mark.offsetWidth / 2)
+        : availableWidth / 2;
+    badge.style.left = "0px";
+    badge.style.top = `-${Math.ceil(fittedFontSize) + 4}px`;
+    badge.style.width = "max-content";
+    badge.style.maxWidth = "none";
+    badge.style.fontSize = `${fittedFontSize.toFixed(2)}px`;
+    const lineHeight = Math.ceil(fittedFontSize);
+    badge.style.lineHeight = `${lineHeight}px`;
+    badge.style.height = `${lineHeight + 2}px`;
+    const fittedWidth = Math.max(1, badge.offsetWidth);
+    badge.style.width = `${fittedWidth}px`;
+    badge.style.maxWidth = `${fittedWidth}px`;
+    badge.style.left = `${(markCenter - fittedWidth / 2).toFixed(2)}px`;
+    badge.style.top = `-${lineHeight + 2}px`;
 }
 
 function sectionStyleName(style) {

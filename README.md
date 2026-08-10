@@ -1,131 +1,73 @@
-# Jazz Chart Viewer + Jampanion
+# Jampanion2
 
-Integrated web application with **Jazz Chart Viewer as the chart/UI base** and the
-**Jampanion accompaniment engine** attached as a compact left sidebar.
+譜面を見ながら、ピアノ・ベース・ドラムの伴奏でジャムセッションを楽しむためのWebアプリです。
 
-This is a standalone integration project. It does not patch a user's Jampanion
-checkout. `scripts/build-integrated.sh` checks out the two pinned upstream baselines
-into a disposable build directory, applies the complete integration files, and writes
-the deployable site to `dist/`.
+公開ページ: [https://over-keys.github.io/Jampanion2/](https://over-keys.github.io/Jampanion2/)
 
-## Source of truth
+## まず使う
 
-- iReal parsing, visible chart layout, normalized chord positions, Original/Expanded,
-  repeats/endings, D.C./D.S./Coda/Fine, key transposition and notation: **Jazz Chart Viewer**.
-- Piano, bass, drums, Opening/Groove/Developing/Peak/HeadOut, the one-bar final tonic
-  hold, browser audio, external MIDI output and mixer: **Jampanion**.
-- Playback uses Jazz Chart Viewer's normalized grid positions and converts them to
-  Jampanion PPQ ticks. Jampanion does not independently re-parse the iReal chart.
-- Parent and chart iframe communicate through a non-visual `postMessage` bridge
-  injected at build time. The visible Jazz Chart Viewer search/toolbar stays intact.
+1. [Jampanion2](https://over-keys.github.io/Jampanion2/)を開きます。
+2. 譜面の右上にある歯車ボタンを押し、**Import iReal data**を選びます。
+3. iReal Proからコピーした`irealb://...`リンクを貼り付け、**Import**を押します。
+4. 検索欄で曲名または作曲者名を検索し、曲を選びます。
+5. 左側の**Start session**を押すと伴奏が始まります。終わるときは**Stop**を押します。
 
-## Playback and editing
+詳しい操作は、譜面右上の**?**ボタンからヘルプを開いてください。
 
-While stopped, the chart can be edited directly:
+## iRealの譜面を読み込む
 
-- Double-click an existing chord to edit it; confirm an empty value to remove it.
-- Double-click empty measure space to add a chord at that exact position.
-- Double-click a rehearsal mark to rename it.
-- Right-click a measure/rehearsal mark to add/remove a mark and set section style.
-- Double-click the title to rename the song.
+iReal Proで共有した曲のリンクをコピーし、**Import iReal data**に貼り付けます。リンクは`irealb://`または`irealbook://`で始まるものを使ってください。
 
-The first edit promotes an imported iReal chart to native IndexedDB data while retaining
-its original iReal source. `Settings` can later **Revert to original iReal chart**.
-New native songs begin with genuinely empty bars; accompaniment treats those as N.C.
-until harmony is entered.
+保存済みの`.txt`、`.html`、`.htm`ファイルを読み込むこともできます。
 
-During playback, score editing and Song Search are locked so the displayed chart cannot
-be changed out from under the sounding session. Space starts the session or queues
-`Back to head` when focus is on the chart/background; Space keeps its normal behavior
-inside inputs, search results, buttons and other interactive controls.
+## 伴奏を使う
 
-## Tempo and style
+左側の**Accompaniment**で、テンポとスタイルを選びます。
 
-Tempo priority is:
+- **Tempo**: 上下操作は5 BPMずつ変わります。数字を直接入力することもできます。
+- **Style**: **Swing / Ballad / Bossa Nova / Latin**から選べます。
+- **Start session**: カウントインの後、伴奏を開始します。
+- **Stop**: 伴奏を停止し、音を止めます。
+- **Save**: コード、リハーサルマーク、テンポ、スタイルの変更をまとめて保存します。
 
-1. tempo explicitly entered by the user in Jampanion;
-2. valid BPM contained in modern iReal player metadata;
-3. style-aware automatic default.
+演奏中にスタイルを変えると、次の4小節の区切りから切り替わります。テンポを変えた場合は、次の小節から滑らかに切り替わります。スタイル変更でテンポが勝手に変わることはありません。
 
-Automatic defaults are:
+## 譜面を編集する
 
-- Swing: **120 BPM**
-- Ballad: **70 BPM**
-- Bossa Nova: **140 BPM**
-- Jazz Waltz: **150 BPM**
-- Latin / Mambo: **180 BPM**
+演奏を止めてから、譜面を操作します。
 
-The Tempo control's spinner advances by 5 BPM, while direct entry still accepts exact
-1-BPM values. A newly selected song initially follows
-its saved/source tempo or the selected accompaniment style; changing the value makes
-it a manual tempo. Chart edits, rehearsal-mark changes, tempo, and style changes are
-all staged until the single Accompaniment Save button is pressed. Existing saved
-tempos, including 140 BPM, are never reinterpreted by a migration heuristic.
+- コードを**ダブルクリック**: コードを編集します。空欄で確定すると削除します。
+- 小節内の空いた場所を**ダブルクリック**: その位置にコードを追加します。
+- リハーサルマークを**ダブルクリック**: マーク名を変更します。
+- 小節やリハーサルマークを**右クリック**: マークの追加・削除、セクションスタイルの指定を行います。
+- タイトルを**ダブルクリック**: 曲名を変更します。
 
-Modern `irealb://` player metadata is read as `music = player style = BPM = repeats`.
-For accompaniment style, precedence is:
+スタイルを指定したリハーサルマークの上には、**Swing / Latin / Bossa / Ballad**が表示されます。曲のデフォルトスタイルを使う場合は表示されません。
 
-1. Jampanion saved style;
-2. recognized iReal **player** style;
-3. chart style label;
-4. Swing fallback (or Jazz Waltz for 3/4).
+編集内容は一時的に反映されます。残したいときは、**Accompaniment**の**Save**を押してください。
 
-A style change during playback is queued at the next four-bar boundary rather than
-changing the sounding block immediately. It never changes the current tempo implicitly.
+## MixとMIDI
 
-When `Back to head` queues the final HeadOut, the integration appends Jampanion's
-native one-bar ending: the song-root bass is held for the full bar, with the final
-piano voicing and ending drum hit around it.
+**Mix**では、Piano、Bass、Drumsの音量とミュートを調整できます。音量とミュートの設定は、次回も同じブラウザで使えるように保存されます。
 
-## Exact harmony timing
+**Settings**では、次の設定ができます。
 
-JCV timing is converted at PPQ 480. Off-beat harmony such as 3& and 4& is restored at
-its exact tick after Jampanion's beat-oriented arranging heuristics run. The correction
-is bounded by the **next written chord change, whether on-beat or off-beat**, and any
-piano/bass note crossing the written change is truncated first. This prevents a 3&
-chord from overlapping the following beat-4 harmony.
+- MIDI inputの選択
+- MIDI outputの選択
+- MIDI thruの設定
 
-## Audio & MIDI
+外部MIDI機器がなくても、**Built-in Trio**を選べばブラウザの音源で演奏できます。
 
-`Settings` → **Audio & MIDI** provides:
+## 譜面の表示
 
-- MIDI input: `No MIDI input` or an available Web MIDI input;
-- Output: **Built-in Trio** or an available external MIDI output.
+- **− / +**: キーを半音ずつ変更します。
+- **Auto / ♭ / ♯**: コードの表記方法を選びます。
+- **Original**: 元の譜面どおりに表示します。
+- **Expanded**: リピートなどを演奏順に展開して表示します。
+- **Fit**: 譜面を画面に収まる大きさにします。
 
-Device choices are saved locally and restored when available. Built-in Trio remains
-usable when Web MIDI is unsupported or permission is unavailable. MIDI input is used
-only for MIDI Thru in this integration. MIDI performance-energy analysis and automatic
-theme-return detection are intentionally disabled; `Back to head` is manual.
+スマートフォンでは、上部のSession操作を残したまま譜面を縦にスクロールできます。Mixは譜面の下にあります。
 
-## Build locally
+## 保存について
 
-Requirements: Git, .NET SDK 10, Node.js 24, npm.
-
-```bash
-./scripts/build-integrated.sh
-```
-
-The finished site is written to `dist/`. Serve it over HTTP/HTTPS, for example:
-
-```bash
-python3 -m http.server 8000 -d dist
-```
-
-## Validation
-
-Run the source-level regression suite with:
-
-```bash
-./scripts/validate-static.sh
-```
-
-The build additionally checks the bundled Jazz Chart Viewer contract after bridge
-injection. See `VALIDATION_RESULTS.md` for the covered cases and environment limits.
-
-## GitHub Pages
-
-Push this project as-is. `.github/workflows/deploy-pages.yml` builds and deploys the
-integrated site on pushes to `main`. The workflow does not push changes to either
-upstream repository.
-
-See `BASELINES.md` for the exact pinned revisions.
+曲や設定は、現在使っているブラウザに保存されます。ブラウザのデータを削除した場合や、別の端末で開いた場合は、曲をもう一度インポートしてください。
