@@ -1,4 +1,5 @@
 const SETTINGS_KEY = "jampanion-jazz-song-settings-v1";
+const LAST_SONG_KEY = "jampanion-jazz-last-song-v1";
 const DEVICE_SETTINGS_KEY = "jampanion-jazz-device-settings-v1";
 const MIXER_SETTINGS_KEY = "jampanion-jazz-mixer-settings-v1";
 const NATIVE_DB = "jampanion-jazz-native";
@@ -37,6 +38,7 @@ let embeddedBridgeListenerInstalled = false;
 let bridgeReady = false;
 let bridgeStartupError = null;
 let bridgeRequestId = 0;
+let lastSongRestorePending = true;
 const bridgePending = new Map();
 const bridgeReadyWaiters = new Set();
 const BRIDGE_CHANNEL = "jampanion-jcv-v12";
@@ -300,6 +302,7 @@ export async function initializeEmbeddedViewer() {
         try { annotateRenderedBars(); } catch (error) { console.warn("Chart annotation failed", error); }
         try { startLibraryWatcher(); } catch (error) { console.warn("Library watcher setup failed", error); }
         try { installEmbeddedShortcuts(); } catch (error) { console.warn("Embedded shortcut setup failed", error); }
+        try { restoreLastSelectedSong(); } catch (error) { console.warn("Last song restore failed", error); }
         installEmbeddedBridgeListener();
         installEmbeddedLayoutObserver();
         initialized = true;
@@ -307,6 +310,7 @@ export async function initializeEmbeddedViewer() {
             try {
                 const changed = applyNativeOverrides();
                 if (changed) forceRender();
+                restoreLastSelectedSong();
                 annotateRenderedBars();
                 queueBootstrapNotification();
             } catch (error) {
@@ -415,6 +419,11 @@ function installIntegrationCss() {
       .jamp-context-menu button:hover { background:#eef4f6; }
       .jamp-context-menu hr { border:0; border-top:1px solid #e3e7e9; margin:4px 2px; }
       .jamp-context-menu .selected::after { content:'✓'; float:right; font-weight:700; }
+      .jamp-section-style {
+        flex:0 0 auto; align-self:flex-start; margin:8px 0 0 2px;
+        color:#53636a; font:700 9px/1 Arial,Helvetica,sans-serif;
+        letter-spacing:-.02em; white-space:nowrap;
+      }
     `;
     doc.head.appendChild(style);
 }
@@ -428,6 +437,10 @@ function installChartListeners() {
     // survives those renders instead of remaining attached to a dead element.
     doc.addEventListener("dblclick", handleDoubleClick, true);
     doc.addEventListener("contextmenu", handleContextMenu, true);
+    doc.addEventListener("click", event => {
+        if (!event.target.closest?.("[data-song-id]")) return;
+        setTimeout(() => rememberSelectedSong(), 0);
+    }, true);
     doc.addEventListener("pointerdown", event => {
         if (contextMenu && !event.target.closest?.(".jamp-context-menu")) closeContextMenu();
     }, true);
@@ -450,13 +463,19 @@ function startLibraryWatcher() {
             forceRender();
         }
         const before = librarySignature();
+        let libraryChanged = false;
         if (before !== lastLibrarySignature) {
             lastLibrarySignature = before;
+            libraryChanged = true;
             const changed = applyNativeOverrides();
-            if (changed) forceRender();
+            if (changed) {
+                libraryChanged = true;
+                forceRender();
+            }
             annotateRenderedBars();
             queueBootstrapNotification();
         }
+        if (lastSongRestorePending && libraryChanged) restoreLastSelectedSong();
     }, 700);
     lastLibrarySignature = librarySignature();
 }
@@ -474,6 +493,59 @@ function songIdentity(song) {
         return `${fields[0] || song.title || ""}\n${fields[1] || song.composer || ""}`.trim();
     }
     return `${song.title || ""}\n${song.composer || ""}`.trim();
+}
+
+function readLastSongReference() {
+    try {
+        const value = JSON.parse(localStorage.getItem(LAST_SONG_KEY) || "null");
+        if (typeof value === "string") return { id: value, identity: "" };
+        if (!value || typeof value !== "object") return null;
+        const id = String(value.id || "");
+        const identity = String(value.identity || "");
+        return id || identity ? { id, identity } : null;
+    } catch {
+        return null;
+    }
+}
+
+function rememberSelectedSong(song = currentSong()) {
+    if (!song) return;
+    try {
+        localStorage.setItem(LAST_SONG_KEY, JSON.stringify({
+            id: String(song.id || ""),
+            identity: songIdentity(song)
+        }));
+        lastSongRestorePending = false;
+    } catch {
+        // Song selection remains usable when persistent storage is unavailable.
+    }
+}
+
+function restoreLastSelectedSong() {
+    if (!lastSongRestorePending) return false;
+    const reference = readLastSongReference();
+    if (!reference) {
+        lastSongRestorePending = false;
+        return false;
+    }
+    const target = (viewer?.state?.songs || []).find(song =>
+        (reference.identity && songIdentity(song) === reference.identity) ||
+        (reference.id && String(song.id || "") === reference.id)
+    );
+    if (!target) {
+        // The Viewer has already selected its first available song; retain that
+        // fallback until the saved song appears in a later library refresh.
+        return false;
+    }
+    const changed = viewer.state.selectedId !== target.id;
+    viewer.state.selectedId = target.id;
+    viewer.state.semitones = 0;
+    lastSongRestorePending = false;
+    if (changed) {
+        forceRender();
+        annotateRenderedBars();
+    }
+    return changed;
 }
 
 function currentSong() {
@@ -682,6 +754,7 @@ export function selectSong(songId) {
     viewer.state.semitones = 0;
     forceRender();
     annotateRenderedBars();
+    rememberSelectedSong(song);
     queueBootstrapNotification();
     return getBootstrap();
 }
@@ -729,8 +802,12 @@ function scrollPlaybackTarget(target) {
         const frameRect = window.frameElement?.getBoundingClientRect();
         const targetRect = target.getBoundingClientRect();
         if (!frameRect) return;
-        const topInset = Number(window.parent.document.querySelector(".jamp-mobile-controls")?.getBoundingClientRect().bottom || 0) + 16;
-        const bottomInset = window.parent.innerHeight - 16;
+        const controlsBottom = Number(window.parent.document.querySelector(".jamp-mobile-controls")?.getBoundingClientRect().bottom || 0);
+        const viewportBottom = Number(window.parent.innerHeight || 0);
+        const usableHeight = Math.max(0, viewportBottom - controlsBottom);
+        const edgeMargin = Math.max(16, usableHeight * 0.075);
+        const topInset = controlsBottom + edgeMargin;
+        const bottomInset = viewportBottom - edgeMargin;
         const targetTop = frameRect.top + targetRect.top;
         const targetBottom = frameRect.top + targetRect.bottom;
         const delta = targetTop < topInset
@@ -783,7 +860,46 @@ function annotateRenderedBars() {
     for (const row of doc.querySelectorAll("#chartPage .system-row")) {
         const bar = row.querySelector(".bar:not(.spacer)");
         const lead = row.querySelector(".system-lead");
-        if (bar && lead) lead.dataset.sourceIndex = bar.dataset.sourceIndex || "";
+        if (!bar || !lead) continue;
+        lead.dataset.sourceIndex = bar.dataset.sourceIndex || "";
+        const sourceIndex = Number(lead.dataset.sourceIndex);
+        const sourceBar = Number.isInteger(sourceIndex) ? song.bars?.[sourceIndex] : null;
+        const styleLabel = sourceBar?.section
+            ? sectionStyleAbbreviation(sourceBar.jampanionStyleOverride)
+            : "";
+        const current = lead.querySelector(".jamp-section-style");
+        if (!styleLabel) {
+            current?.remove();
+            continue;
+        }
+        const badge = current || doc.createElement("span");
+        badge.className = "jamp-section-style";
+        badge.textContent = styleLabel;
+        badge.title = `Section style: ${sectionStyleName(sourceBar.jampanionStyleOverride)}`;
+        badge.setAttribute("aria-label", `Section style ${sectionStyleName(sourceBar.jampanionStyleOverride)}`);
+        if (!current) lead.appendChild(badge);
+    }
+}
+
+function sectionStyleAbbreviation(style) {
+    switch (String(style || "")) {
+        case "Swing": return "Sw";
+        case "JazzBallad": return "Ba";
+        case "BossaNova": return "Bo";
+        case "AfroCubanLatin": return "La";
+        case "JazzWaltz": return "Wz";
+        default: return "";
+    }
+}
+
+function sectionStyleName(style) {
+    switch (String(style || "")) {
+        case "Swing": return "Swing";
+        case "JazzBallad": return "Ballad";
+        case "BossaNova": return "Bossa Nova";
+        case "AfroCubanLatin": return "Latin";
+        case "JazzWaltz": return "Jazz Waltz";
+        default: return "song default";
     }
 }
 
@@ -1545,6 +1661,7 @@ export async function createNewSong(title, barCount, meter, key, accompanimentSt
     saveSongSettings(identity, defaultTempoForStyle(meter === "3/4" ? "JazzWaltz" : accompanimentStyle || "Swing"), meter === "3/4" ? "JazzWaltz" : accompanimentStyle || "Swing", false);
     forceRender();
     annotateRenderedBars();
+    rememberSelectedSong(song);
     await edited("New song created");
     return getBootstrap();
 }
@@ -1586,6 +1703,7 @@ export async function deleteCurrentNativeSong() {
     viewer.state.semitones = 0;
     forceRender();
     annotateRenderedBars();
+    rememberSelectedSong(currentSong());
     queueBootstrapNotification();
     return getBootstrap();
 }
