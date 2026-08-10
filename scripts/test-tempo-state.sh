@@ -28,7 +28,7 @@ if grep -q 'storedTempo !== 140' "$HOST"; then
   echo 'Legacy 140 migration heuristic must not be present.' >&2
   exit 1
 fi
-grep -q './js/jazz-chart-host.js?v=21' "$LOGIC"
+grep -q './js/jazz-chart-host.js?v=23' "$LOGIC"
 grep -q 'viewer/index.html?integrated=12' "$HOME_RAZOR"
 echo 'Style-aware tempo regression checks passed.'
 

@@ -420,9 +420,20 @@ function installIntegrationCss() {
       .jamp-context-menu hr { border:0; border-top:1px solid #e3e7e9; margin:4px 2px; }
       .jamp-context-menu .selected::after { content:'✓'; float:right; font-weight:700; }
       .jamp-section-style {
-        flex:0 0 auto; align-self:flex-start; margin:8px 0 0 2px;
-        color:#53636a; font:700 9px/1 Arial,Helvetica,sans-serif;
-        letter-spacing:-.02em; white-space:nowrap;
+        flex:0 0 auto; align-self:flex-start; min-width:24px; margin:0 0 2px;
+        color:#53636a; font:700 12px/12px Arial,Helvetica,sans-serif;
+        letter-spacing:-.02em; text-align:center; white-space:nowrap;
+      }
+      .system-lead.jamp-has-section-style {
+        flex-direction:column;
+      }
+      .system-lead.jamp-has-section-style .time-signature {
+        top:47px !important;
+      }
+      @media (max-width:620px) {
+        .system-lead.jamp-has-section-style .time-signature {
+          top:42px !important;
+        }
       }
     `;
     doc.head.appendChild(style);
@@ -868,16 +879,22 @@ function annotateRenderedBars() {
             ? sectionStyleAbbreviation(sourceBar.jampanionStyleOverride)
             : "";
         const current = lead.querySelector(".jamp-section-style");
+        lead.classList.toggle("jamp-has-section-style", Boolean(styleLabel));
         if (!styleLabel) {
             current?.remove();
             continue;
         }
         const badge = current || doc.createElement("span");
         badge.className = "jamp-section-style";
-        badge.textContent = styleLabel;
-        badge.title = `Section style: ${sectionStyleName(sourceBar.jampanionStyleOverride)}`;
-        badge.setAttribute("aria-label", `Section style ${sectionStyleName(sourceBar.jampanionStyleOverride)}`);
-        if (!current) lead.appendChild(badge);
+        if (badge.textContent !== styleLabel) badge.textContent = styleLabel;
+        const styleName = sectionStyleName(sourceBar.jampanionStyleOverride);
+        const title = `Section style: ${styleName}`;
+        if (badge.title !== title) badge.title = title;
+        const ariaLabel = `Section style ${styleName}`;
+        if (badge.getAttribute("aria-label") !== ariaLabel) badge.setAttribute("aria-label", ariaLabel);
+        const mark = lead.querySelector(".rehearsal-mark");
+        if (!current) lead.insertBefore(badge, mark || lead.firstChild);
+        else if (mark && badge !== mark.previousElementSibling) lead.insertBefore(badge, mark);
     }
 }
 
