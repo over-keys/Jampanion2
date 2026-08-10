@@ -960,6 +960,9 @@ async function captureSourceTiming(song) {
                 const slotIndex = Number(slotElement.dataset.slotIndex);
                 const sourceSlot = sourceBar.chordSlots?.[slotIndex];
                 if (!sourceSlot || sourceSlot.hidden) continue;
+                // Use the Viewer-rendered grid, not the raw iReal source cell.
+                // This preserves Viewer-owned normalizations such as XyQ's
+                // compact 4/4 three-chord [1,2,4] -> written [1,3,4].
                 const total = Math.max(1, Number(slotElement.dataset.gridTotal) || 1);
                 const start = Math.max(0, Number(slotElement.dataset.gridStart) || 0);
                 events.push({

@@ -2,7 +2,7 @@
 
 This source tree builds one integrated web application from two pinned upstream baselines.
 
-- Jazz Chart Viewer: `over-keys/Jazz-Chart-Viewer` at `d7b3c523aeaac411d0048288e3af48749286a9d3`
+- Jazz Chart Viewer: `over-keys/Jazz-Chart-Viewer` at `1457dde2a133987237a7f3c50800a32dcea00033`
 - Jampanion: `over-keys/Jampanion` at `d216b4c9658e93347ea42b9fd082900be8bf6d98`
 
 Jazz Chart Viewer owns the chart model, iReal parsing, repeat/navigation expansion,

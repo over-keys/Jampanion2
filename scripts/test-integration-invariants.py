@@ -21,6 +21,7 @@ checks = {
     "subbeat duration sees all chord changes": '.Where(candidate => candidate.StartTick > change.StartTick)' in planner,
     "old harmony is truncated at offbeat change": 'TruncateHarmonyAtTick(notes, exactTick)' in planner,
     "waltz count-in includes beat two": 'beatsPerBar == 4 && bar == 0 && beat % 2 != 0' in planner,
+    "playback uses Viewer-rendered normalized grid": 'captureSourceTiming' in host and 'dataset.gridStart' in host and 'gridCellToTick(start, total, activeMeter)' in host,
     "start locks chart before compilation": logic.find('InvokeVoidAsync("setPlaybackState", true, -1)') < logic.find('InvokeAsync<JazzPlaybackFormDto>("compilePlayback")'),
     "start failure stops audio": 'await startedAudio.InvokeVoidAsync("stopSession")' in logic,
     "start preparation is cancelable": 'generationVersion != _generationVersion' in logic and 'await Task.Yield();' in logic and '@(!IsPlaying && !IsLoading)' in home,
