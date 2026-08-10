@@ -2,7 +2,7 @@
 
 Pinned baselines:
 
-- Jazz Chart Viewer: `d7b3c523aeaac411d0048288e3af48749286a9d3`
+- Jazz Chart Viewer: `1457dde2a133987237a7f3c50800a32dcea00033`
 - Jampanion: `d216b4c9658e93347ea42b9fd082900be8bf6d98`
 
 ## Source-level regression suite
@@ -26,6 +26,7 @@ including:
 - tempo precedence and manual-state ownership across bridge refreshes;
 - Swing 120 / Ballad 70 / Bossa 140 / Waltz 150 / Latin 180 automatic defaults;
 - live style changes use the next four-bar boundary and `replaceContinuation`;
+- XyQ three-chord 4/4 bars normalize compact source cells `[1, 2, 4]` to written beats `[1, 3, 4]` through the pinned Viewer;
 - HeadOut appends Jampanion's one-bar `Ending / final tonic` plan, including the held
   song-root bass and final piano/drum resolution;
 - blank chord edit removes the chord without pulling a later first-bar chord early;

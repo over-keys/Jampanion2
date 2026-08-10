@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="${ROOT}/.build"
-JCV_SHA='d7b3c523aeaac411d0048288e3af48749286a9d3'
+JCV_SHA='1457dde2a133987237a7f3c50800a32dcea00033'
 JAMP_SHA='d216b4c9658e93347ea42b9fd082900be8bf6d98'
 JCV_REPO='https://github.com/over-keys/Jazz-Chart-Viewer.git'
 JAMP_REPO='https://github.com/over-keys/Jampanion.git'
