@@ -50,7 +50,7 @@ checks = {
     "session status is omitted": 'session-status' not in home and 'Stopped' not in home and '0:00' not in home,
     "visible footer status is omitted": 'jamp-footer-status' not in home and 'jamp-footer-status' not in (root / "integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text(),
     "tempo Auto control is removed": 'ResetTempoAutoAsync' not in logic and '>Auto<' not in home,
-    "tempo accepts exact iReal BPM": 'step="1"' in home,
+    "tempo spinner advances by five": 'step="5"' in home,
     "MIDI preferences persist": 'saveDevicePreferences' in host and 'getDevicePreferences' in logic,
     "MIDI Thru restores saved input": 'RestorePreferredInputForMidiThruAsync' in logic,
     "Built-in Trio remains usable without Web MIDI": 'Built-in Trio available · Web MIDI unavailable' in logic,

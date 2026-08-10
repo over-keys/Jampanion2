@@ -55,7 +55,8 @@ Automatic defaults are:
 - Jazz Waltz: **150 BPM**
 - Latin / Mambo: **180 BPM**
 
-The Tempo control accepts exact 1-BPM values. A newly selected song initially follows
+The Tempo control's spinner advances by 5 BPM, while direct entry still accepts exact
+1-BPM values. A newly selected song initially follows
 its saved/source tempo or the selected accompaniment style; changing the value makes
 it a manual tempo. Chart edits, rehearsal-mark changes, tempo, and style changes are
 all staged until the single Accompaniment Save button is pressed. Existing saved
@@ -70,8 +71,7 @@ For accompaniment style, precedence is:
 4. Swing fallback (or Jazz Waltz for 3/4).
 
 A style change during playback is queued at the next four-bar boundary rather than
-changing the sounding block immediately. If the tempo is Auto and has no source BPM,
-the style's automatic tempo also begins at that boundary.
+changing the sounding block immediately. It never changes the current tempo implicitly.
 
 When `Back to head` queues the final HeadOut, the integration appends Jampanion's
 native one-bar ending: the song-root bass is held for the full bar, with the final
