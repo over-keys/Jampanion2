@@ -563,7 +563,10 @@ public static class IntegratedSessionPlanner
         {
             for (var beat = 0; beat < beatsPerBar; beat++)
             {
-                if (bar == 0 && beat % 2 != 0)
+                // Match Jampanion's count-in: the first 4/4 bar is a light
+                // 1-and-3 pickup, while waltz is counted straight through as
+                // | 1 2 3 | 1 2 3 |.
+                if (beatsPerBar == 4 && bar == 0 && beat % 2 != 0)
                 {
                     continue;
                 }

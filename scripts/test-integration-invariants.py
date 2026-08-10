@@ -5,6 +5,8 @@ host = (root / "integration/overlay/src/Jampanion.Web/wwwroot/js/jazz-chart-host
 logic = (root / "integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs").read_text()
 planner = (root / "integration/overlay/src/Jampanion.Web/Audio/IntegratedSessionPlanner.cs").read_text()
 home = (root / "integration/overlay/src/Jampanion.Web/Pages/Home.razor").read_text()
+style_change_method = logic[logic.find('protected async Task ChangeStyleAsync'):logic.find('private static int DefaultTempoForStyle')]
+tempo_change_method = logic[logic.find('private async Task RebuildLiveTempoAsync'):logic.find('private async Task QueueStyleChangeAsync')]
 
 checks = {
     "playback disables original search": 'search.disabled = playing' in host,
@@ -18,11 +20,15 @@ checks = {
     "iReal player style precedes chart inference": 'stored.accompanimentStyle || sourcePlayerStyle || inferredStyle(song)' in host,
     "subbeat duration sees all chord changes": '.Where(candidate => candidate.StartTick > change.StartTick)' in planner,
     "old harmony is truncated at offbeat change": 'TruncateHarmonyAtTick(notes, exactTick)' in planner,
+    "waltz count-in includes beat two": 'beatsPerBar == 4 && bar == 0 && beat % 2 != 0' in planner,
     "start locks chart before compilation": logic.find('InvokeVoidAsync("setPlaybackState", true, -1)') < logic.find('InvokeAsync<JazzPlaybackFormDto>("compilePlayback")'),
     "start failure stops audio": 'await startedAudio.InvokeVoidAsync("stopSession")' in logic,
     "start preparation is cancelable": 'generationVersion != _generationVersion' in logic and 'await Task.Yield();' in logic and '@(!IsPlaying && !IsLoading)' in home,
     "style changes use four-bar boundary": 'SequenceIndex % SessionConstants.BarsPerSegment == 0' in logic,
     "style continuation is replaced, not rebased immediately": '"replaceContinuation"' in logic,
+    "style changes preserve the current tempo": 'TempoBpm = DefaultTempoForStyle(SelectedStyle)' not in style_change_method,
+    "tempo changes wait for a bar boundary": 'NextBarBoundary' in tempo_change_method and 'next bar boundary' in tempo_change_method,
+    "tempo continuation is replaced without rebasing": '"replaceContinuation"' in tempo_change_method and '"replaceSession"' not in tempo_change_method,
     "Ending appends the native final tonic hold": 'EndingPlanBuilder.Build' in planner and 'headOutRendered = true' in planner and 'Ending / final tonic' in planner,
     "Ending retains the root-hold plan inputs": 'headOutExactTune.TonicChord' in planner and 'endingPlan.LengthTicks' in planner,
     "all edits share one explicit save": 'SaveAccompanimentSettingsAsync' in logic and 'HasUnsavedChanges' in home and 'saveCurrentChart' in logic and 'SaveSongSettingsAsync' in logic,

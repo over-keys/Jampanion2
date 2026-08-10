@@ -253,15 +253,10 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         if (CurrentMeter == "3/4") requested = AccompanimentStyle.JazzWaltz;
         if (requested == SelectedStyle) return;
         var previousStyle = SelectedStyle;
-        var previousTempo = TempoBpm;
         SelectedStyle = requested;
-        if (!TempoIsExplicit)
-        {
-            TempoBpm = DefaultTempoForStyle(SelectedStyle);
-        }
         if (IsPlaying)
         {
-            await QueueStyleChangeAsync(previousStyle, previousTempo);
+            await QueueStyleChangeAsync(previousStyle);
         }
     }
 
@@ -479,6 +474,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         if (!IsPlaying || _compiledChart is null || _sessionPlan is null || _audioModule is null) return;
         var oldPlan = _sessionPlan;
         var generationVersion = ++_generationVersion;
+        const double schedulingGuardSeconds = 0.30d;
         try
         {
             async ValueTask YieldAsync()
@@ -486,7 +482,10 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                 await Task.Delay(1);
                 if (!IsPlaying || generationVersion != _generationVersion) throw new OperationCanceledException();
             }
+
             var currentPosition = await _audioModule.InvokeAsync<double>("getPosition");
+            var boundaryBar = NextBarBoundary(oldPlan, currentPosition, schedulingGuardSeconds)
+                ?? throw new InvalidOperationException("No later bar boundary is available in the prepared session.");
             var replacement = await IntegratedSessionPlanner.BuildSessionIncrementallyAsync(
                 _compiledChart,
                 TempoBpm,
@@ -495,24 +494,35 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                 YieldAsync,
                 headOutChorus: oldPlan.HeadOutChorus,
                 endWithHeadOut: oldPlan.HeadOutChorus is not null);
-            if (!IsPlaying || generationVersion != _generationVersion) return;
+            if (!IsPlaying || generationVersion != _generationVersion || _audioModule is null) return;
 
-            var newPosition = currentPosition < oldPlan.CountInSeconds
-                ? replacement.CountInSeconds * currentPosition / Math.Max(0.001d, oldPlan.CountInSeconds)
-                : replacement.CountInSeconds + Math.Max(0d, currentPosition - oldPlan.CountInSeconds) * previousTempo / (double)TempoBpm;
+            currentPosition = await _audioModule.InvokeAsync<double>("getPosition");
+            if (boundaryBar.StartSeconds - currentPosition <= schedulingGuardSeconds)
+            {
+                boundaryBar = NextBarBoundary(oldPlan, currentPosition, schedulingGuardSeconds)
+                    ?? throw new InvalidOperationException("The requested tempo change reached the end of the prepared session.");
+            }
+
+            var replacementBoundary = replacement.PlaybackBars.FirstOrDefault(bar => bar.SequenceIndex == boundaryBar.SequenceIndex)
+                ?? throw new InvalidOperationException("The replacement plan does not contain the requested bar boundary.");
+            var delta = boundaryBar.StartSeconds - replacementBoundary.StartSeconds;
+            var continuation = replacement.Notes
+                .Where(note => note.StartSeconds >= replacementBoundary.StartSeconds - 0.001d)
+                .Select(note => note with { StartSeconds = note.StartSeconds + delta })
+                .ToArray();
+            var duration = boundaryBar.StartSeconds + Math.Max(0d, replacement.DurationSeconds - replacementBoundary.StartSeconds);
+
+            // Keep the current MIDI queue and let the old notes ring out. The
+            // new tempo takes effect on the next bar, matching Jampanion's
+            // boundary-based handoff without rebasing/stopping the AudioContext.
             await _audioModule.InvokeVoidAsync(
-                "replaceSession",
-                replacement.Notes,
-                replacement.DurationSeconds,
-                newPosition,
-                true);
-            _sessionPlan = replacement;
-            _positionSeconds = newPosition;
-            StatusText = TempoIsUserSet
-                ? $"Tempo changed to {TempoBpm} BPM"
-                : TempoIsExplicit
-                    ? $"Tempo restored to source value {TempoBpm} BPM"
-                    : $"Tempo changed to {TempoBpm} BPM (Auto)";
+                "replaceContinuation",
+                continuation,
+                duration,
+                boundaryBar.StartSeconds);
+            _sessionPlan = SplicePlanAtBoundary(oldPlan, replacement, boundaryBar.SequenceIndex, boundaryBar.StartSeconds, replacementBoundary.StartSeconds);
+            _positionSeconds = currentPosition;
+            StatusText = $"Tempo {TempoBpm} BPM queued for the next bar boundary";
         }
         catch (OperationCanceledException) { }
         catch (Exception exception)
@@ -524,7 +534,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         }
     }
 
-    private async Task QueueStyleChangeAsync(AccompanimentStyle previousStyle, int previousTempo)
+    private async Task QueueStyleChangeAsync(AccompanimentStyle previousStyle)
     {
         if (!IsPlaying || _compiledChart is null || _sessionPlan is null || _audioModule is null || HeadOutQueued)
         {
@@ -586,16 +596,44 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                 duration,
                 boundaryBar.StartSeconds);
             _sessionPlan = SplicePlanAtBoundary(oldPlan, replacement, boundaryBar.SequenceIndex, boundaryBar.StartSeconds, replacementBoundary.StartSeconds);
-            StatusText = $"{AccompanimentStyleNames.DisplayName(SelectedStyle)} queued for the next 4-bar boundary" +
-                (previousTempo != TempoBpm ? $" · {TempoBpm} BPM (Auto)" : string.Empty);
+            StatusText = $"{AccompanimentStyleNames.DisplayName(SelectedStyle)} queued for the next 4-bar boundary";
         }
         catch (OperationCanceledException) { }
         catch (Exception exception)
         {
             SelectedStyle = previousStyle;
-            TempoBpm = previousTempo;
             StatusText = $"Style change failed: {exception.Message}";
         }
+    }
+
+    private static IntegratedPlaybackBar? NextBarBoundary(
+        IntegratedSessionPlan plan,
+        double currentPosition,
+        double guardSeconds)
+    {
+        var known = plan.PlaybackBars
+            .Where(bar => bar.StartSeconds - currentPosition > guardSeconds)
+            .OrderBy(bar => bar.StartSeconds)
+            .FirstOrDefault();
+        if (known is not null) return known;
+
+        var currentBar = plan.PlaybackBars
+            .Where(bar => bar.StartSeconds <= currentPosition)
+            .OrderByDescending(bar => bar.StartSeconds)
+            .FirstOrDefault();
+        var sequenceIndex = currentBar is null ? 0 : currentBar.SequenceIndex + 1;
+        var start = plan.CountInSeconds + sequenceIndex * plan.BarDurationSeconds;
+        if (start - currentPosition <= guardSeconds) sequenceIndex++;
+
+        start = plan.CountInSeconds + sequenceIndex * plan.BarDurationSeconds;
+        return new IntegratedPlaybackBar(
+            sequenceIndex,
+            SourceIndex: -1,
+            SourceOccurrence: 0,
+            Chorus: 0,
+            Stage: string.Empty,
+            StartSeconds: start,
+            EndSeconds: start + plan.BarDurationSeconds);
     }
 
     private static IntegratedPlaybackBar? NextFourBarBoundary(
