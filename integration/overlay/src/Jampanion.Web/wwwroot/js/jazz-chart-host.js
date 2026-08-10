@@ -701,22 +701,31 @@ export function setPlaybackState(isPlaying, sourceIndex = -1) {
 
 function scrollPlaybackTarget(target) {
     const mobile = window.matchMedia?.("(max-width: 700px)").matches === true;
-    target.scrollIntoView({
-        block: mobile ? "center" : "nearest",
-        inline: "nearest",
-        behavior: "smooth"
-    });
+    const embeddedMobile = mobile && window.parent !== window;
+
+    // The integrated mobile page expands the iframe to the chart's full
+    // height. Scrolling inside that iframe on every bar change causes small
+    // vertical corrections even when consecutive bars share a system. Let
+    // the parent page scroll only when the active bar leaves its visible band.
+    if (!embeddedMobile) {
+        target.scrollIntoView({
+            block: mobile ? "center" : "nearest",
+            inline: "nearest",
+            behavior: "smooth"
+        });
+    }
 
     // The integrated page has its own sticky session row around this iframe.
-    // After the iframe scrolls its chart, make sure the parent page has not
-    // left the target underneath that row or below the mobile viewport.
-    if (!mobile || window.parent === window) return;
+    // Make sure the parent page has not left the target underneath that row or
+    // below the mobile viewport. The extra margin is intentional hysteresis:
+    // it prevents repeated tiny corrections around an edge.
+    if (!embeddedMobile) return;
     try {
         const frameRect = window.frameElement?.getBoundingClientRect();
         const targetRect = target.getBoundingClientRect();
         if (!frameRect) return;
-        const topInset = Number(window.parent.document.querySelector(".jamp-mobile-controls")?.getBoundingClientRect().bottom || 0) + 8;
-        const bottomInset = window.parent.innerHeight - 8;
+        const topInset = Number(window.parent.document.querySelector(".jamp-mobile-controls")?.getBoundingClientRect().bottom || 0) + 16;
+        const bottomInset = window.parent.innerHeight - 16;
         const targetTop = frameRect.top + targetRect.top;
         const targetBottom = frameRect.top + targetRect.bottom;
         const delta = targetTop < topInset
@@ -724,7 +733,7 @@ function scrollPlaybackTarget(target) {
             : targetBottom > bottomInset
                 ? targetBottom - bottomInset
                 : 0;
-        if (Math.abs(delta) > 2) {
+        if (Math.abs(delta) > 12) {
             window.parent.scrollBy({ top: delta, left: 0, behavior: "smooth" });
         }
     } catch {
