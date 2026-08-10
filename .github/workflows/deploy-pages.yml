@@ -1,0 +1,68 @@
+name: Deploy integrated Jazz Chart Viewer + Jampanion
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out integration source
+        uses: actions/checkout@v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Validate integration source
+        run: scripts/validate-static.sh
+
+      - name: Build integrated site
+        run: scripts/build-integrated.sh
+
+      - name: Prepare GitHub Pages base path
+        run: scripts/prepare-pages.sh dist "${GITHUB_REPOSITORY#*/}"
+
+      - name: Verify output
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/index.html
+          test -s dist/viewer/index.html
+          test -s dist/js/jazz-chart-host.js
+          test -s dist/js/jampanion-audio.js
+          test -s dist/soundfonts/FluidR3_Jampanion.sf3
+          grep -q "<base href=\"/${GITHUB_REPOSITORY#*/}/\" />" dist/index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v6
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

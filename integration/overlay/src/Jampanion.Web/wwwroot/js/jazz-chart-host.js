@@ -1,0 +1,1561 @@
+const SETTINGS_KEY = "jampanion-jazz-song-settings-v1";
+const DEVICE_SETTINGS_KEY = "jampanion-jazz-device-settings-v1";
+const MIXER_SETTINGS_KEY = "jampanion-jazz-mixer-settings-v1";
+const NATIVE_DB = "jampanion-jazz-native";
+const NATIVE_STORE = "songs";
+const NATIVE_DB_VERSION = 1;
+const PPQ = 480;
+const IREAL_MUSIC_PREFIX = "1r34LbKcu7";
+
+let frame;
+let win;
+let doc;
+let viewer;
+let dotNet;
+let editingEnabled = true;
+let nativeSongs = new Map();
+let observer;
+let mobileControlsScrollCleanup;
+let libraryTimer;
+let lastLibrarySignature = "";
+let editInput;
+let contextMenu;
+let notifying = false;
+let globalKeyHandler;
+let visibilityHandler;
+let embeddedKeyHandler;
+let playbackLockedSongId = "";
+let initialized = false;
+let embeddedMode = false;
+let frameOrigin = null;
+let parentBridgeListenerInstalled = false;
+let embeddedBridgeListenerInstalled = false;
+let bridgeReady = false;
+let bridgeStartupError = null;
+let bridgeRequestId = 0;
+const bridgePending = new Map();
+const bridgeReadyWaiters = new Set();
+const BRIDGE_CHANNEL = "jampanion-jcv-v12";
+
+function postToFrame(message) {
+    const target = frame?.contentWindow;
+    if (!target) throw new Error("Jazz Chart Viewer frame is not available.");
+    target.postMessage({ channel: BRIDGE_CHANNEL, ...message }, frameOrigin || "*");
+}
+
+function postToParent(message) {
+    if (window.parent === window) return;
+    window.parent.postMessage({ channel: BRIDGE_CHANNEL, ...message }, "*");
+}
+
+function installParentBridgeListener() {
+    if (parentBridgeListenerInstalled) return;
+    parentBridgeListenerInstalled = true;
+    window.addEventListener("message", event => {
+        if (!frame || event.source !== frame.contentWindow) return;
+        const data = event.data;
+        if (!data || data.channel !== BRIDGE_CHANNEL) return;
+        if (data.type === "bridge-error") {
+            bridgeStartupError = String(data.error || "Jazz Chart Viewer embedded bridge failed.");
+            for (const resolve of bridgeReadyWaiters) resolve();
+            bridgeReadyWaiters.clear();
+            return;
+        }
+        if (data.type === "ready") {
+            bridgeStartupError = null;
+            bridgeReady = true;
+            for (const resolve of bridgeReadyWaiters) resolve();
+            bridgeReadyWaiters.clear();
+            return;
+        }
+        if (data.type === "response") {
+            const pending = bridgePending.get(data.id);
+            if (!pending) return;
+            bridgePending.delete(data.id);
+            clearTimeout(pending.timer);
+            if (data.ok) pending.resolve(data.value);
+            else pending.reject(new Error(data.error || "Jazz Chart Viewer bridge request failed."));
+            return;
+        }
+        if (data.type === "event") {
+            if (data.name === "bootstrapChanged") {
+                void dotNet?.invokeMethodAsync("ChartBootstrapChanged", data.value);
+            } else if (data.name === "edited") {
+                void dotNet?.invokeMethodAsync("ChartEdited", String(data.message || "Chart updated"));
+            } else if (data.name === "spaceShortcut") {
+                void dotNet?.invokeMethodAsync("HandleSpaceShortcut");
+            }
+        }
+    });
+}
+
+async function waitForEmbeddedReady(timeoutMs = 15000) {
+    if (bridgeReady) return;
+    const started = performance.now();
+    while (!bridgeReady && performance.now() - started < timeoutMs) {
+        if (bridgeStartupError) throw new Error(bridgeStartupError);
+        try { postToFrame({ type: "ping" }); } catch {}
+        await Promise.race([
+            new Promise(resolve => {
+                bridgeReadyWaiters.add(resolve);
+                setTimeout(() => {
+                    bridgeReadyWaiters.delete(resolve);
+                    resolve();
+                }, 120);
+            }),
+            delay(140)
+        ]);
+    }
+    if (bridgeStartupError) throw new Error(bridgeStartupError);
+    if (!bridgeReady) throw new Error("Jazz Chart Viewer accompaniment bridge did not become ready.");
+}
+
+function requestEmbedded(action, args = {}, timeoutMs = 60000) {
+    return new Promise((resolve, reject) => {
+        const id = ++bridgeRequestId;
+        const timer = setTimeout(() => {
+            bridgePending.delete(id);
+            reject(new Error(`Jazz Chart Viewer bridge timed out while running ${action}.`));
+        }, timeoutMs);
+        bridgePending.set(id, { resolve, reject, timer });
+        try { postToFrame({ type: "request", id, action, args }); }
+        catch (error) {
+            bridgePending.delete(id);
+            clearTimeout(timer);
+            reject(error);
+        }
+    });
+}
+
+function installEmbeddedBridgeListener() {
+    if (embeddedBridgeListenerInstalled) return;
+    embeddedBridgeListenerInstalled = true;
+    window.addEventListener("message", async event => {
+        if (event.source !== window.parent) return;
+        const data = event.data;
+        if (!data || data.channel !== BRIDGE_CHANNEL) return;
+        if (data.type === "ping") {
+            postToParent({ type: "ready" });
+            return;
+        }
+        if (data.type !== "request") return;
+        try {
+            const args = data.args || {};
+            let value;
+            switch (data.action) {
+                case "getState": value = getBootstrap(); break;
+                case "compilePlayback": value = await compilePlayback(); break;
+                case "saveSongSettings": value = saveSongSettings(args.identity, args.tempoBpm, args.accompanimentStyle, args.tempoExplicit); break;
+                case "saveCurrentChart": value = await saveCurrentChart(); break;
+                case "selectSong": value = selectSong(args.songId); break;
+                case "setPlaybackState": value = setPlaybackState(args.isPlaying, args.sourceIndex); break;
+                case "highlightSourceBar": value = highlightSourceBar(args.sourceIndex, args.occurrence); break;
+                case "createNewSong": value = await createNewSong(args.title, args.barCount, args.meter, args.key, args.accompanimentStyle); break;
+                case "deleteCurrentNativeSong": value = await deleteCurrentNativeSong(); break;
+                default: throw new Error(`Unknown Jazz Chart Viewer bridge action: ${data.action}`);
+            }
+            postToParent({ type: "response", id: data.id, ok: true, value });
+        } catch (error) {
+            postToParent({
+                type: "response",
+                id: data.id,
+                ok: false,
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
+    });
+}
+
+async function waitForLocalViewer(timeoutMs = 15000) {
+    const deadline = performance.now() + timeoutMs;
+    while (performance.now() < deadline) {
+        viewer = window.__chartViewer || null;
+        if (viewer?.state && typeof viewer.expandChartBars === "function") return;
+        await delay(40);
+    }
+    throw new Error("Jazz Chart Viewer did not expose its chart API.");
+}
+
+export async function initialize(frameId, dotNetReference) {
+    embeddedMode = false;
+    dotNet = dotNetReference || dotNet;
+    const requestedFrame = document.getElementById(frameId);
+    if (!requestedFrame) throw new Error("Jazz Chart Viewer frame was not found.");
+    if (frame !== requestedFrame) {
+        frame = requestedFrame;
+        bridgeReady = false;
+        bridgeStartupError = null;
+        initialized = false;
+        if (!frame.dataset.jampanionBridgeLoadHook) {
+            frame.dataset.jampanionBridgeLoadHook = "1";
+            frame.addEventListener("load", () => {
+                bridgeReady = false;
+                bridgeStartupError = null;
+                try { postToFrame({ type: "ping" }); } catch {}
+            });
+        }
+    }
+    try {
+        frameOrigin = new URL(frame.src, window.location.href).origin;
+        if (frameOrigin === "null") frameOrigin = "*";
+    } catch {
+        frameOrigin = "*";
+    }
+    installParentBridgeListener();
+    installParentShortcuts();
+    await waitForEmbeddedReady();
+    initialized = true;
+    return await requestEmbedded("getState", {}, 10000);
+}
+
+export function initializeMobileControlsScrollHint() {
+    const controls = document.querySelector(".jamp-mobile-controls");
+    if (!controls) return;
+    mobileControlsScrollCleanup?.();
+    const update = () => {
+        const maxScroll = Math.max(0, controls.scrollWidth - controls.clientWidth);
+        controls.classList.toggle("can-scroll-left", controls.scrollLeft > 1);
+        controls.classList.toggle("can-scroll-right", controls.scrollLeft < maxScroll - 1);
+    };
+    controls.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update, { passive: true });
+    mobileControlsScrollCleanup = () => {
+        controls.removeEventListener("scroll", update);
+        window.removeEventListener("resize", update);
+        mobileControlsScrollCleanup = null;
+    };
+    update();
+}
+
+export async function initializeEmbeddedViewer() {
+    embeddedMode = true;
+    win = window;
+    doc = document;
+    await waitForLocalViewer();
+    if (!initialized) {
+        try { installIntegrationCss(); } catch (error) { console.warn("Integration CSS setup failed", error); }
+        try { installChartListeners(); } catch (error) { console.warn("Chart listener setup failed", error); }
+        try { annotateRenderedBars(); } catch (error) { console.warn("Chart annotation failed", error); }
+        try { startLibraryWatcher(); } catch (error) { console.warn("Library watcher setup failed", error); }
+        try { installEmbeddedShortcuts(); } catch (error) { console.warn("Embedded shortcut setup failed", error); }
+        installEmbeddedBridgeListener();
+        initialized = true;
+        void loadNativeSongs().then(() => {
+            try {
+                const changed = applyNativeOverrides();
+                if (changed) forceRender();
+                annotateRenderedBars();
+                queueBootstrapNotification();
+            } catch (error) {
+                console.warn("Native song merge failed", error);
+            }
+        }).catch(error => console.warn("Native song storage unavailable", error));
+    }
+    postToParent({ type: "ready" });
+    queueBootstrapNotification();
+    return getBootstrap();
+}
+
+function shortcutBelongsToInteractiveControl(target) {
+    const tag = target?.tagName?.toLowerCase?.() || "";
+    if (tag === "input" || tag === "textarea" || tag === "select" || tag === "button" || tag === "a") return true;
+    if (target?.isContentEditable) return true;
+    if (target?.closest?.('[role="button"], [role="option"], .search-wrap, .search-options')) return true;
+    return false;
+}
+
+function installParentShortcuts() {
+    if (!globalKeyHandler) {
+        globalKeyHandler = event => {
+            if (event.code !== "Space" || event.repeat || shortcutBelongsToInteractiveControl(event.target)) return;
+            event.preventDefault();
+            void dotNet?.invokeMethodAsync("HandleSpaceShortcut");
+        };
+        document.addEventListener("keydown", globalKeyHandler);
+    }
+    if (!visibilityHandler) {
+        visibilityHandler = () => {
+            if (document.visibilityState === "hidden") {
+                void dotNet?.invokeMethodAsync("StopSessionFromVisibility");
+            }
+        };
+        document.addEventListener("visibilitychange", visibilityHandler);
+    }
+}
+
+function installEmbeddedShortcuts() {
+    if (embeddedKeyHandler) return;
+    embeddedKeyHandler = event => {
+        if (event.code !== "Space" || event.repeat || shortcutBelongsToInteractiveControl(event.target)) return;
+        event.preventDefault();
+        postToParent({ type: "event", name: "spaceShortcut" });
+    };
+    document.addEventListener("keydown", embeddedKeyHandler);
+}
+
+async function waitForViewer() {
+    const deadline = performance.now() + 60000;
+    let lastError = null;
+    while (performance.now() < deadline) {
+        try {
+            win = frame?.contentWindow || null;
+            doc = frame?.contentDocument || null;
+            viewer = win?.__chartViewer || null;
+            if (win && doc && viewer?.state && typeof viewer.expandChartBars === "function") return;
+        } catch (error) {
+            lastError = error;
+        }
+        await delay(50);
+    }
+    const suffix = lastError?.message ? ` (${lastError.message})` : "";
+    throw new Error(`Jazz Chart Viewer did not finish loading${suffix}.`);
+}
+
+function installIntegrationCss() {
+    if (doc.getElementById("jampanion-jcv-style")) return;
+    const style = doc.createElement("style");
+    style.id = "jampanion-jcv-style";
+    style.textContent = `
+      body.jampanion-playback .key-group,
+      body.jampanion-playback #settingsButton,
+      body.jampanion-playback .search-wrap { pointer-events:none !important; opacity:.48 !important; }
+      body.jampanion-playback .score-header h1,
+      body.jampanion-playback .rehearsal-mark,
+      body.jampanion-playback .bar { cursor:default !important; }
+      .jamp-edit-input {
+        position:fixed; z-index:99999; box-sizing:border-box; min-width:72px;
+        height:34px; padding:3px 7px; border:2px solid #1f5f74; border-radius:5px;
+        background:white; color:#111; font:600 20px/1.1 Arial,sans-serif; box-shadow:0 4px 14px #0002;
+      }
+      .jamp-context-menu {
+        position:fixed; z-index:100000; min-width:190px; padding:5px;
+        border:1px solid #b8c2c7; border-radius:7px; background:#fff;
+        box-shadow:0 8px 28px #0003; font:13px/1.2 system-ui,sans-serif;
+      }
+      .jamp-context-menu button { display:block; width:100%; border:0; border-radius:4px;
+        padding:7px 9px; text-align:left; background:transparent; color:#222; }
+      .jamp-context-menu button:hover { background:#eef4f6; }
+      .jamp-context-menu hr { border:0; border-top:1px solid #e3e7e9; margin:4px 2px; }
+      .jamp-context-menu .selected::after { content:'✓'; float:right; font-weight:700; }
+    `;
+    doc.head.appendChild(style);
+}
+
+function installChartListeners() {
+    const page = doc.getElementById("chartPage");
+    if (!page) throw new Error("Jazz Chart Viewer chart page was not found.");
+
+    // The upstream viewer may replace #chartPage during a song selection or
+    // native-chart promotion. Delegate from the iframe document so editing
+    // survives those renders instead of remaining attached to a dead element.
+    doc.addEventListener("dblclick", handleDoubleClick, true);
+    doc.addEventListener("contextmenu", handleContextMenu, true);
+    doc.addEventListener("pointerdown", event => {
+        if (contextMenu && !event.target.closest?.(".jamp-context-menu")) closeContextMenu();
+    }, true);
+
+    observer = new MutationObserver(() => {
+        annotateRenderedBars();
+        queueBootstrapNotification();
+    });
+    observer.observe(doc, { childList: true, subtree: true });
+
+    for (const id of ["keyDown", "keyUp", "accidentalGroup", "viewModeGroup", "scale", "scaleAuto"]) {
+        doc.getElementById(id)?.addEventListener("click", () => queueBootstrapNotification(), true);
+    }
+}
+
+function startLibraryWatcher() {
+    libraryTimer = window.setInterval(() => {
+        if (!editingEnabled && playbackLockedSongId && viewer?.state?.selectedId !== playbackLockedSongId) {
+            viewer.state.selectedId = playbackLockedSongId;
+            forceRender();
+        }
+        const before = librarySignature();
+        if (before !== lastLibrarySignature) {
+            lastLibrarySignature = before;
+            const changed = applyNativeOverrides();
+            if (changed) forceRender();
+            annotateRenderedBars();
+            queueBootstrapNotification();
+        }
+    }, 700);
+    lastLibrarySignature = librarySignature();
+}
+
+function librarySignature() {
+    return (viewer?.state?.songs || []).map(song => `${song.id}|${song.title}|${song.composer}|${song.source}`).join("\n");
+}
+
+function songIdentity(song) {
+    if (!song) return "";
+    if (song.nativeIdentity) return String(song.nativeIdentity);
+    const record = song.sourceRecord;
+    if (record?.body) {
+        const fields = String(record.body).split("=");
+        return `${fields[0] || song.title || ""}\n${fields[1] || song.composer || ""}`.trim();
+    }
+    return `${song.title || ""}\n${song.composer || ""}`.trim();
+}
+
+function currentSong() {
+    const state = viewer.state;
+    return state.songs.find(song => song.id === state.selectedId) || state.songs[0];
+}
+
+function loadSettingsMap() {
+    try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") || {}; }
+    catch { return {}; }
+}
+
+function saveSettingsMap(value) {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(value)); }
+    catch { /* current-session state remains usable */ }
+}
+
+function inferredStyle(song) {
+    const meter = String(song?.timeSignature || "4/4");
+    if (meter === "3/4") return "JazzWaltz";
+    const style = String(song?.style || "").toLowerCase();
+    if (style.includes("ballad") || style.includes("slow swing")) return "JazzBallad";
+    if (style.includes("bossa")) return "BossaNova";
+    if (/(latin|mambo|salsa|afro[- ]?cuban|montuno)/.test(style)) return "AfroCubanLatin";
+    return "Swing";
+}
+
+export function extractIRealPlayerStyleFromRecord(record, meter = "4/4") {
+    if (String(meter) === "3/4") return "JazzWaltz";
+    if (!record || typeof record.body !== "string") return null;
+    let body = record.body.trim();
+    if (!body.includes("=") && /%3d/i.test(body)) {
+        try { body = decodeURIComponent(body); } catch { /* keep original */ }
+    }
+    const fields = body.split("=");
+    const musicIndex = fields.findIndex(field => String(field || "").startsWith(IREAL_MUSIC_PREFIX));
+    if (musicIndex < 0) return null;
+    const raw = String(fields[musicIndex + 1] || "").trim().toLowerCase();
+    if (!raw) return null;
+    if (raw.includes("bossa")) return "BossaNova";
+    if (raw.includes("ballad") || raw.includes("slow swing")) return "JazzBallad";
+    if (/(latin|mambo|salsa|afro[- ]?cuban|montuno)/.test(raw)) return "AfroCubanLatin";
+    if (raw.includes("waltz")) return "JazzWaltz";
+    if (raw.includes("swing") || raw.startsWith("jazz")) return "Swing";
+    return null;
+}
+
+function iRealPlayerStyleForSong(song) {
+    const meter = String(song?.timeSignature || "4/4");
+    return extractIRealPlayerStyleFromRecord(song?.sourceRecord, meter)
+        ?? extractIRealPlayerStyleFromRecord(song?.originalSourceRecord, meter);
+}
+
+function defaultTempoForStyle(style) {
+    switch (String(style || "Swing")) {
+        case "JazzBallad": return 70;
+        case "BossaNova": return 140;
+        case "JazzWaltz": return 150;
+        case "AfroCubanLatin": return 180;
+        default: return 120;
+    }
+}
+
+function validTempo(value) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric >= 40 && numeric <= 300 ? numeric : null;
+}
+
+export function extractIRealTempoFromRecord(record) {
+    if (!record || typeof record.body !== "string") return null;
+    let body = record.body.trim();
+    if (!body.includes("=") && /%3d/i.test(body)) {
+        try { body = decodeURIComponent(body); } catch { /* keep the original body */ }
+    }
+    const fields = body.split("=");
+    const musicIndex = fields.findIndex(field => String(field || "").startsWith(IREAL_MUSIC_PREFIX));
+    if (musicIndex < 0) return null;
+
+    // Modern irealb:// records append player metadata after the scrambled music:
+    //   ... = music = accompaniment style = BPM = repeats
+    // BPM 0/blank means no usable explicit tempo and falls back to the style default.
+    return validTempo(fields[musicIndex + 2]);
+}
+
+function iRealTempoForSong(song) {
+    return extractIRealTempoFromRecord(song?.sourceRecord)
+        ?? extractIRealTempoFromRecord(song?.originalSourceRecord);
+}
+
+function songSettings(song) {
+    const identity = songIdentity(song);
+    const stored = loadSettingsMap()[identity] || {};
+    const meter = String(song?.timeSignature || "4/4");
+    const sourcePlayerStyle = iRealPlayerStyleForSong(song);
+    const accompanimentStyle = meter === "3/4"
+        ? "JazzWaltz"
+        : (stored.accompanimentStyle || sourcePlayerStyle || inferredStyle(song));
+    const sourceTempo = validTempo(song?.tempoBpm) ?? iRealTempoForSong(song);
+    const storedTempo = validTempo(stored.tempoBpm);
+
+    // A user-entered tempo has priority. Otherwise an iReal/source tempo is
+    // authoritative. Only a chart with neither uses the style-aware Auto value.
+    const storedTempoExplicit = stored.tempoExplicit === true ||
+        (stored.tempoExplicit == null && storedTempo != null);
+    const tempoExplicit = sourceTempo != null || storedTempoExplicit;
+    const tempoBpm = storedTempoExplicit
+        ? storedTempo
+        : sourceTempo != null
+            ? sourceTempo
+            : defaultTempoForStyle(accompanimentStyle);
+
+    return {
+        tempoBpm: clamp(tempoBpm, 40, 300),
+        tempoExplicit,
+        tempoUserExplicit: storedTempoExplicit,
+        accompanimentStyle
+    };
+}
+
+export function saveSongSettings(identity, tempoBpm, accompanimentStyle, tempoExplicit = true) {
+    if (!embeddedMode) {
+        return requestEmbedded("saveSongSettings", { identity, tempoBpm, accompanimentStyle, tempoExplicit }, 10000);
+    }
+    if (!identity) return null;
+    const map = loadSettingsMap();
+    map[identity] = {
+        tempoBpm: tempoExplicit === true
+            ? clamp(Number(tempoBpm) || defaultTempoForStyle(accompanimentStyle), 40, 300)
+            : null,
+        tempoExplicit: tempoExplicit === true,
+        accompanimentStyle: String(accompanimentStyle || "Swing")
+    };
+    saveSettingsMap(map);
+    queueBootstrapNotification();
+    return getBootstrap();
+}
+
+function sidebarListTitle(song) {
+    const title = song?.title || "Untitled";
+    return song?.source === "demo" ? `${title} (Demo)` : title;
+}
+
+function summary(song) {
+    const settings = songSettings(song);
+    return {
+        id: song.id,
+        identity: songIdentity(song),
+        title: sidebarListTitle(song),
+        composer: displayComposer(song.composer || ""),
+        originalStyle: song.style || "",
+        key: song.key || "C",
+        timeSignature: song.timeSignature || "4/4",
+        tempoBpm: settings.tempoBpm,
+        tempoExplicit: settings.tempoExplicit,
+        tempoUserExplicit: settings.tempoUserExplicit,
+        accompanimentStyle: settings.accompanimentStyle,
+        isNative: song.source === "native",
+        hasOriginalSource: Boolean(song.originalSourceRecord?.body)
+    };
+}
+
+function getBootstrap() {
+    const song = currentSong();
+    const settings = songSettings(song);
+    return {
+        songs: (viewer.state.songs || []).map(summary).sort((a, b) => a.title.localeCompare(b.title)),
+        selectedId: song?.id || "",
+        selectedIdentity: songIdentity(song),
+        title: sidebarListTitle(song),
+        composer: displayComposer(song?.composer || ""),
+        key: displayedKey(),
+        timeSignature: song?.timeSignature || "4/4",
+        tempoBpm: settings.tempoBpm,
+        tempoExplicit: settings.tempoExplicit,
+        tempoUserExplicit: settings.tempoUserExplicit,
+        accompanimentStyle: settings.accompanimentStyle,
+        isNative: song?.source === "native",
+        hasOriginalSource: Boolean(song?.originalSourceRecord?.body),
+        viewMode: viewer.state.viewMode || "original"
+    };
+}
+
+async function notifyBootstrap(value = getBootstrap()) {
+    if (notifying) return;
+    notifying = true;
+    try {
+        if (embeddedMode) postToParent({ type: "event", name: "bootstrapChanged", value });
+        else if (dotNet) await dotNet.invokeMethodAsync("ChartBootstrapChanged", value);
+    } finally { notifying = false; }
+}
+
+let notifyTimer;
+function queueBootstrapNotification() {
+    clearTimeout(notifyTimer);
+    notifyTimer = setTimeout(() => void notifyBootstrap(), 80);
+}
+
+export function getState() { return embeddedMode ? getBootstrap() : requestEmbedded("getState", {}, 10000); }
+
+export function selectSong(songId) {
+    if (!embeddedMode) return requestEmbedded("selectSong", { songId }, 10000);
+    if (!editingEnabled) return getBootstrap();
+    const song = viewer.state.songs.find(item => item.id === songId);
+    if (!song) throw new Error("The selected song is no longer in the library.");
+    viewer.state.selectedId = song.id;
+    viewer.state.semitones = 0;
+    forceRender();
+    annotateRenderedBars();
+    queueBootstrapNotification();
+    return getBootstrap();
+}
+
+export function setPlaybackState(isPlaying, sourceIndex = -1) {
+    if (!embeddedMode) return requestEmbedded("setPlaybackState", { isPlaying, sourceIndex }, 10000);
+    const playing = Boolean(isPlaying);
+    editingEnabled = !playing;
+    playbackLockedSongId = playing ? (currentSong()?.id || viewer.state.selectedId || "") : "";
+    doc.body.classList.toggle("jampanion-playback", playing);
+    const search = doc.getElementById("search");
+    if (search) {
+        search.disabled = playing;
+        if (playing) search.blur();
+    }
+    if (playing) {
+        const options = doc.getElementById("searchOptions") || doc.querySelector(".search-options");
+        if (options) options.innerHTML = "";
+    }
+    highlightSourceBar(sourceIndex, 0);
+}
+
+export function highlightSourceBar(sourceIndex, occurrence = 0) {
+    if (!embeddedMode) return requestEmbedded("highlightSourceBar", { sourceIndex, occurrence }, 10000);
+    for (const element of doc.querySelectorAll(".bar.jamp-current-playback")) {
+        element.classList.remove("jamp-current-playback");
+        element.style.removeProperty("box-shadow");
+        element.style.removeProperty("background");
+    }
+    if (!Number.isInteger(sourceIndex) || sourceIndex < 0) return;
+    const candidates = [...doc.querySelectorAll(`.bar[data-source-index="${sourceIndex}"]`)];
+    const requested = Math.max(0, Number(occurrence) || 0);
+    const target = viewer.state.viewMode === "expanded"
+        ? candidates[Math.min(requested, Math.max(0, candidates.length - 1))]
+        : candidates[0];
+    if (!target) return;
+    target.classList.add("jamp-current-playback");
+    target.style.boxShadow = "inset 0 0 0 3px rgba(30,105,130,.42)";
+    target.style.background = "rgba(30,105,130,.055)";
+    target.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+}
+
+function annotateRenderedBars() {
+    if (!viewer?.state || !doc) return;
+    const song = currentSong();
+    if (!song) return;
+    const displayed = viewer.state.viewMode === "expanded"
+        ? viewer.expandChartBars(song.bars || [])
+        : (song.bars || []).map((bar, index) => ({ ...bar, _sourceIndex: index }));
+    const elements = [...doc.querySelectorAll("#chartPage .bar:not(.spacer)")];
+    for (let index = 0; index < elements.length; index++) {
+        const source = displayed[index];
+        const sourceIndex = Number.isInteger(source?._sourceIndex) ? source._sourceIndex : index;
+        elements[index].dataset.sourceIndex = String(sourceIndex);
+        elements[index].dataset.displayIndex = String(index);
+    }
+    for (const row of doc.querySelectorAll("#chartPage .system-row")) {
+        const bar = row.querySelector(".bar:not(.spacer)");
+        const lead = row.querySelector(".system-lead");
+        if (bar && lead) lead.dataset.sourceIndex = bar.dataset.sourceIndex || "";
+    }
+}
+
+function forceRender() {
+    const group = doc.getElementById("viewModeGroup");
+    if (!group) return;
+    const current = viewer.state.viewMode || "original";
+    const other = current === "original" ? "expanded" : "original";
+    const otherButton = group.querySelector(`button[data-value="${other}"]`);
+    const currentButton = group.querySelector(`button[data-value="${current}"]`);
+    otherButton?.click();
+    currentButton?.click();
+}
+
+async function ensureOriginalView() {
+    const prior = viewer.state.viewMode || "original";
+    if (prior === "original") {
+        annotateRenderedBars();
+        await nextFrames(2);
+        return () => {};
+    }
+    doc.querySelector('#viewModeGroup button[data-value="original"]')?.click();
+    await nextFrames(3);
+    annotateRenderedBars();
+    return () => {
+        doc.querySelector(`#viewModeGroup button[data-value="${prior}"]`)?.click();
+    };
+}
+
+function displayedKey() {
+    return (doc.getElementById("keyValue")?.textContent || currentSong()?.key || "C").trim();
+}
+
+function displayComposer(value) {
+    try { return viewer.displayComposer ? viewer.displayComposer(value) : value; }
+    catch { return value; }
+}
+
+async function captureSourceTiming(song) {
+    const restore = await ensureOriginalView();
+    try {
+        annotateRenderedBars();
+        const result = new Map();
+        let activeMeter = song.timeSignature || "4/4";
+        for (let index = 0; index < (song.bars || []).length; index++) {
+            const sourceBar = song.bars[index];
+            if (sourceBar.timeSignature) activeMeter = normalizeMeter(sourceBar.timeSignature) || activeMeter;
+            const element = doc.querySelector(`.bar[data-source-index="${index}"]`);
+            const slots = [...(element?.querySelectorAll(".chord-slot") || [])];
+            const events = [];
+            for (const slotElement of slots) {
+                const slotIndex = Number(slotElement.dataset.slotIndex);
+                const sourceSlot = sourceBar.chordSlots?.[slotIndex];
+                if (!sourceSlot || sourceSlot.hidden) continue;
+                const total = Math.max(1, Number(slotElement.dataset.gridTotal) || 1);
+                const start = Math.max(0, Number(slotElement.dataset.gridStart) || 0);
+                events.push({
+                    startTick: gridCellToTick(start, total, activeMeter),
+                    symbol: String(sourceSlot.chord || "").trim()
+                });
+            }
+            if (!events.length && sourceBar.chords?.length) {
+                const values = sourceBar.chords.filter(Boolean);
+                const ticks = barTicks(activeMeter);
+                values.forEach((symbol, position) => events.push({
+                    startTick: Math.floor(position * ticks / values.length), symbol
+                }));
+            }
+            result.set(index, { meter: activeMeter, events });
+        }
+        return result;
+    } finally {
+        restore();
+        await nextFrames(2);
+        annotateRenderedBars();
+    }
+}
+
+export async function compilePlayback() {
+    if (!embeddedMode) return await requestEmbedded("compilePlayback", {}, 60000);
+    const song = currentSong();
+    if (!song) throw new Error("No song is selected.");
+    const timing = await captureSourceTiming(song);
+    const loopStart = findLoopStart(song.bars || []);
+    const loopSource = (song.bars || []).slice(loopStart);
+
+    const soloSequence = buildSoloSequence(loopSource, loopStart);
+    const headOutSequence = buildHeadOutSequence(loopSource, loopStart);
+    const leadSource = (song.bars || []).slice(0, loopStart);
+    const leadSequence = leadSource.length
+        ? offsetExpanded(viewer.expandChartBars(leadSource), 0)
+        : [];
+    const openingSequence = [...leadSequence, ...soloSequence];
+
+    const styles = effectiveStyles(song.bars || []);
+    const materialized = {
+        opening: materializeSequence(openingSequence, song, timing, styles),
+        solo: materializeSequence(soloSequence, song, timing, styles),
+        headout: materializeSequence(headOutSequence, song, timing, styles)
+    };
+    const meters = new Set([
+        ...materialized.opening,
+        ...materialized.solo,
+        ...materialized.headout
+    ].map(bar => bar.timeSignature));
+    const meter = meters.size === 1 ? [...meters][0] : "mixed";
+    const accidental = viewer.state.settings?.accidental || "auto";
+    const key = displayedKey();
+    const preferFlats = accidental === "flat" || (accidental === "auto" && /[♭b]/.test(key));
+
+    return {
+        title: song.title || "Untitled",
+        originalKey: song.key || "C",
+        displayedKey: key,
+        timeSignature: meter,
+        semitoneShift: Number(viewer.state.semitones) || 0,
+        preferFlats,
+        openingBars: materialized.opening,
+        soloBars: materialized.solo,
+        headOutBars: materialized.headout
+    };
+}
+
+function buildSoloSequence(loopSource, sourceOffset) {
+    return buildSoloSequenceWithExpander(loopSource, sourceOffset, bars => viewer.expandChartBars(bars));
+}
+
+function buildHeadOutSequence(loopSource, sourceOffset) {
+    return buildHeadOutSequenceWithExpander(loopSource, sourceOffset, bars => viewer.expandChartBars(bars));
+}
+
+export function buildHeadOutSequenceWithExpander(loopSource, sourceOffset, expandChartBars) {
+    if (!loopSource.length) return [];
+    const hasJump = loopSource.some(bar =>
+        [...(bar.navigationSymbols || []), ...(bar.symbols || [])]
+            .some(value => /^D\.[CS]\./i.test(String(value))));
+    if (hasJump) {
+        return offsetExpanded(expandChartBars(loopSource), sourceOffset);
+    }
+
+    // Chart Viewer intentionally leaves a standalone To Coda/Coda pair in
+    // written order in Expanded view. Playback has a different requirement:
+    // reserve the destination for HeadOut and take the written To Coda only on
+    // the final chorus. Use the same Chart Viewer repeat expander on both sides
+    // of the jump; only the navigation edge is session-specific.
+    const codaStart = loopSource.findIndex((bar, index) => index > 0 && Boolean(bar.codaStart));
+    if (codaStart > 0) {
+        const toCoda = loopSource.findIndex((bar, index) => index < codaStart && Boolean(bar.codaEnd));
+        if (toCoda >= 0) {
+            const main = offsetExpanded(expandChartBars(loopSource.slice(0, toCoda + 1)), sourceOffset);
+            const coda = offsetExpanded(expandChartBars(loopSource.slice(codaStart)), sourceOffset + codaStart);
+            return [...main, ...coda];
+        }
+    }
+    return offsetExpanded(expandChartBars(loopSource), sourceOffset);
+}
+
+export function buildSoloSequenceWithExpander(loopSource, sourceOffset, expandChartBars) {
+    if (!loopSource.length) return [];
+    let jumpIndex = -1;
+    for (let index = 0; index < loopSource.length; index++) {
+        const bar = loopSource[index];
+        const nav = [...(bar.navigationSymbols || []), ...(bar.symbols || [])];
+        if (nav.some(value => /^D\.[CS]\./i.test(String(value)))) {
+            jumpIndex = index;
+            break;
+        }
+    }
+
+    // A written Coda destination is a last-chorus destination. When no D.C./D.S.
+    // directive is present, Jazz Chart Viewer deliberately leaves it in written
+    // order for display; the accompaniment solo loop must still stop before that
+    // destination so Coda is reserved for HeadOut.
+    const independentCoda = jumpIndex < 0
+        ? loopSource.findIndex((bar, index) => index > 0 && Boolean(bar.codaStart))
+        : -1;
+    const firstPass = jumpIndex >= 0
+        ? loopSource.slice(0, jumpIndex + 1)
+        : independentCoda > 0
+            ? loopSource.slice(0, independentCoda)
+            : loopSource.slice();
+    const cleaned = firstPass.map(bar => ({
+        ...structuredCloneSafe(bar),
+        symbols: (bar.symbols || []).filter(value => !/^D\.[CS]\./i.test(String(value))),
+        navigationSymbols: [],
+        displayDirectives: (bar.displayDirectives || []).filter(value => !/^D\.[CS]\./i.test(String(value)))
+    }));
+    return offsetExpanded(expandChartBars(cleaned), sourceOffset);
+}
+
+function offsetExpanded(bars, offset) {
+    return (bars || []).map((bar, index) => ({
+        sourceIndex: offset + (Number.isInteger(bar._sourceIndex) ? bar._sourceIndex : index)
+    }));
+}
+
+function materializeSequence(sequence, song, timing, styles) {
+    const output = [];
+    for (const item of sequence) {
+        const sourceIndex = item.sourceIndex;
+        const sourceBar = song.bars?.[sourceIndex];
+        const info = timing.get(sourceIndex);
+        if (!sourceBar || !info) continue;
+        let chords = info.events
+            .filter(event => event.symbol)
+            .map(event => ({ ...event }));
+
+        if (sourceBar.repeatTwoBars || sourceBar.repeatTwoBarsContinuation) {
+            chords = cloneChords(output.at(-2)?.chords || output.at(-1)?.chords || []);
+        } else if (sourceBar.repeatBar || chords.some(event => event.symbol === "%" || event.symbol === "%%")) {
+            chords = cloneChords(output.at(-1)?.chords || []);
+        } else {
+            const resolved = [];
+            let active = output.at(-1)?.chords?.at(-1)?.symbol || null;
+            for (const event of chords.sort((a, b) => a.startTick - b.startTick)) {
+                let symbol = event.symbol;
+                if (symbol === "/") {
+                    if (!active) continue;
+                    symbol = active;
+                }
+                const invisibleBass = String(symbol).match(/^[Ww]\/([A-G])([#b]?)$/);
+                if (invisibleBass) {
+                    const prior = active || output.at(-1)?.chords?.at(-1)?.symbol || "C";
+                    const harmony = String(prior).replace(/\/[A-G][#b]?$/, "");
+                    symbol = `${harmony}/${invisibleBass[1]}${invisibleBass[2]}`;
+                }
+                if (symbol === "%" || symbol === "%%") continue;
+                active = symbol;
+                if (!resolved.length || resolved.at(-1).symbol !== symbol || resolved.at(-1).startTick !== event.startTick) {
+                    resolved.push({ startTick: event.startTick, symbol });
+                }
+            }
+            chords = resolved;
+        }
+
+        if (!chords.length) {
+            chords = sourceBar.jampanionNoChord === true
+                ? [{ startTick: 0, symbol: "N.C." }]
+                : cloneChords(output.at(-1)?.chords || [{ startTick: 0, symbol: "N.C." }]);
+        }
+        if (chords[0].startTick !== 0) {
+            // A later written change must never be pulled early merely to satisfy
+            // TuneBar's tick-zero invariant. Carry the prior bar when one exists;
+            // the first bar remains N.C. until its first written chord.
+            const prior = output.at(-1)?.chords?.at(-1)?.symbol || "N.C.";
+            chords.unshift({ startTick: 0, symbol: prior });
+        }
+
+        output.push({
+            sourceIndex,
+            timeSignature: info.meter,
+            section: sourceBar.section || "",
+            styleOverride: styles[sourceIndex] || null,
+            chords
+        });
+    }
+    return output;
+}
+
+function cloneChords(chords) {
+    return (chords || []).map(chord => ({ startTick: chord.startTick, symbol: chord.symbol }));
+}
+
+function effectiveStyles(bars) {
+    const result = [];
+    let active = null;
+    for (let index = 0; index < bars.length; index++) {
+        const bar = bars[index];
+        if (bar.section) active = bar.jampanionStyleOverride || null;
+        result[index] = active;
+    }
+    return result;
+}
+
+function findLoopStart(bars) {
+    const marked = bars.findIndex(bar => String(bar.section || "").trim());
+    if (marked < 0) return 0;
+    const first = String(bars[marked].section || "").trim().toLowerCase();
+    if (!isLeadInName(first)) return 0;
+    for (let index = marked + 1; index < bars.length; index++) {
+        const label = String(bars[index].section || "").trim();
+        if (label && !isLeadInName(label.toLowerCase())) return index;
+    }
+    return 0;
+}
+
+function isLeadInName(value) {
+    return ["i", "intro", "v", "verse"].includes(value);
+}
+
+function normalizeMeter(value) {
+    const match = String(value || "").match(/^(\d+)\/(\d+)$/);
+    return match ? `${Number(match[1])}/${Number(match[2])}` : null;
+}
+
+function barTicks(meter) {
+    const normalized = normalizeMeter(meter) || "4/4";
+    const [top, bottom] = normalized.split("/").map(Number);
+    return Math.round(PPQ * top * 4 / bottom);
+}
+
+export function gridCellToTick(startCell, totalCells, meter) {
+    const ticks = barTicks(meter);
+    const total = Math.max(1, Number(totalCells) || 1);
+    const start = Math.max(0, Number(startCell) || 0);
+    return Math.max(0, Math.min(ticks - 1, Math.round(start / total * ticks)));
+}
+
+function handleDoubleClick(event) {
+    if (!editingEnabled || viewer.state.viewMode !== "original") return;
+    const title = event.target.closest?.(".score-header h1");
+    if (title) {
+        event.preventDefault();
+        editTitle(title);
+        return;
+    }
+    const mark = event.target.closest?.(".rehearsal-mark");
+    if (mark) {
+        event.preventDefault();
+        const lead = mark.closest(".system-lead");
+        editRehearsal(Number(lead?.dataset.sourceIndex), mark);
+        return;
+    }
+    const slot = event.target.closest?.(".chord-slot");
+    if (slot) {
+        event.preventDefault();
+        const bar = slot.closest(".bar");
+        const sourceIndex = Number(bar?.dataset.sourceIndex);
+        const slotIndex = Number(slot.dataset.slotIndex);
+        const sourceSlot = currentSong()?.bars?.[sourceIndex]?.chordSlots?.[slotIndex];
+        if (sourceSlot) {
+            editChord(sourceIndex, slotIndex, slot);
+        } else if (bar) {
+            // Empty native bars render a placeholder slot even though there is
+            // no source chord yet. Treat that placeholder as an add target.
+            addChordAtPoint(sourceIndex, bar, event.clientX);
+        }
+        return;
+    }
+    const bar = event.target.closest?.(".bar:not(.spacer)");
+    if (bar) {
+        event.preventDefault();
+        addChordAtPoint(Number(bar.dataset.sourceIndex), bar, event.clientX);
+    }
+}
+
+function handleContextMenu(event) {
+    if (!editingEnabled || viewer.state.viewMode !== "original") return;
+    const barElement = event.target.closest?.(".bar:not(.spacer)") ||
+        event.target.closest?.(".system-lead")?.closest?.(".system-row")?.querySelector?.(".bar:not(.spacer)");
+    if (!barElement) return;
+    const sourceIndex = Number(barElement.dataset.sourceIndex);
+    if (!Number.isInteger(sourceIndex)) return;
+    event.preventDefault();
+    showBarMenu(sourceIndex, event.clientX, event.clientY);
+}
+
+function editTitle(anchor) {
+    const song = currentSong();
+    openEditor(anchor, song.title || "", async value => {
+        const title = value.trim();
+        if (!title || title === song.title) return;
+        promoteNative(song);
+        song.title = title;
+        stageNative(song);
+        forceRender();
+        await edited("Title updated");
+    });
+}
+
+function editRehearsal(sourceIndex, anchor) {
+    const bar = currentSong()?.bars?.[sourceIndex];
+    if (!bar) return;
+    openEditor(anchor, bar.section || "", async value => {
+        promoteNative(currentSong());
+        const label = value.trim().replace(/[|\r\n]/g, "");
+        bar.section = label || null;
+        if (!label) bar.jampanionStyleOverride = null;
+        stageNative(currentSong());
+        forceRender();
+        await edited(label ? "Rehearsal mark updated" : "Rehearsal mark removed");
+    });
+}
+
+function editChord(sourceIndex, slotIndex, anchor) {
+    const song = currentSong();
+    const bar = song?.bars?.[sourceIndex];
+    const slot = bar?.chordSlots?.[slotIndex];
+    if (!slot) return;
+    openEditor(anchor, slot.chord || "", async value => {
+        const chord = value.trim();
+        if (chord === slot.chord) return;
+        promoteNative(song);
+        if (!chord) {
+            bar.chordSlots.splice(slotIndex, 1);
+            bar.jampanionNoChord = bar.chordSlots.filter(item => !item.hidden).length === 0;
+            rebuildChordList(bar);
+            stageNative(song);
+            forceRender();
+            await edited("Chord removed");
+            return;
+        }
+        bar.jampanionNoChord = false;
+        slot.chord = chord;
+        rebuildChordList(bar);
+        stageNative(song);
+        forceRender();
+        await edited("Chord updated");
+    });
+}
+
+function addChordAtPoint(sourceIndex, barElement, clientX) {
+    const song = currentSong();
+    const bar = song?.bars?.[sourceIndex];
+    if (!bar) return;
+    const sourceSlots = bar.chordSlots || (bar.chordSlots = []);
+    const domSlots = [...barElement.querySelectorAll(".chord-slot")];
+    const first = domSlots[0];
+    const total = Math.max(1, Number(first?.dataset.gridTotal) || (resolvedMeterAt(song.bars, sourceIndex) === "3/4" ? 6 : 8));
+    const rect = barElement.getBoundingClientRect();
+    const fraction = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, .9999);
+    const startCell = Math.min(total - 1, Math.round(fraction * total));
+
+    normalizeBarGridFromDom(bar, barElement, total);
+    const existingIndex = sourceSlots.findIndex(slot => Number(slot.cell) === startCell && !slot.hidden);
+    if (existingIndex >= 0) {
+        editChord(sourceIndex, existingIndex, domSlots.find(el => Number(el.dataset.slotIndex) === existingIndex) || barElement);
+        return;
+    }
+
+    openEditorAtPoint(clientX, rect.top + 12, "", async value => {
+        const chord = value.trim();
+        if (!chord) return;
+        promoteNative(song);
+        bar.jampanionNoChord = false;
+        sourceSlots.push({ chord, alternates: [], cell: startCell, small: false, fermata: false, hidden: false });
+        sourceSlots.sort((a, b) => Number(a.cell || 0) - Number(b.cell || 0));
+        rebuildChordList(bar);
+        stageNative(song);
+        forceRender();
+        await edited("Chord added");
+    });
+}
+
+function normalizeBarGridFromDom(bar, barElement, total) {
+    const sourceSlots = bar.chordSlots || (bar.chordSlots = []);
+    const domSlots = [...barElement.querySelectorAll(".chord-slot")];
+    for (const element of domSlots) {
+        const index = Number(element.dataset.slotIndex);
+        const gridStart = Number(element.dataset.gridStart) || 0;
+        if (sourceSlots[index]) sourceSlots[index].cell = gridStart;
+    }
+
+    const alternateRefs = [];
+    for (const slot of sourceSlots) {
+        const alternates = Array.isArray(slot.alternates) ? slot.alternates : [];
+        for (let index = 0; index < alternates.length; index++) {
+            alternateRefs.push({ slot, index });
+        }
+    }
+    let cursor = 0;
+    for (const group of barElement.querySelectorAll(".alternate-cell")) {
+        const inline = String(group.style.gridColumn || "");
+        const match = inline.match(/^(\d+)/);
+        const startCell = match ? Math.max(0, Number(match[1]) - 1) : 0;
+        const count = Math.max(1, group.querySelectorAll(".alternate-chord").length);
+        for (let index = 0; index < count && cursor < alternateRefs.length; index++, cursor++) {
+            const ref = alternateRefs[cursor];
+            const current = ref.slot.alternates[ref.index];
+            ref.slot.alternates[ref.index] = typeof current === "string"
+                ? { chord: current, cell: startCell }
+                : { ...current, cell: startCell };
+        }
+    }
+    bar.cellCount = total;
+}
+
+function rebuildChordList(bar) {
+    bar.chords = (bar.chordSlots || []).filter(slot => !slot.hidden).map(slot => slot.chord);
+}
+
+function showBarMenu(sourceIndex, x, y) {
+    closeContextMenu();
+    const song = currentSong();
+    const bar = song?.bars?.[sourceIndex];
+    if (!bar) return;
+    const menu = doc.createElement("div");
+    menu.className = "jamp-context-menu";
+    contextMenu = menu;
+
+    if (!bar.section) {
+        addMenuButton(menu, "Add rehearsal mark", () => {
+            closeContextMenu();
+            const barElement = doc.querySelector(`.bar[data-source-index="${sourceIndex}"]`);
+            openEditor(barElement, "", async value => {
+                const label = value.trim().replace(/[|\r\n]/g, "");
+                if (!label) return;
+                promoteNative(song);
+                bar.section = label;
+                bar.jampanionStyleOverride = null;
+                stageNative(song);
+                forceRender();
+                await edited("Rehearsal mark added");
+            });
+        });
+    } else {
+        addMenuButton(menu, `Edit rehearsal mark “${bar.section}”`, () => {
+            closeContextMenu();
+            editRehearsal(sourceIndex, doc.querySelector(`.system-lead[data-source-index="${sourceIndex}"] .rehearsal-mark`) || doc.querySelector(`.bar[data-source-index="${sourceIndex}"]`));
+        });
+        addMenuButton(menu, "Remove rehearsal mark", async () => {
+            closeContextMenu();
+            promoteNative(song);
+            bar.section = null;
+            bar.jampanionStyleOverride = null;
+            stageNative(song);
+            forceRender();
+            await edited("Rehearsal mark removed");
+        });
+        menu.appendChild(doc.createElement("hr"));
+        const styles = resolvedMeterAt(song.bars || [], sourceIndex) === "3/4"
+            ? [[null, "Use song default"], ["JazzWaltz", "Jazz Waltz"]]
+            : [
+                [null, "Use song default"],
+                ["Swing", "Swing"], ["JazzBallad", "Ballad"], ["BossaNova", "Bossa Nova"],
+                ["AfroCubanLatin", "Latin"]
+            ];
+        for (const [value, label] of styles) {
+            const button = addMenuButton(menu, label, async () => {
+                closeContextMenu();
+                promoteNative(song);
+                bar.jampanionStyleOverride = value;
+                stageNative(song);
+                await edited(value ? `Section style: ${label}` : "Section style: song default");
+            });
+            if ((bar.jampanionStyleOverride || null) === value) button.classList.add("selected");
+        }
+    }
+
+    doc.body.appendChild(menu);
+    const rect = menu.getBoundingClientRect();
+    menu.style.left = `${Math.max(4, Math.min(x, win.innerWidth - rect.width - 4))}px`;
+    menu.style.top = `${Math.max(4, Math.min(y, win.innerHeight - rect.height - 4))}px`;
+}
+
+function addMenuButton(menu, text, action) {
+    const button = doc.createElement("button");
+    button.type = "button";
+    button.textContent = text;
+    button.addEventListener("click", event => { event.preventDefault(); event.stopPropagation(); void action(); });
+    menu.appendChild(button);
+    return button;
+}
+
+function closeContextMenu() {
+    contextMenu?.remove();
+    contextMenu = null;
+}
+
+function openEditor(anchor, value, commit) {
+    const rect = anchor?.getBoundingClientRect?.() || { left: 20, top: 20, width: 140, height: 30 };
+    openEditorAtPoint(rect.left, rect.top, value, commit, Math.max(100, rect.width));
+}
+
+function openEditorAtPoint(left, top, value, commit, width = 120) {
+    closeEditor(false);
+    const input = doc.createElement("input");
+    input.className = "jamp-edit-input";
+    input.value = value;
+    input.style.left = `${Math.max(4, left)}px`;
+    input.style.top = `${Math.max(4, top)}px`;
+    input.style.width = `${Math.max(80, Math.min(width, 240))}px`;
+    editInput = input;
+    let finished = false;
+    const finish = async shouldCommit => {
+        if (finished) return;
+        finished = true;
+        const next = input.value;
+        input.remove();
+        if (editInput === input) editInput = null;
+        if (shouldCommit) await commit(next);
+    };
+    input.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === "Tab") { event.preventDefault(); void finish(true); }
+        else if (event.key === "Escape") { event.preventDefault(); void finish(false); }
+    });
+    input.addEventListener("blur", () => void finish(true));
+    doc.body.appendChild(input);
+    input.focus();
+    input.select();
+}
+
+function closeEditor(commit = false) {
+    if (!editInput) return;
+    if (commit) editInput.blur();
+    else { editInput.remove(); editInput = null; }
+}
+
+async function edited(message) {
+    annotateRenderedBars();
+    queueBootstrapNotification();
+    if (embeddedMode) postToParent({ type: "event", name: "edited", message });
+    else if (dotNet) await dotNet.invokeMethodAsync("ChartEdited", message);
+}
+
+function promoteNative(song) {
+    if (!song) return;
+    if (song.source !== "native") {
+        song.nativeIdentity = songIdentity(song);
+        song.originalSourceRecord = song.sourceRecord ? structuredCloneSafe(song.sourceRecord) : null;
+        song.source = "native";
+        song.nativeSchemaVersion = 1;
+    }
+}
+
+function stageNative(song) {
+    if (!song) return;
+    promoteNative(song);
+    nativeSongs.set(songIdentity(song), structuredCloneSafe(song));
+}
+
+async function persistNative(song) {
+    if (!song) return;
+    stageNative(song);
+    const identity = songIdentity(song);
+    nativeSongs.set(identity, structuredCloneSafe(song));
+    await putNativeRecord(identity, song);
+}
+
+export async function saveCurrentChart() {
+    if (!embeddedMode) return await requestEmbedded("saveCurrentChart", {}, 10000);
+    if (!editingEnabled) throw new Error("Stop playback before saving the chart.");
+    const song = currentSong();
+    if (!song || song.source !== "native") return getBootstrap();
+    await persistNative(song);
+    annotateRenderedBars();
+    queueBootstrapNotification();
+    return getBootstrap();
+}
+
+async function loadNativeSongs() {
+    nativeSongs = new Map();
+    try {
+        const database = await openNativeDb();
+        const records = await transactionRequest(database, "readonly", store => store.getAll());
+        database.close();
+        for (const record of records || []) {
+            if (record?.identity && record?.song) nativeSongs.set(record.identity, record.song);
+        }
+    } catch {
+        // Native editing remains available for this session even if IndexedDB is blocked.
+    }
+}
+
+function applyNativeOverrides() {
+    if (!viewer?.state?.songs) return false;
+    const selectedIdentity = songIdentity(currentSong());
+    const output = [];
+    const used = new Set();
+    let changed = false;
+    for (const song of viewer.state.songs) {
+        const identity = songIdentity(song);
+        const native = nativeSongs.get(identity);
+        if (native) {
+            output.push(structuredCloneSafe(native));
+            used.add(identity);
+            changed = changed || song.source !== "native" || song.id !== native.id;
+        } else {
+            output.push(song);
+        }
+    }
+    for (const [identity, native] of nativeSongs) {
+        if (!used.has(identity) && !output.some(song => songIdentity(song) === identity)) {
+            output.push(structuredCloneSafe(native));
+            changed = true;
+        }
+    }
+    if (changed) {
+        viewer.state.songs = output;
+        const selected = output.find(song => songIdentity(song) === selectedIdentity) || output[0];
+        if (selected) viewer.state.selectedId = selected.id;
+    }
+    return changed;
+}
+
+function openNativeDb() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(NATIVE_DB, NATIVE_DB_VERSION);
+        request.onerror = () => reject(request.error);
+        request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains(NATIVE_STORE)) db.createObjectStore(NATIVE_STORE, { keyPath: "identity" });
+        };
+        request.onsuccess = () => resolve(request.result);
+    });
+}
+
+function transactionRequest(database, mode, operation) {
+    return new Promise((resolve, reject) => {
+        const tx = database.transaction(NATIVE_STORE, mode);
+        const store = tx.objectStore(NATIVE_STORE);
+        let result;
+        let request;
+        try { request = operation(store); }
+        catch (error) { reject(error); return; }
+        request.onsuccess = () => { result = request.result; };
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = () => resolve(result);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
+}
+
+async function putNativeRecord(identity, song) {
+    try {
+        const database = await openNativeDb();
+        await transactionRequest(database, "readwrite", store => store.put({ identity, song: structuredCloneSafe(song) }));
+        database.close();
+    } catch {
+        // Do not block chart editing if persistence is unavailable.
+    }
+}
+
+export async function createNewSong(title, barCount, meter, key, accompanimentStyle) {
+    if (!embeddedMode) return await requestEmbedded("createNewSong", { title, barCount, meter, key, accompanimentStyle }, 10000);
+    if (!editingEnabled) throw new Error("Stop playback before creating a song.");
+    title = String(title || "").trim();
+    if (!title) throw new Error("Enter a song title.");
+    barCount = clamp(Math.round(Number(barCount) || 32), 4, 512);
+    meter = meter === "3/4" ? "3/4" : "4/4";
+    key = String(key || "C").trim() || "C";
+    const id = `native-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+    const identity = `native:${id}`;
+    const bars = Array.from({ length: barCount }, (_, index) => ({
+        chords: [],
+        chordSlots: [],
+        alternateChords: [],
+        section: index === 0 ? "A" : null,
+        ending: null, symbols: [], navigationSymbols: [], displayDirectives: [], texts: [],
+        startRepeat: false, endRepeat: false, doubleStart: false, doubleEnd: false,
+        final: index === barCount - 1, repeatBar: false, repeatTwoBars: false,
+        repeatTwoBarsContinuation: false, repeatCount: null,
+        cellCount: meter === "3/4" ? 6 : 8, verticalSpace: 0,
+        timeSignature: index === 0 ? meter : null, meterGrouping: null,
+        systemBreak: false, codaStart: false, codaEnd: false, endMarker: false,
+        jampanionStyleOverride: null, jampanionNoChord: true
+    }));
+    const song = {
+        id, nativeIdentity: identity, title, composer: "", style: "", key,
+        timeSignature: meter, bars, warnings: [], importedAt: Date.now(),
+        source: "native", sourceRecord: null, originalSourceRecord: null,
+        parserVersion: 18, nativeSchemaVersion: 1
+    };
+    nativeSongs.set(identity, structuredCloneSafe(song));
+    await putNativeRecord(identity, song);
+    viewer.state.songs.push(song);
+    viewer.state.selectedId = id;
+    viewer.state.semitones = 0;
+    saveSongSettings(identity, defaultTempoForStyle(meter === "3/4" ? "JazzWaltz" : accompanimentStyle || "Swing"), meter === "3/4" ? "JazzWaltz" : accompanimentStyle || "Swing", false);
+    forceRender();
+    annotateRenderedBars();
+    await edited("New song created");
+    return getBootstrap();
+}
+
+export async function deleteCurrentNativeSong() {
+    if (!embeddedMode) return await requestEmbedded("deleteCurrentNativeSong", {}, 10000);
+    const song = currentSong();
+    if (!song || song.source !== "native") return getBootstrap();
+    const identity = songIdentity(song);
+    const originalRecord = song.originalSourceRecord ? structuredCloneSafe(song.originalSourceRecord) : null;
+    nativeSongs.delete(identity);
+    try {
+        const database = await openNativeDb();
+        await transactionRequest(database, "readwrite", store => store.delete(identity));
+        database.close();
+    } catch {}
+
+    const currentIndex = viewer.state.songs.findIndex(item => item.id === song.id);
+    let restored = null;
+    if (originalRecord?.body && typeof viewer.parseIRealCollection === "function") {
+        try {
+            const protocol = /^(?:irealb|irealbook):\/\/$/i.test(originalRecord.protocol || "")
+                ? originalRecord.protocol
+                : "irealb://";
+            restored = viewer.parseIRealCollection(`${protocol}${encodeURIComponent(originalRecord.body)}`).songs?.[0] || null;
+        } catch (error) {
+            console.warn("Original iReal chart could not be restored", error);
+        }
+    }
+
+    if (restored) {
+        if (currentIndex >= 0) viewer.state.songs.splice(currentIndex, 1, restored);
+        else viewer.state.songs.push(restored);
+        viewer.state.selectedId = restored.id;
+    } else {
+        viewer.state.songs = viewer.state.songs.filter(item => item.id !== song.id);
+        viewer.state.selectedId = viewer.state.songs[0]?.id || "";
+    }
+    viewer.state.semitones = 0;
+    forceRender();
+    annotateRenderedBars();
+    queueBootstrapNotification();
+    return getBootstrap();
+}
+
+function resolvedMeterAt(bars, sourceIndex) {
+    let meter = "4/4";
+    for (let index = 0; index <= sourceIndex && index < bars.length; index++) {
+        if (bars[index].timeSignature) meter = normalizeMeter(bars[index].timeSignature) || meter;
+    }
+    return meter;
+}
+
+function structuredCloneSafe(value) {
+    if (typeof structuredClone === "function") return structuredClone(value);
+    return JSON.parse(JSON.stringify(value));
+}
+
+function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+function nextFrame() { return new Promise(resolve => requestAnimationFrame(resolve)); }
+async function nextFrames(count) { for (let i = 0; i < count; i++) await nextFrame(); }
+
+export function getDevicePreferences() {
+    try {
+        const value = JSON.parse(localStorage.getItem(DEVICE_SETTINGS_KEY) || "{}");
+        return { inputId: String(value?.inputId || ""), outputId: String(value?.outputId || "") };
+    } catch {
+        return { inputId: "", outputId: "" };
+    }
+}
+
+export function saveDevicePreferences(inputId, outputId) {
+    try {
+        localStorage.setItem(DEVICE_SETTINGS_KEY, JSON.stringify({
+            inputId: String(inputId || ""),
+            outputId: String(outputId || "")
+        }));
+    } catch {}
+}
+
+export function getMixerPreferences() {
+    try {
+        const value = JSON.parse(localStorage.getItem(MIXER_SETTINGS_KEY) || "null");
+        if (!value || typeof value !== "object") return null;
+        return {
+            pianoEnabled: value.pianoEnabled !== false,
+            bassEnabled: value.bassEnabled !== false,
+            drumsEnabled: value.drumsEnabled !== false,
+            midiThruEnabled: value.midiThruEnabled === true,
+            pianoVolume: clamp(Number(value.pianoVolume), 0, 100),
+            bassVolume: clamp(Number(value.bassVolume), 0, 100),
+            drumsVolume: clamp(Number(value.drumsVolume), 0, 100),
+            vibraphoneVolume: clamp(Number(value.vibraphoneVolume), 0, 100)
+        };
+    } catch {
+        return null;
+    }
+}
+
+export function saveMixerPreferences(value) {
+    try {
+        localStorage.setItem(MIXER_SETTINGS_KEY, JSON.stringify({
+            pianoEnabled: value?.pianoEnabled !== false,
+            bassEnabled: value?.bassEnabled !== false,
+            drumsEnabled: value?.drumsEnabled !== false,
+            midiThruEnabled: value?.midiThruEnabled === true,
+            pianoVolume: clamp(Number(value?.pianoVolume), 0, 100),
+            bassVolume: clamp(Number(value?.bassVolume), 0, 100),
+            drumsVolume: clamp(Number(value?.drumsVolume), 0, 100),
+            vibraphoneVolume: clamp(Number(value?.vibraphoneVolume), 0, 100)
+        }));
+    } catch {}
+}
+
+export function dispose() {
+    observer?.disconnect();
+    mobileControlsScrollCleanup?.();
+    if (globalKeyHandler) document.removeEventListener("keydown", globalKeyHandler);
+    if (visibilityHandler) document.removeEventListener("visibilitychange", visibilityHandler);
+    if (embeddedKeyHandler) document.removeEventListener("keydown", embeddedKeyHandler);
+    globalKeyHandler = null;
+    visibilityHandler = null;
+    observer = null;
+    if (libraryTimer) clearInterval(libraryTimer);
+    libraryTimer = null;
+    closeEditor(false);
+    closeContextMenu();
+    dotNet = null;
+    viewer = null;
+    doc = null;
+    win = null;
+    frame = null;
+}

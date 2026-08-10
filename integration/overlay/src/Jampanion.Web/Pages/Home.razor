@@ -1,0 +1,125 @@
+@page "/"
+@inherits IntegratedHomeLogic
+@implements IAsyncDisposable
+
+<PageTitle>Jampanion</PageTitle>
+<link rel="stylesheet" href="css/jazz-integration.css?v=14" />
+
+<div class="jamp-shell @(IsPlaying ? "is-playing" : string.Empty)">
+    <aside class="jamp-sidebar">
+        <div class="jamp-mobile-controls">
+            <section class="jamp-brand-row">
+                <strong>Jampanion</strong>
+                <button class="tiny" @onclick="OpenNewSong" disabled="@(IsPlaying || IsLoading)">New</button>
+            </section>
+
+            <section class="jamp-panel session-panel">
+                <h2>Session</h2>
+                <div class="session-controls">
+                    <button class="session-primary @(HeadOutQueued ? "queued" : string.Empty)"
+                            disabled="@IsLoading"
+                            @onclick="PrimarySessionActionAsync">@PrimaryButtonText</button>
+                    <button @onclick="StopSessionAsync" disabled="@(!IsPlaying && !IsLoading)">Stop</button>
+                </div>
+            </section>
+
+            <section class="jamp-panel accompaniment-panel">
+                <div class="jamp-heading-row">
+                    <h2>Accompaniment</h2>
+                    <button class="tiny" @onclick="SaveAccompanimentSettingsAsync"
+                            disabled="@(!HasUnsavedChanges || IsPlaying || IsLoading)">Save</button>
+                </div>
+                <div class="compact-fields">
+                    <label>
+                        <span>Tempo</span>
+                        <input type="number" min="40" max="300" step="1" value="@TempoBpm" @onchange="ChangeTempoAsync" disabled="@IsLoading" aria-label="Tempo" />
+                    </label>
+                    <label>
+                        <span>Style</span>
+                        <select value="@AccompanimentStyleNames.StorageName(SelectedStyle)" @onchange="ChangeStyleAsync" disabled="@IsLoading" aria-label="Style">
+                            @foreach (var style in StyleChoices)
+                            {
+                                <option value="@AccompanimentStyleNames.StorageName(style)">@AccompanimentStyleNames.DisplayName(style)</option>
+                            }
+                        </select>
+                    </label>
+                </div>
+            </section>
+        </div>
+
+        <section class="jamp-panel mix-panel">
+            <div class="jamp-heading-row"><h2>Mix</h2><button class="tiny" @onclick="ToggleSettingsAsync">Settings</button></div>
+            <MixerStrip Name="Piano" Enabled="PianoEnabled" EnabledChanged="OnPianoEnabledChanged"
+                        Volume="PianoVolume" VolumeChanged="OnPianoVolumeChanged" />
+            <MixerStrip Name="Bass" Enabled="BassEnabled" EnabledChanged="OnBassEnabledChanged"
+                        Volume="BassVolume" VolumeChanged="OnBassVolumeChanged" />
+            <MixerStrip Name="Drums" Enabled="DrumsEnabled" EnabledChanged="OnDrumsEnabledChanged"
+                        Volume="DrumsVolume" VolumeChanged="OnDrumsVolumeChanged" />
+            <MixerStrip Name="MIDI thru" Enabled="MidiThruEnabled" EnabledChanged="OnMidiThruEnabledChanged"
+                        Volume="VibraphoneVolume" VolumeChanged="OnVibraphoneVolumeChanged" />
+        </section>
+
+    </aside>
+
+    <main class="jamp-chart-area">
+        <iframe id="jcv-frame"
+                title="Jazz chart"
+                src="viewer/index.html?integrated=12"
+                allow="fullscreen"
+                referrerpolicy="no-referrer"></iframe>
+    </main>
+</div>
+
+@if (SettingsOpen)
+{
+    <div class="integration-backdrop" @onclick="ToggleSettingsAsync"></div>
+    <section class="integration-dialog" role="dialog" aria-modal="true" aria-label="Settings">
+        <header><div><h2>Settings</h2><p>Audio output, MIDI input, and local song controls</p></div><button @onclick="ToggleSettingsAsync">×</button></header>
+        <section>
+            <div class="jamp-heading-row"><h3>Audio &amp; MIDI</h3><button class="tiny" @onclick="RefreshMidiAsync">Refresh</button></div>
+            <label class="dialog-field"><span>MIDI input</span>
+                <select value="@SelectedMidiInputId" @onchange="SelectMidiInputAsync">
+                    <option value="">No MIDI input</option>
+                    @foreach (var device in MidiInputs) { <option value="@device.Id">@device.Name</option> }
+                </select>
+            </label>
+            <label class="dialog-field"><span>Output</span>
+                <select value="@SelectedMidiOutputId" @onchange="SelectMidiOutputAsync" disabled="@(IsPlaying || IsLoading)">
+                    <option value="">Built-in Trio</option>
+                    @foreach (var device in MidiOutputs) { <option value="@device.Id">@device.Name</option> }
+                </select>
+            </label>
+            <p class="dialog-note">@MidiStatusText</p>
+            <p class="dialog-note">MIDI input is used only for MIDI Thru. Performance-energy analysis is disabled.</p>
+        </section>
+        @if (CurrentSongIsNative)
+        {
+            <section>
+                <h3>Native song</h3>
+                <p class="dialog-note">Edited charts are stored as native chart data. Their original iReal source is retained when available.</p>
+                <button class="danger" @onclick="DeleteCurrentNativeSongAsync" disabled="@(IsPlaying || IsLoading)">
+                    @(CurrentNativeHasOriginalSource ? "Revert to original iReal chart" : "Delete this native song")
+                </button>
+            </section>
+        }
+        <footer><button @onclick="ToggleSettingsAsync">Close</button></footer>
+    </section>
+}
+
+@if (NewSongOpen)
+{
+    <div class="integration-backdrop"></div>
+    <section class="integration-dialog new-song-dialog" role="dialog" aria-modal="true" aria-label="New song">
+        <header><div><h2>New song</h2><p>Create an editable native chart</p></div><button @onclick="CloseNewSong">×</button></header>
+        <section>
+            <label class="dialog-field"><span>Title</span><input value="@NewSongTitle" @oninput="UpdateNewSongTitle" /></label>
+            <label class="dialog-field"><span>Bars</span><input type="number" min="4" max="512" value="@NewSongBars" @oninput="UpdateNewSongBars" /></label>
+            <label class="dialog-field"><span>Meter</span>
+                <select value="@NewSongMeter" @onchange="UpdateNewSongMeter"><option>4/4</option><option>3/4</option></select>
+            </label>
+            <label class="dialog-field"><span>Key</span><input value="@NewSongKey" @oninput="UpdateNewSongKey" /></label>
+            @if (!string.IsNullOrWhiteSpace(NewSongValidation)) { <p class="validation">@NewSongValidation</p> }
+        </section>
+        <footer><button @onclick="CloseNewSong">Cancel</button><button class="primary" @onclick="CreateNewSongAsync">Create</button></footer>
+    </section>
+}
