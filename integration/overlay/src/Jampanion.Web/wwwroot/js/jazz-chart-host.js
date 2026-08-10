@@ -874,9 +874,12 @@ function annotateRenderedBars() {
         }
         const badge = current || doc.createElement("span");
         badge.className = "jamp-section-style";
-        badge.textContent = styleLabel;
-        badge.title = `Section style: ${sectionStyleName(sourceBar.jampanionStyleOverride)}`;
-        badge.setAttribute("aria-label", `Section style ${sectionStyleName(sourceBar.jampanionStyleOverride)}`);
+        if (badge.textContent !== styleLabel) badge.textContent = styleLabel;
+        const styleName = sectionStyleName(sourceBar.jampanionStyleOverride);
+        const title = `Section style: ${styleName}`;
+        if (badge.title !== title) badge.title = title;
+        const ariaLabel = `Section style ${styleName}`;
+        if (badge.getAttribute("aria-label") !== ariaLabel) badge.setAttribute("aria-label", ariaLabel);
         if (!current) lead.appendChild(badge);
     }
 }
