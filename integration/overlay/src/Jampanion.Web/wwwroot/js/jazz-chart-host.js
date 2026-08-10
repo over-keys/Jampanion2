@@ -626,6 +626,39 @@ export function setPlaybackState(isPlaying, sourceIndex = -1) {
     highlightSourceBar(sourceIndex, 0);
 }
 
+function scrollPlaybackTarget(target) {
+    const mobile = window.matchMedia?.("(max-width: 700px)").matches === true;
+    target.scrollIntoView({
+        block: mobile ? "center" : "nearest",
+        inline: "nearest",
+        behavior: "smooth"
+    });
+
+    // The integrated page has its own sticky session row around this iframe.
+    // After the iframe scrolls its chart, make sure the parent page has not
+    // left the target underneath that row or below the mobile viewport.
+    if (!mobile || window.parent === window) return;
+    try {
+        const frameRect = window.frameElement?.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        if (!frameRect) return;
+        const topInset = Number(window.parent.document.querySelector(".jamp-mobile-controls")?.getBoundingClientRect().bottom || 0) + 8;
+        const bottomInset = window.parent.innerHeight - 8;
+        const targetTop = frameRect.top + targetRect.top;
+        const targetBottom = frameRect.top + targetRect.bottom;
+        const delta = targetTop < topInset
+            ? targetTop - topInset
+            : targetBottom > bottomInset
+                ? targetBottom - bottomInset
+                : 0;
+        if (Math.abs(delta) > 2) {
+            window.parent.scrollBy({ top: delta, left: 0, behavior: "smooth" });
+        }
+    } catch {
+        // A standalone viewer or cross-origin parent needs no parent scroll.
+    }
+}
+
 export function highlightSourceBar(sourceIndex, occurrence = 0) {
     if (!embeddedMode) return requestEmbedded("highlightSourceBar", { sourceIndex, occurrence }, 10000);
     for (const element of doc.querySelectorAll(".bar.jamp-current-playback")) {
@@ -643,7 +676,7 @@ export function highlightSourceBar(sourceIndex, occurrence = 0) {
     target.classList.add("jamp-current-playback");
     target.style.boxShadow = "inset 0 0 0 3px rgba(30,105,130,.42)";
     target.style.background = "rgba(30,105,130,.055)";
-    target.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    scrollPlaybackTarget(target);
 }
 
 function annotateRenderedBars() {
