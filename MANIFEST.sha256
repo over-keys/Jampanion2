@@ -21,4 +21,4 @@ ad4ce55cac318c7ce0024615476b992e8bbd58a8d9f92eb972fb74da0868abdc  ./scripts/test
 e13b1f3d453bc7acaec4f6a8e6bfb3663fef44d3e72c72c3be97ce28974db5a1  ./scripts/test-jazz-timing.mjs
 7dc86c344395fd802bfa11ebe6ed4cdd12079247a3803a8be857c2541372d769  ./scripts/test-tempo-state.sh
 4eba08d6311cb27368f3594fabc0f4643bc54193a5a8cb972f428336c18f4789  ./scripts/test-viewer-contract.mjs
-55a5e13a96e22687e8fea5c45b182e5d58409044fb04d0582140c6ce6f65806a  ./scripts/validate-static.sh
+6a4e4c00645f9ac7a6c1b64dd08ad58ab2e4da2ed3b02fe98fb694c25638789e  ./scripts/validate-static.sh
