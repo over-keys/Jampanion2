@@ -28,7 +28,7 @@
                     <h2>Accompaniment</h2>
                     <div class="heading-actions">
                         <button class="tiny" @onclick="SaveAccompanimentSettingsAsync"
-                                disabled="@(!HasUnsavedChanges || IsPlaying || IsLoading)">Save</button>
+                                disabled="@(!HasUnsavedChanges || IsPlaying || IsLoading)">@SaveButtonText</button>
                         @if (CanRevertCurrentSong)
                         {
                             <button class="tiny" @onclick="RevertCurrentSongAsync"

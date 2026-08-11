@@ -13,7 +13,7 @@ button:disabled { opacity:.45; cursor:default; }
 .jamp-heading-row { display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:7px; }
 .heading-actions { display:flex; align-items:center; gap:4px; }
 .accompaniment-panel .jamp-heading-row h2 { font-size:11px; letter-spacing:.04em; }
-.accompaniment-panel .heading-actions .tiny { padding-left:6px!important; padding-right:6px!important; font-size:10px; }
+.accompaniment-panel .heading-actions .tiny { box-sizing:border-box; width:42px; min-width:42px; padding-left:3px!important; padding-right:3px!important; font-size:10px; text-align:center; display:inline-flex; align-items:center; justify-content:center; }
 .compact-fields { display:grid; grid-template-columns:80px minmax(0,1fr); gap:6px; margin-top:7px; }
 .compact-fields label,.dialog-field { display:flex; flex-direction:column; gap:3px; min-width:0; }
 .compact-fields span,.dialog-field span { font-size:10px; color:#69767c; }

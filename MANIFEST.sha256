@@ -9,9 +9,9 @@ fbd5347e31f0b698780c7f7e497e9c4c1f80d2d0396d19190bdb22740d75b220  ./integration/
 c04579d005698ab0055d526591a12798900b7c539173bcd235cad79586bf943c  ./integration/overlay/src/Jampanion.Core/Music/TuneTransposer.cs
 22567c8e5b09dc4d0675a893930c8298d2d3ab63553683342c2d2e60aebd0af1  ./integration/overlay/src/Jampanion.Web/Audio/IntegratedSessionPlanner.cs
 786a3f445c0867dcc809b3a16722d4bfbff41af767f4305de87e75ef8f044673  ./integration/overlay/src/Jampanion.Web/Models/JazzChartModels.cs
-e4a7260858090fb015a617c2360a031a9589d8dd7bcc3ab77a258ee26efcfbf0  ./integration/overlay/src/Jampanion.Web/Pages/Home.razor
-c9bbb3104d9c8a5ab123a01a11cdb6df2f307f2231a1483b133b8854b1fe6019  ./integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs
-8dce4d18422b62b7f7c6c808cf88c784a0e6c11f296022e90cbeeb9cc6edd1db  ./integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css
+a3d97d51773e98f91ff4574d4e857475e3882c61479abc3676298d2ce6020e33  ./integration/overlay/src/Jampanion.Web/Pages/Home.razor
+1136309d170bf29882f42866f48bcea0991728ed21484816ce868ef5f7eee568  ./integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs
+c438bf95e92b0069f84e4bfe175afe6e31a3c2030c8aa8289f5eb95669be528f  ./integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css
 fdff44ed572a006701ba7e7b850b9c85bd7c57841ff9eb9ac2bb80ef06348038  ./integration/overlay/src/Jampanion.Web/wwwroot/js/jazz-chart-host.js
 e09c46e5f1832b328099af7c0a04aff18a0bd6ca9302637ac1da792a907e152e  ./scripts/build-integrated.sh
 85994f6be6834aff3f32a95235c2960cae6fa10e24ac0fb05031af678c744d6e  ./scripts/customize-help.mjs
@@ -19,7 +19,7 @@ dec37c2778d99aa339848821da16c56e61a660b65267d56bc8accb612d9d8943  ./scripts/cust
 a294077e00b2254e34522786c9de1fc81b4cd169b64346789819149fa5737606  ./scripts/customize-viewer.mjs
 82387def5dd5dd2202c3f527b0c9f91f9e46fe870e2206cf34402208612b5ad9  ./scripts/prepare-pages.sh
 8b386cf94cdc14bed95cc61c381c4bf1db1d35cb2569ed0911f2956d9d011910  ./scripts/test-chart-bridge.sh
-2fa0de3117fa2f564e96f843a74cd5132b49c8ea687d5ec5c127513276428d74  ./scripts/test-integration-invariants.py
+6f7ac96657410d06b293442caef528d7da1aaa66b8b4ef4dd0037d2d78b15077  ./scripts/test-integration-invariants.py
 9e71270fc8fcd8d0f30c6c29105a7f793b81bc26371a4701aa089eba2d2a640e  ./scripts/customize-shell.mjs
 f998f00dca511c1b9bd46329240a82b77337718829a10245868ccacfdb44d715  ./scripts/test-shell-contract.mjs
 4bb55dda1dd31a164e105b60157595318c8d337b32f0ce9bbbdd2490b0ccfe26  ./scripts/test-help-contract.mjs
