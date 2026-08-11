@@ -39,6 +39,7 @@ let bridgeReady = false;
 let bridgeStartupError = null;
 let bridgeRequestId = 0;
 let lastSongRestorePending = true;
+let standaloneSaveButton;
 const bridgePending = new Map();
 const bridgeReadyWaiters = new Set();
 const BRIDGE_CHANNEL = "jampanion-jcv-v12";
@@ -299,6 +300,7 @@ export async function initializeEmbeddedViewer() {
     if (!initialized) {
         try { installIntegrationCss(); } catch (error) { console.warn("Integration CSS setup failed", error); }
         try { installChartListeners(); } catch (error) { console.warn("Chart listener setup failed", error); }
+        try { installStandaloneSaveButton(); } catch (error) { console.warn("Standalone Save setup failed", error); }
         try { annotateRenderedBars(); } catch (error) { console.warn("Chart annotation failed", error); }
         try { startLibraryWatcher(); } catch (error) { console.warn("Library watcher setup failed", error); }
         try { installEmbeddedShortcuts(); } catch (error) { console.warn("Embedded shortcut setup failed", error); }
@@ -458,6 +460,43 @@ function installChartListeners() {
     for (const id of ["keyDown", "keyUp", "accidentalGroup", "viewModeGroup", "scale", "scaleAuto"]) {
         doc.getElementById(id)?.addEventListener("click", () => queueBootstrapNotification(), true);
     }
+}
+
+function installStandaloneSaveButton() {
+    if (window.parent !== window || standaloneSaveButton) return;
+    const utilityGroup = doc.querySelector(".utility-group");
+    const settingsButton = doc.getElementById("settingsButton");
+    if (!utilityGroup || !settingsButton) return;
+
+    const button = doc.createElement("button");
+    button.id = "jampanionStandaloneSave";
+    button.type = "button";
+    button.className = "text-button standalone-save";
+    button.textContent = "Save";
+    button.title = "Save chart edits";
+    button.setAttribute("aria-label", "Save chart edits");
+    button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+            await saveCurrentChart();
+            button.textContent = "Saved";
+            window.setTimeout(() => { if (button.isConnected) button.textContent = "Save"; }, 1200);
+        } catch (error) {
+            button.textContent = "Save";
+            window.alert(error instanceof Error ? error.message : String(error));
+        } finally {
+            updateStandaloneSaveButton();
+        }
+    });
+    standaloneSaveButton = button;
+    utilityGroup.insertBefore(button, settingsButton);
+    updateStandaloneSaveButton();
+}
+
+function updateStandaloneSaveButton() {
+    if (!standaloneSaveButton) return;
+    const song = currentSong();
+    standaloneSaveButton.disabled = !editingEnabled || !song || song.source !== "native";
 }
 
 function startLibraryWatcher() {
@@ -1300,6 +1339,16 @@ function handleDoubleClick(event) {
         editRehearsal(Number(lead?.dataset.sourceIndex), mark);
         return;
     }
+    const lead = event.target.closest?.(".system-lead");
+    if (lead) {
+        const firstBar = lead.closest(".system-row")?.querySelector(".bar:not(.spacer)");
+        const sourceIndex = Number(firstBar?.dataset.sourceIndex);
+        if (Number.isInteger(sourceIndex)) {
+            event.preventDefault();
+            editRehearsal(sourceIndex, lead);
+        }
+        return;
+    }
     const slot = event.target.closest?.(".chord-slot");
     if (slot) {
         event.preventDefault();
@@ -1467,53 +1516,23 @@ function showBarMenu(sourceIndex, x, y) {
     menu.className = "jamp-context-menu";
     contextMenu = menu;
 
-    if (!bar.section) {
-        addMenuButton(menu, "Add rehearsal mark", () => {
-            closeContextMenu();
-            const barElement = doc.querySelector(`.bar[data-source-index="${sourceIndex}"]`);
-            openEditor(barElement, "", async value => {
-                const label = value.trim().replace(/[|\r\n]/g, "");
-                if (!label) return;
-                promoteNative(song);
-                bar.section = label;
-                bar.jampanionStyleOverride = null;
-                stageNative(song);
-                forceRender();
-                await edited("Rehearsal mark added");
-            });
-        });
-    } else {
-        addMenuButton(menu, `Edit rehearsal mark “${bar.section}”`, () => {
-            closeContextMenu();
-            editRehearsal(sourceIndex, doc.querySelector(`.system-lead[data-source-index="${sourceIndex}"] .rehearsal-mark`) || doc.querySelector(`.bar[data-source-index="${sourceIndex}"]`));
-        });
-        addMenuButton(menu, "Remove rehearsal mark", async () => {
+    if (!bar.section) return;
+    const styles = resolvedMeterAt(song.bars || [], sourceIndex) === "3/4"
+        ? [[null, "Use song default"], ["JazzWaltz", "Jazz Waltz"]]
+        : [
+            [null, "Use song default"],
+            ["Swing", "Swing"], ["JazzBallad", "Ballad"], ["BossaNova", "Bossa Nova"],
+            ["AfroCubanLatin", "Latin"]
+        ];
+    for (const [value, label] of styles) {
+        const button = addMenuButton(menu, label, async () => {
             closeContextMenu();
             promoteNative(song);
-            bar.section = null;
-            bar.jampanionStyleOverride = null;
+            bar.jampanionStyleOverride = value;
             stageNative(song);
-            forceRender();
-            await edited("Rehearsal mark removed");
+            await edited(value ? `Section style: ${label}` : "Section style: song default");
         });
-        menu.appendChild(doc.createElement("hr"));
-        const styles = resolvedMeterAt(song.bars || [], sourceIndex) === "3/4"
-            ? [[null, "Use song default"], ["JazzWaltz", "Jazz Waltz"]]
-            : [
-                [null, "Use song default"],
-                ["Swing", "Swing"], ["JazzBallad", "Ballad"], ["BossaNova", "Bossa Nova"],
-                ["AfroCubanLatin", "Latin"]
-            ];
-        for (const [value, label] of styles) {
-            const button = addMenuButton(menu, label, async () => {
-                closeContextMenu();
-                promoteNative(song);
-                bar.jampanionStyleOverride = value;
-                stageNative(song);
-                await edited(value ? `Section style: ${label}` : "Section style: song default");
-            });
-            if ((bar.jampanionStyleOverride || null) === value) button.classList.add("selected");
-        }
+        if ((bar.jampanionStyleOverride || null) === value) button.classList.add("selected");
     }
 
     doc.body.appendChild(menu);
@@ -1577,6 +1596,7 @@ function closeEditor(commit = false) {
 
 async function edited(message) {
     annotateRenderedBars();
+    updateStandaloneSaveButton();
     queueBootstrapNotification();
     if (embeddedMode) postToParent({ type: "event", name: "edited", message });
     else if (dotNet) await dotNet.invokeMethodAsync("ChartEdited", message);
@@ -1612,6 +1632,7 @@ export async function saveCurrentChart() {
     const song = currentSong();
     if (!song || song.source !== "native") return getBootstrap();
     await persistNative(song);
+    updateStandaloneSaveButton();
     annotateRenderedBars();
     queueBootstrapNotification();
     return getBootstrap();
