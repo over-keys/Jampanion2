@@ -432,6 +432,11 @@ function installIntegrationCss() {
         letter-spacing:-.04em; text-align:center; white-space:nowrap;
         pointer-events:none;
       }
+      .utility-group .standalone-save {
+        box-sizing:border-box; flex:0 0 48px; width:48px; min-width:48px;
+        padding-inline:4px; text-align:center; white-space:nowrap;
+        display:inline-flex; align-items:center; justify-content:center;
+      }
     `;
     doc.head.appendChild(style);
 }

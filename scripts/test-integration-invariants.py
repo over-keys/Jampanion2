@@ -42,6 +42,7 @@ checks = {
     "English Jampanion help is built": 'customize-help-en.mjs' in (root / "scripts/build-integrated.sh").read_text() and 'test-help-en-contract.mjs' in (root / "scripts/build-integrated.sh").read_text(),
     "transpose is saved with accompaniment settings": 'CurrentSemitoneShift' in logic and 'SemitoneShift' in (root / "integration/overlay/src/Jampanion.Web/Models/JazzChartModels.cs").read_text() and 'semitoneShift' in host and 'saveSongSettings' in logic,
     "standalone viewer Save includes settings": 'installStandaloneSaveButton' in host and 'jampanionStandaloneSave' in host and 'window.parent !== window' in host and 'hasUnsavedStandaloneSettings' in host and 'Save chart, key, tempo, and style' in host and 'Number(viewer.state.semitones) || 0' in host,
+    "standalone Save feedback is centered": '.utility-group .standalone-save' in host and 'justify-content:center' in host and 'flex:0 0 48px' in host,
     "standalone viewer hides Rev. until needed": 'jampanionStandaloneRevert' in host and 'revertButton.hidden = true' in host and 'revertButton.textContent = "Rev."' in host and 'originalSourceRecord?.body' in host,
     "rehearsal marks use double-click editing": 'const lead = event.target.closest?.(".system-lead")' in host and 'editRehearsal(sourceIndex, lead)' in host,
     "rehearsal context menu only sets styles": 'bar.section = label || null' in host and 'Add rehearsal mark' not in host and 'Edit rehearsal mark' not in host and 'Remove rehearsal mark' not in host and 'Section style:' in host,
