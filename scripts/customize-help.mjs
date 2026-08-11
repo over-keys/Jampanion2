@@ -23,8 +23,8 @@ html = html
     "iReal形式のジャズ・コード譜をブラウザで表示し、移調やリピート展開を行うためのビューアーです。Jazz 1460の取り込みから譜面の読み方、表記設定まで、実際に使うために必要な操作をまとめています。",
     "iReal形式のジャズ・コード譜を表示し、ピアノ・ベース・ドラムの伴奏に合わせて練習・演奏できるアプリです。コードやリハーサルマークの編集、移調、リピート展開など、Jampanion2を使うために必要な操作をまとめています。"
   )
-  .replace('href="./help.css"', 'href="./help.css?v=29"')
-  .replaceAll('href="./help.en.html"', 'href="./help.en.html?v=29"')
+  .replace('href="./help.css"', 'href="./help.css?v=30"')
+  .replaceAll('href="./help.en.html"', 'href="./help.en.html?v=30"')
   .replace("曲は、現在開いているサイトURL専用のIndexedDBへローカル保存され、表示設定は同じURLのlocalStorageへ保存されます。", "曲と表示設定は、現在開いているサイト専用のブラウザ内に保存されます。")
   .replace(
     '      <a href="#quick-start">まず使ってみる</a>',

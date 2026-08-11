@@ -505,7 +505,7 @@ function installChartListeners() {
 
     for (const id of ["keyDown", "keyUp", "accidentalGroup", "viewModeGroup", "scale", "scaleAuto"]) {
         doc.getElementById(id)?.addEventListener("click", () => {
-            if (id === "keyDown" || id === "keyUp") setToolbarRevertVisible(true);
+            if (id === "keyDown" || id === "keyUp") setToolbarState(true, true);
             updateStandaloneSaveButton();
             queueBootstrapNotification();
         }, true);
@@ -637,12 +637,8 @@ export function setToolbarState(dirty, canRevert = dirty) {
 
 export function setToolbarRevertVisible(visible) {
     if (!embeddedMode) return requestEmbedded("setToolbarRevertVisible", { visible }, 10000);
-    toolbarHasUnsavedChanges = Boolean(visible);
     toolbarRevertVisible = Boolean(visible);
-    if (standaloneRevertButton) {
-        standaloneRevertButton.hidden = !toolbarRevertVisible;
-        standaloneRevertButton.disabled = !editingEnabled || !toolbarRevertVisible;
-    }
+    updateStandaloneSaveButton();
 }
 
 function startLibraryWatcher() {
@@ -1656,8 +1652,12 @@ function editRehearsal(sourceIndex, anchor) {
     const bar = currentSong()?.bars?.[sourceIndex];
     if (!bar) return;
     openEditor(anchor, bar.section || "", async value => {
-        promoteNative(currentSong());
         const label = value.trim().replace(/[|\r\n]/g, "");
+        const nextSection = label || null;
+        const nextStyle = label ? (bar.jampanionStyleOverride || null) : null;
+        if ((bar.section || null) === nextSection &&
+            (bar.jampanionStyleOverride || null) === nextStyle) return;
+        promoteNative(currentSong());
         bar.section = label || null;
         if (!label) bar.jampanionStyleOverride = null;
         stageNative(currentSong());
@@ -1833,8 +1833,10 @@ function showBarMenu(sourceIndex, x, y) {
     for (const [value, label] of styles) {
         const button = addMenuButton(menu, label, async () => {
             closeContextMenu();
+            const nextStyle = value || null;
+            if ((bar.jampanionStyleOverride || null) === nextStyle) return;
             promoteNative(song);
-            bar.jampanionStyleOverride = value;
+            bar.jampanionStyleOverride = nextStyle;
             stageNative(song);
             await edited(value ? `Section style: ${label}` : "Section style: song default");
         });

@@ -158,7 +158,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         try
         {
             _self ??= DotNetObjectReference.Create(this);
-            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=42");
+            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=43");
             try { await _chartModule.InvokeVoidAsync("initializeMobileControlsScrollHint"); } catch { }
             var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("initialize", "jcv-frame", _self);
             ApplyBootstrap(bootstrap);
@@ -292,14 +292,22 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         if (IsLoading) return;
         if (!int.TryParse(args.Value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var requested)) return;
         requested = Math.Clamp(requested, 40, 300);
+        if (requested == TempoBpm)
+        {
+            // Re-entering the value already shown is not a user-visible or
+            // persisted change. In particular, do not turn an Auto/default
+            // tempo into an explicit override merely because the input lost
+            // and regained focus.
+            return;
+        }
+
         var previous = TempoBpm;
         var previousExplicit = TempoIsExplicit;
         var previousUserSet = TempoIsUserSet;
-        var changed = requested != TempoBpm;
         TempoBpm = requested;
         TempoIsExplicit = true;
         TempoIsUserSet = true;
-        if (IsPlaying && changed)
+        if (IsPlaying)
         {
             await RebuildLiveTempoAsync(previous, previousExplicit, previousUserSet);
         }
@@ -863,13 +871,21 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                     HeadOutActive = true;
                     StatusText = "Head Out";
                 }
-                await UpdateChartHighlightAsync();
-                await InvokeAsync(StateHasChanged);
-                if (_sessionPlan is not null && position > _sessionPlan.DurationSeconds + 0.3d)
+
+                // StopSessionAsync is also used by the automatic completion
+                // path. Keep this check ahead of chart highlighting so a
+                // transient viewer/interop error cannot prevent the session
+                // from being finalized, and explicitly rerender after the
+                // state is reset so the UI leaves Head Out automatically.
+                if (_sessionPlan is not null && position >= _sessionPlan.DurationSeconds + 0.3d)
                 {
                     await StopSessionAsync();
+                    await InvokeAsync(StateHasChanged);
                     break;
                 }
+
+                await UpdateChartHighlightAsync();
+                await InvokeAsync(StateHasChanged);
             }
             catch (JSDisconnectedException) { break; }
             catch { }
