@@ -2,7 +2,7 @@ html, body, #app { width:100%; height:100%; margin:0; overflow:hidden; }
 .jamp-shell { height:100dvh; display:grid; grid-template-columns:220px minmax(0,1fr); background:#eef1f2; color:#1d2428; font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
 .jamp-sidebar { min-width:0; overflow:auto; border-right:1px solid #cfd7da; background:#f7f9fa; padding:8px; display:flex; flex-direction:column; gap:7px; }
 .jamp-mobile-controls { display:contents; }
-.jamp-brand-row { order:99; align-self:center; margin-top:auto; box-sizing:border-box; width:max-content; max-width:100%; height:30px; display:flex; align-items:center; justify-content:center; gap:6px; padding:3px 9px; border:1px solid #b9c4c8; border-radius:5px; background:#fff; }
+.jamp-brand-row { order:99; align-self:center; margin-top:auto; box-sizing:border-box; width:max-content; max-width:100%; height:30px; display:flex; align-items:center; justify-content:center; gap:6px; padding:0 3px; }
 .jamp-brand-row img { flex:0 0 22px; width:22px; height:22px; border-radius:6px; object-fit:cover; }
 .jamp-brand-row strong { flex:0 0 auto; font-size:15px; letter-spacing:.01em; }
 .icon-control,.tiny,.jamp-panel button,.integration-dialog button { border:1px solid #b9c4c8; background:#fff; color:#253036; border-radius:5px; min-height:29px; cursor:pointer; }
@@ -99,6 +99,11 @@ button:disabled { opacity:.45; cursor:default; }
   .jamp-panel h2 { font-size:10px; }
   .compact-fields input,.compact-fields select { height:24px; }
   .session-primary { min-height:30px!important; }
+}
+
+@media (max-width:350px) {
+  .mix-panel { grid-template-columns:auto repeat(4,minmax(56px,1fr)); gap:3px; padding-inline:4px; }
+  .mix-panel .part-toggle { gap:2px; font-size:9px; }
 }
 .dialog-check { display:flex; align-items:center; gap:7px; font-size:12px; color:#3d4b51; }
 .dialog-check input { width:16px; height:16px; }
