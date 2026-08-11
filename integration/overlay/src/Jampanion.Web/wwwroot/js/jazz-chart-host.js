@@ -92,10 +92,28 @@ function installParentBridgeListener() {
                 void dotNet?.invokeMethodAsync("ChartEdited", String(data.message || "Chart updated"));
             } else if (data.name === "spaceShortcut") {
                 void dotNet?.invokeMethodAsync("HandleSpaceShortcut");
+            } else if (data.name === "toolbarSave") {
+                invokeToolbarAction("SaveChartFromToolbar", "save");
+            } else if (data.name === "toolbarRevert") {
+                invokeToolbarAction("RevertChartFromToolbar", "revert");
             } else if (data.name === "layoutChanged") {
                 applyEmbeddedFrameHeight(data.value?.height);
             }
         }
+    });
+}
+
+function invokeToolbarAction(methodName, action) {
+    if (!dotNet) return;
+    void dotNet.invokeMethodAsync(methodName).then(() => {
+        postToFrame({ type: "toolbarResult", action, ok: true });
+    }).catch(error => {
+        postToFrame({
+            type: "toolbarResult",
+            action,
+            ok: false,
+            error: error instanceof Error ? error.message : String(error)
+        });
     });
 }
 
@@ -146,6 +164,10 @@ function installEmbeddedBridgeListener() {
         if (!data || data.channel !== BRIDGE_CHANNEL) return;
         if (data.type === "ping") {
             postToParent({ type: "ready" });
+            return;
+        }
+        if (data.type === "toolbarResult") {
+            handleToolbarResult(data);
             return;
         }
         if (data.type !== "request") return;
@@ -433,7 +455,8 @@ function installIntegrationCss() {
         letter-spacing:-.04em; text-align:center; white-space:nowrap;
         pointer-events:none;
       }
-      .utility-group .standalone-save {
+      .utility-group .standalone-save,
+      .scale-group .standalone-save {
         box-sizing:border-box; flex:0 0 48px; width:48px; min-width:48px;
         padding-inline:4px; text-align:center; white-space:nowrap;
         display:inline-flex; align-items:center; justify-content:center;
@@ -476,11 +499,26 @@ function installChartListeners() {
     }
 }
 
+function handleToolbarResult(data) {
+    const button = data.action === "revert" ? standaloneRevertButton : standaloneSaveButton;
+    if (!button) return;
+    if (!data.ok) {
+        button.disabled = false;
+        window.alert(String(data.error || "Toolbar action failed."));
+        updateStandaloneSaveButton();
+        return;
+    }
+    button.textContent = data.action === "save" ? "Saved" : "Rev.";
+    window.setTimeout(() => {
+        if (button.isConnected) button.textContent = data.action === "save" ? "Save" : "Rev.";
+    }, 1200);
+    updateStandaloneSaveButton();
+}
+
 function installStandaloneSaveButton() {
-    if (window.parent !== window || standaloneSaveButton) return;
-    const utilityGroup = doc.querySelector(".utility-group");
-    const settingsButton = doc.getElementById("settingsButton");
-    if (!utilityGroup || !settingsButton) return;
+    if (standaloneSaveButton) return;
+    const fitButton = doc.getElementById("scaleAuto");
+    if (!fitButton) return;
 
     const button = doc.createElement("button");
     button.id = "jampanionStandaloneSave";
@@ -492,9 +530,13 @@ function installStandaloneSaveButton() {
     button.addEventListener("click", async () => {
         button.disabled = true;
         try {
-            await saveCurrentChart();
-            button.textContent = "Saved";
-            window.setTimeout(() => { if (button.isConnected) button.textContent = "Save"; }, 1200);
+            if (window.parent !== window) {
+                postToParent({ type: "event", name: "toolbarSave" });
+            } else {
+                await saveCurrentChart();
+                button.textContent = "Saved";
+                window.setTimeout(() => { if (button.isConnected) button.textContent = "Save"; }, 1200);
+            }
         } catch (error) {
             button.textContent = "Save";
             window.alert(error instanceof Error ? error.message : String(error));
@@ -503,7 +545,6 @@ function installStandaloneSaveButton() {
         }
     });
     standaloneSaveButton = button;
-    utilityGroup.insertBefore(button, settingsButton);
 
     const revertButton = doc.createElement("button");
     revertButton.id = "jampanionStandaloneRevert";
@@ -512,13 +553,16 @@ function installStandaloneSaveButton() {
     revertButton.textContent = "Rev.";
     revertButton.title = "Restore the original iReal chart";
     revertButton.setAttribute("aria-label", "Restore the original iReal chart");
-    revertButton.hidden = true;
     revertButton.addEventListener("click", async () => {
         revertButton.disabled = true;
         try {
-            await revertCurrentSong();
-            revertButton.textContent = "Rev.";
-            window.setTimeout(() => { if (revertButton.isConnected) revertButton.textContent = "Rev."; }, 1200);
+            if (window.parent !== window) {
+                postToParent({ type: "event", name: "toolbarRevert" });
+            } else {
+                await revertCurrentSong();
+                revertButton.textContent = "Rev.";
+                window.setTimeout(() => { if (revertButton.isConnected) revertButton.textContent = "Rev."; }, 1200);
+            }
         } catch (error) {
             revertButton.textContent = "Rev.";
             window.alert(error instanceof Error ? error.message : String(error));
@@ -527,21 +571,22 @@ function installStandaloneSaveButton() {
         }
     });
     standaloneRevertButton = revertButton;
-    utilityGroup.insertBefore(revertButton, settingsButton);
+    fitButton.after(button, revertButton);
     updateStandaloneSaveButton();
 }
 
 function updateStandaloneSaveButton() {
     if (!standaloneSaveButton) return;
     const song = currentSong();
+    const embeddedToolbar = window.parent !== window;
     standaloneSaveButton.disabled = !editingEnabled || !song ||
-        (song.source !== "native" && !hasUnsavedStandaloneSettings(song));
+        (!embeddedToolbar && song.source !== "native" && !hasUnsavedStandaloneSettings(song));
     if (!standaloneRevertButton) return;
     const canRevert = Boolean(song && (
         (song.source === "native" && song.originalSourceRecord?.body) ||
         hasSavedSongOverrides(song)
     ));
-    standaloneRevertButton.hidden = !canRevert;
+    standaloneRevertButton.hidden = false;
     standaloneRevertButton.disabled = !editingEnabled || !canRevert;
 }
 
@@ -923,6 +968,7 @@ export function setPlaybackState(isPlaying, sourceIndex = -1) {
         if (options) options.innerHTML = "";
     }
     highlightSourceBar(sourceIndex, 0);
+    updateStandaloneSaveButton();
 }
 
 function scrollPlaybackTarget(target) {
@@ -1575,7 +1621,9 @@ function addChordAtPoint(sourceIndex, barElement, clientX) {
         return;
     }
 
-    openEditorAtPoint(clientX, rect.top + 12, "", async value => {
+    const inputHeight = 28;
+    const chordTop = rect.top + (rect.height - inputHeight) / 2;
+    openEditorAtPoint(clientX, chordTop, "", async value => {
         const chord = value.trim();
         if (!chord) return;
         promoteNative(song);
@@ -1679,7 +1727,7 @@ function openEditor(anchor, value, commit) {
     const isRehearsal = Boolean(anchor?.closest?.(".rehearsal-mark") || anchor?.closest?.(".system-lead") || anchor?.classList?.contains?.("bar"));
     const visualAnchor = isChord ? (anchor.querySelector?.(".chord") || anchor) : anchor;
     const rect = visualAnchor?.getBoundingClientRect?.() || { left: 20, top: 20, width: 140, height: 30 };
-    const width = isChord ? rect.width : isRehearsal ? 64 : Math.min(180, Math.max(120, rect.width));
+    const width = isChord ? Math.max(88, rect.width) : isRehearsal ? 64 : Math.min(180, Math.max(120, rect.width));
     const height = isChord ? rect.height : 28;
     const left = rect.left;
     const top = rect.top;

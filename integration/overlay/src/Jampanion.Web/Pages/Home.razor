@@ -24,20 +24,7 @@
             </section>
 
             <section class="jamp-panel accompaniment-panel">
-                <div class="jamp-heading-row">
-                    <h2>Accompaniment</h2>
-                    <div class="heading-actions">
-                        <button class="tiny" @onclick="SaveAccompanimentSettingsAsync"
-                                disabled="@(!HasUnsavedChanges || IsPlaying || IsLoading)">@SaveButtonText</button>
-                        @if (CanRevertCurrentSong)
-                        {
-                            <button class="tiny" @onclick="RevertCurrentSongAsync"
-                                    disabled="@(IsPlaying || IsLoading)"
-                                    aria-label="Revert"
-                                    title="Revert">Rev.</button>
-                        }
-                    </div>
-                </div>
+                <div class="jamp-heading-row"><h2>Accompaniment</h2></div>
                 <div class="compact-fields">
                     <label>
                         <span>Tempo</span>
