@@ -18,6 +18,6 @@ for (const target of targets) {
     .replaceAll("Return to Jampanion", "Return to Jampanion2")
     .replaceAll('"name": "Jampanion"', '"name": "Jampanion2"')
     .replaceAll('"short_name": "Jampanion"', '"short_name": "Jampanion2"')
-    .replaceAll('const APP_VERSION = "26"', 'const APP_VERSION = "30"');
+    .replaceAll('const APP_VERSION = "26"', 'const APP_VERSION = "31"');
   fs.writeFileSync(resolved, text);
 }

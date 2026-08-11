@@ -473,6 +473,11 @@ function installIntegrationCss() {
       }
       .utility-group .standalone-save[hidden],
       .scale-group .standalone-save[hidden] { display:none !important; }
+      .utility-group .standalone-save:disabled,
+      .scale-group .standalone-save:disabled {
+        opacity:.45; cursor:default; pointer-events:none;
+        border-color:#cbd2d5; background:#edf0f1; color:#68757b;
+      }
     `;
     doc.head.appendChild(style);
 }

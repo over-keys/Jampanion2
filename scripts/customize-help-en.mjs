@@ -24,8 +24,8 @@ html = html
     "Display, transpose, and read iReal-format jazz chord charts directly in your browser. This guide covers the complete workflow from importing Jazz 1460 to expanding repeats and adjusting notation.",
     "Jampanion2 displays iReal-format jazz chord charts and lets you practice or play along with piano, bass, and drums. This guide covers accompaniment, chart editing, importing songs, transposition, and repeat expansion."
   )
-  .replace('href="./help.css"', 'href="./help.css?v=30"')
-  .replaceAll('href="./help.html"', 'href="./help.html?v=30"')
+  .replace('href="./help.css"', 'href="./help.css?v=31"')
+  .replaceAll('href="./help.html"', 'href="./help.html?v=31"')
   .replace(
     '      <a href="#quick-start">Quick start</a>',
     '      <a href="#jampanion">Accompaniment and editing</a>\n      <a href="#quick-start">Quick start</a>'
