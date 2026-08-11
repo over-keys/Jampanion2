@@ -11,6 +11,7 @@ const requirements = [
   ["English head out instructions", /Back to head[\s\S]*Head Out[\s\S]*returns to the theme[\s\S]*Head out queued/],
   ["English head out distinction", /Stop vs Head Out[\s\S]*Stop stops the accompaniment[\s\S]*Head Out keeps playback running/],
   ["English Save instructions", /chart edits, rehearsal marks, the transposed key, tempo, and style changes[\s\S]*press Save/],
+  ["English revert instructions", /Revert restores the original iReal chart/],
   ["English key persistence instructions", /Key[\s\S]*saved per song when you press Save and restored next time/],
   ["English four-bar style changes", /next four-bar boundary/],
   ["English rehearsal mark editing instructions", /Double-click the left side of a row without a mark[\s\S]*Confirm an empty value to remove it/],

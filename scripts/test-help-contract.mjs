@@ -11,6 +11,7 @@ const requirements = [
   ["head out instructions", /Back to head[\s\S]*Head Out[\s\S]*テーマに戻って[\s\S]*Head out queued/],
   ["head out distinction", /StopとHead Outの違い[\s\S]*Stopはその場で伴奏を止めます[\s\S]*Head Outは/],
   ["single Save instructions", /コード、リハーサルマーク、移調したキー、テンポ、スタイルの変更[\s\S]*Save/],
+  ["revert instructions", /Revertで元のiReal譜面に戻せます/],
   ["key persistence instructions", /Key[\s\S]*移調キーも、Saveで曲ごとに保存され、次回自動復元/],
   ["four-bar style changes", /次の4小節区切り/],
   ["chord editing instructions", /コードを<strong>ダブルクリック<\/strong>/],

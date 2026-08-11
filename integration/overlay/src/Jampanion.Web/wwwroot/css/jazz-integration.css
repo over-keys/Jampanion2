@@ -11,6 +11,7 @@ button:disabled { opacity:.45; cursor:default; }
 .jamp-panel { position:relative; border:1px solid #d6dde0; border-radius:7px; background:#fff; padding:8px; }
 .jamp-panel h2,.integration-dialog h2,.integration-dialog h3 { margin:0; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.055em; color:#4b5b62; }
 .jamp-heading-row { display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:7px; }
+.heading-actions { display:flex; align-items:center; gap:4px; }
 .compact-fields { display:grid; grid-template-columns:80px minmax(0,1fr); gap:6px; margin-top:7px; }
 .compact-fields label,.dialog-field { display:flex; flex-direction:column; gap:3px; min-width:0; }
 .compact-fields span,.dialog-field span { font-size:10px; color:#69767c; }

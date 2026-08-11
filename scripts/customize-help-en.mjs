@@ -52,7 +52,7 @@ const integratedSection = String.raw`      <section id="jampanion" class="help-s
           <tbody>
             <tr><th>Tempo</th><td>The stepper buttons change the tempo by 5 BPM. You can enter any whole-number BPM directly.</td></tr>
             <tr><th>Style</th><td>Choose Swing, Ballad, Bossa Nova, or Latin. You can assign a different style to each rehearsal mark.</td></tr>
-            <tr><th>Save</th><td>Saves chart edits, rehearsal marks, the transposed key, tempo, and style changes together. Changes remain temporary until you press Save.</td></tr>
+            <tr><th>Save / Revert</th><td>Save stores chart edits, rehearsal marks, the transposed key, tempo, and style changes together. Changes remain temporary until you press Save. For an edited song that keeps its imported source, Revert restores the original iReal chart.</td></tr>
           </tbody>
         </table>
         <div class="note"><strong>Key</strong>The transposition made with − / + is also saved per song when you press Save and restored next time.</div>

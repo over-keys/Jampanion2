@@ -14,6 +14,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     private IJSObjectReference? _audioModule;
     private DotNetObjectReference<IntegratedHomeLogic>? _self;
     private CancellationTokenSource? _progressCancellation;
+    private readonly SemaphoreSlim _planMutationGate = new(1, 1);
     private IntegratedSessionPlan? _sessionPlan;
     private JazzPlaybackFormDto? _compiledChart;
     private int _sessionSeed;
@@ -49,6 +50,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     protected bool IsLoading { get; set; }
     protected bool ChartReady { get; set; }
     protected bool HeadOutQueued { get; set; }
+    protected bool HeadOutActive { get; set; }
     protected bool SettingsOpen { get; set; }
     protected bool NewSongOpen { get; set; }
 
@@ -89,7 +91,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
 
     protected string PrimaryButtonText => IsLoading
         ? "Preparing…"
-        : !IsPlaying ? "Start session" : HeadOutQueued ? "Head out queued" : "Back to head";
+        : !IsPlaying ? "Start session" : HeadOutActive ? "Head Out" : HeadOutQueued ? "Head out queued" : "Back to head";
 
     protected string CurrentStage
     {
@@ -288,6 +290,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     protected async Task PrimarySessionActionAsync()
     {
         if (!IsPlaying) await StartSessionAsync();
+        else if (HeadOutActive) return;
         else if (!HeadOutQueued) await CueHeadOutAsync();
     }
 
@@ -344,6 +347,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             _launchPlanDurationSeconds = _sessionPlan.DurationSeconds;
             _positionSeconds = 0;
             HeadOutQueued = false;
+            HeadOutActive = false;
             await Task.Yield();
             if (generationVersion != _generationVersion) throw new OperationCanceledException();
             await audio.InvokeVoidAsync("startSession", _sessionPlan.Notes, MixerState());
@@ -382,6 +386,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         }
         IsPlaying = false;
         HeadOutQueued = false;
+        HeadOutActive = false;
         _sessionPlan = null;
         _compiledChart = null;
         _positionSeconds = 0;
@@ -391,6 +396,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     private async Task ExpandSessionAfterStartAsync(int generationVersion)
     {
         if (_compiledChart is null) return;
+        var gateEntered = false;
         try
         {
             var browserYieldModule = _chartModule;
@@ -411,10 +417,16 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                 _sessionSeed,
                 YieldAsync,
                 endWithHeadOut: false);
+            await _planMutationGate.WaitAsync();
+            gateEntered = true;
             if (!IsPlaying || HeadOutQueued || generationVersion != _generationVersion || _audioModule is null) return;
 
             var continuation = expanded.Notes.Where(note => note.StartSeconds >= _launchPlanDurationSeconds - 0.001d).ToArray();
             await _audioModule.InvokeVoidAsync("appendSession", continuation, expanded.DurationSeconds);
+            // Head Out can be queued while appendSession is crossing the JS
+            // boundary. Never let this background expansion overwrite the
+            // replacement plan that contains the HeadOut stage.
+            if (!IsPlaying || HeadOutQueued || generationVersion != _generationVersion) return;
             _sessionPlan = expanded;
             _positionSeconds = await _audioModule.InvokeAsync<double>("getPosition");
             await InvokeAsync(StateHasChanged);
@@ -425,6 +437,10 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             StatusText = $"Playback continues with the prepared section; full-session expansion failed: {exception.Message}";
             await InvokeAsync(StateHasChanged);
         }
+        finally
+        {
+            if (gateEntered) _planMutationGate.Release();
+        }
     }
 
     protected async Task CueHeadOutAsync()
@@ -432,6 +448,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         if (!IsPlaying || _sessionPlan is null || _compiledChart is null || _audioModule is null || HeadOutQueued || _endingInProgress) return;
         _endingInProgress = true;
         var generationVersion = ++_generationVersion;
+        var gateEntered = false;
         try
         {
             _positionSeconds = await _audioModule.InvokeAsync<double>("getPosition");
@@ -453,6 +470,9 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                 YieldAsync,
                 headOutChorus: headOutChorus);
             if (!IsPlaying || generationVersion != _generationVersion || _audioModule is null) return;
+            await _planMutationGate.WaitAsync();
+            gateEntered = true;
+            if (!IsPlaying || generationVersion != _generationVersion || _audioModule is null) return;
             var current = await _audioModule.InvokeAsync<double>("getPosition");
             await _audioModule.InvokeVoidAsync("replaceSession", replacement.Notes, replacement.DurationSeconds, current, false);
             _sessionPlan = replacement;
@@ -467,6 +487,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         }
         finally
         {
+            if (gateEntered) _planMutationGate.Release();
             _endingInProgress = false;
         }
     }
@@ -751,6 +772,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         IsPlaying = false;
         IsLoading = false;
         HeadOutQueued = false;
+        HeadOutActive = false;
         _positionSeconds = 0;
         _sessionPlan = null;
         _compiledChart = null;
@@ -780,6 +802,14 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             {
                 var position = await _audioModule.InvokeAsync<double>("getPosition");
                 _positionSeconds = position;
+                if (HeadOutQueued && _sessionPlan?.Stages.Any(stage =>
+                    string.Equals(stage.Name, "HeadOut", StringComparison.Ordinal) &&
+                    position >= stage.StartSeconds) == true)
+                {
+                    HeadOutQueued = false;
+                    HeadOutActive = true;
+                    StatusText = "Head Out";
+                }
                 await UpdateChartHighlightAsync();
                 await InvokeAsync(StateHasChanged);
                 if (_sessionPlan is not null && position > _sessionPlan.DurationSeconds + 0.3d)
@@ -1108,13 +1138,20 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         catch (Exception exception) { NewSongValidation = exception.Message; }
     }
 
-    protected async Task DeleteCurrentNativeSongAsync()
+    protected async Task RevertCurrentSongAsync()
     {
-        if (IsPlaying || IsLoading || !CurrentSongIsNative || _chartModule is null) return;
-        var restoringOriginal = CurrentNativeHasOriginalSource;
+        if (IsPlaying || IsLoading || !CurrentSongIsNative || !CurrentNativeHasOriginalSource || _chartModule is null) return;
         var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("deleteCurrentNativeSong");
         ApplyBootstrap(bootstrap);
-        StatusText = restoringOriginal ? "Original iReal chart restored" : "Native song deleted";
+        StatusText = "Original iReal chart restored";
+    }
+
+    protected async Task DeleteCurrentNativeSongAsync()
+    {
+        if (IsPlaying || IsLoading || !CurrentSongIsNative || CurrentNativeHasOriginalSource || _chartModule is null) return;
+        var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("deleteCurrentNativeSong");
+        ApplyBootstrap(bootstrap);
+        StatusText = "Native song deleted";
     }
 
     private async Task<IJSObjectReference> EnsureAudioModuleAsync() =>

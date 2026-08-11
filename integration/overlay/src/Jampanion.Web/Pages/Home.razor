@@ -16,8 +16,8 @@
             <section class="jamp-panel session-panel">
                 <h2>Session</h2>
                 <div class="session-controls">
-                    <button class="session-primary @(HeadOutQueued ? "queued" : string.Empty)"
-                            disabled="@IsLoading"
+                    <button class="session-primary @(HeadOutQueued || HeadOutActive ? "queued" : string.Empty)"
+                            disabled="@(IsLoading || HeadOutActive)"
                             @onclick="PrimarySessionActionAsync">@PrimaryButtonText</button>
                     <button @onclick="StopSessionAsync" disabled="@(!IsPlaying && !IsLoading)">Stop</button>
                 </div>
@@ -26,8 +26,15 @@
             <section class="jamp-panel accompaniment-panel">
                 <div class="jamp-heading-row">
                     <h2>Accompaniment</h2>
-                    <button class="tiny" @onclick="SaveAccompanimentSettingsAsync"
-                            disabled="@(!HasUnsavedChanges || IsPlaying || IsLoading)">Save</button>
+                    <div class="heading-actions">
+                        <button class="tiny" @onclick="SaveAccompanimentSettingsAsync"
+                                disabled="@(!HasUnsavedChanges || IsPlaying || IsLoading)">Save</button>
+                        @if (CurrentSongIsNative && CurrentNativeHasOriginalSource)
+                        {
+                            <button class="tiny" @onclick="RevertCurrentSongAsync"
+                                    disabled="@(IsPlaying || IsLoading)">Revert</button>
+                        }
+                    </div>
                 </div>
                 <div class="compact-fields">
                     <label>
@@ -92,14 +99,12 @@
             <p class="dialog-note">@MidiStatusText</p>
             <p class="dialog-note">MIDI input is used only for MIDI Thru. Performance-energy analysis is disabled.</p>
         </section>
-        @if (CurrentSongIsNative)
+        @if (CurrentSongIsNative && !CurrentNativeHasOriginalSource)
         {
             <section>
                 <h3>Native song</h3>
-                <p class="dialog-note">Edited charts are stored as native chart data. Their original iReal source is retained when available.</p>
-                <button class="danger" @onclick="DeleteCurrentNativeSongAsync" disabled="@(IsPlaying || IsLoading)">
-                    @(CurrentNativeHasOriginalSource ? "Revert to original iReal chart" : "Delete this native song")
-                </button>
+                <p class="dialog-note">This new chart is stored in this browser.</p>
+                <button class="danger" @onclick="DeleteCurrentNativeSongAsync" disabled="@(IsPlaying || IsLoading)">Delete this native song</button>
             </section>
         }
         <footer><button @onclick="ToggleSettingsAsync">Close</button></footer>
