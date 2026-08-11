@@ -49,6 +49,8 @@ node "$ROOT/scripts/customize-viewer.mjs" "$VIEWER/index.html"
 node "$ROOT/scripts/test-viewer-contract.mjs" "$VIEWER/index.html"
 node "$ROOT/scripts/customize-help.mjs" "$VIEWER/help.html"
 node "$ROOT/scripts/test-help-contract.mjs" "$VIEWER/help.html"
+node "$ROOT/scripts/customize-help-en.mjs" "$VIEWER/help.en.html"
+node "$ROOT/scripts/test-help-en-contract.mjs" "$VIEWER/help.en.html"
 
 # Build the exact Jampanion browser audio backend from the pinned source.
 (

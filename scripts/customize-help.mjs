@@ -19,6 +19,12 @@ html = html
   .replace("<span>Jazz Chart Viewer ヘルプ</span>", "<span>Jampanion2 ヘルプ</span>")
   .replace("<h1>Jazz Chart Viewer</h1>", "<h1>Jampanion2</h1>")
   .replace("Jazz Chart Viewerの使い方。", "Jampanion2の譜面表示、編集、伴奏機能の使い方。")
+  .replace(
+    "iReal形式のジャズ・コード譜をブラウザで表示し、移調やリピート展開を行うためのビューアーです。Jazz 1460の取り込みから譜面の読み方、表記設定まで、実際に使うために必要な操作をまとめています。",
+    "iReal形式のジャズ・コード譜を表示し、ピアノ・ベース・ドラムの伴奏に合わせて練習・演奏できるアプリです。コードやリハーサルマークの編集、移調、リピート展開など、Jampanion2を使うために必要な操作をまとめています。"
+  )
+  .replace('href="./help.css"', 'href="./help.css?v=27"')
+  .replaceAll('href="./help.en.html"', 'href="./help.en.html?v=27"')
   .replace("曲は、現在開いているサイトURL専用のIndexedDBへローカル保存され、表示設定は同じURLのlocalStorageへ保存されます。", "曲と表示設定は、現在開いているサイト専用のブラウザ内に保存されます。")
   .replace(
     '      <a href="#quick-start">まず使ってみる</a>',
@@ -34,8 +40,11 @@ const integratedSection = String.raw`      <section id="jampanion" class="help-s
           <li>曲を選び、キー、<strong>Original / Expanded</strong>、テンポ、スタイルを確認します。</li>
           <li><strong>Tempo</strong>を入力し、<strong>Style</strong>で<strong>Swing / Ballad / Bossa Nova / Latin</strong>を選びます。4/4以外の曲では対応するスタイルだけが表示されます。</li>
           <li><strong>Start session</strong>を押すとカウントインの後に演奏が始まります。演奏中は譜面が現在位置へ自動スクロールします。</li>
-          <li>終了するときは<strong>Stop</strong>を押します。再生中のノートオフも同時に送られます。</li>
+          <li>すぐに演奏を止めるときは<strong>Stop</strong>を押します。再生中のノートオフも同時に送られます。</li>
+          <li>テーマに戻って自然に終わらせるときは、演奏中の<strong>Back to head</strong>を押します。<strong>Head Out</strong>がキューされ、現在の区切りからテーマに戻って演奏したあと、曲が終了します。キューされるとボタンは<strong>Head out queued</strong>に変わります。</li>
         </ol>
+
+        <div class="note"><strong>StopとHead Outの違い</strong>Stopはその場で伴奏を止めます。Head Outは演奏をすぐには止めず、テーマに戻る流れをキューしてから終了します。</div>
 
         <h3>テンポ、スタイル、保存</h3>
         <table class="control-table">

@@ -1,73 +1,74 @@
 # Jampanion2
 
-譜面を見ながら、ピアノ・ベース・ドラムの伴奏でジャムセッションを楽しむためのWebアプリです。
+A browser-based jazz chart viewer and accompaniment partner for practicing, rehearsing, and playing along with piano, bass, and drums.
 
-公開ページ: [https://over-keys.github.io/Jampanion2/](https://over-keys.github.io/Jampanion2/)
+Public page: [https://over-keys.github.io/Jampanion2/](https://over-keys.github.io/Jampanion2/)
 
-## まず使う
+## Getting started
 
-1. [Jampanion2](https://over-keys.github.io/Jampanion2/)を開きます。
-2. 譜面の右上にある歯車ボタンを押し、**Import iReal data**を選びます。
-3. iReal Proからコピーした`irealb://...`リンクを貼り付け、**Import**を押します。
-4. 検索欄で曲名または作曲者名を検索し、曲を選びます。
-5. 左側の**Start session**を押すと伴奏が始まります。終わるときは**Stop**を押します。
+1. Open [Jampanion2](https://over-keys.github.io/Jampanion2/).
+2. Open the chart viewer's settings menu and choose **Import iReal data**.
+3. Paste an `irealb://...` link copied from iReal Pro and press **Import**.
+4. Search by song title or composer and select a song.
+5. Press **Start session** in the left panel to begin accompaniment. Press **Stop** when you are finished.
 
-詳しい操作は、譜面右上の**?**ボタンからヘルプを開いてください。
+For more details, open the help page with the **?** button in the chart viewer.
 
-## iRealの譜面を読み込む
+## Importing iReal charts
 
-iReal Proで共有した曲のリンクをコピーし、**Import iReal data**に貼り付けます。リンクは`irealb://`または`irealbook://`で始まるものを使ってください。
+Copy a shared song link from iReal Pro and paste it into **Import iReal data**. The link should begin with `irealb://` or `irealbook://`.
 
-保存済みの`.txt`、`.html`、`.htm`ファイルを読み込むこともできます。
+You can also import saved `.txt`, `.html`, or `.htm` files.
 
-## 伴奏を使う
+## Playing accompaniment
 
-左側の**Accompaniment**で、テンポとスタイルを選びます。
+Use **Accompaniment** to choose the tempo and style.
 
-- **Tempo**: 上下操作は5 BPMずつ変わります。数字を直接入力することもできます。
-- **Style**: **Swing / Ballad / Bossa Nova / Latin**から選べます。
-- **Start session**: カウントインの後、伴奏を開始します。
-- **Stop**: 伴奏を停止し、音を止めます。
-- **Save**: コード、リハーサルマーク、テンポ、スタイルの変更をまとめて保存します。
+- **Tempo**: The stepper buttons change the tempo by 5 BPM. You can also enter a value directly.
+- **Style**: Choose **Swing**, **Ballad**, **Bossa Nova**, or **Latin**.
+- **Start session**: Starts the accompaniment after the count-in.
+- **Stop**: Stops the accompaniment immediately and sends note-off messages.
+- **Back to head / Head Out**: During playback, press **Back to head** to queue a head out. The accompaniment returns to the theme, plays it through, and then ends naturally. The button changes to **Head out queued** while it is queued.
+- **Save**: Saves chart edits, rehearsal marks, tempo, and style changes together.
 
-演奏中にスタイルを変えると、次の4小節の区切りから切り替わります。テンポを変えた場合は、次の小節から滑らかに切り替わります。スタイル変更でテンポが勝手に変わることはありません。
+During playback, a style change takes effect at the next four-bar boundary. A tempo change takes effect at the next bar boundary so the sound continues smoothly. Changing the style does not reset the tempo.
 
-## 譜面を編集する
+## Editing a chart
 
-演奏を止めてから、譜面を操作します。
+Stop playback before editing the chart.
 
-- コードを**ダブルクリック**: コードを編集します。空欄で確定すると削除します。
-- 小節内の空いた場所を**ダブルクリック**: その位置にコードを追加します。
-- リハーサルマークを**ダブルクリック**: マーク名を変更します。
-- 小節やリハーサルマークを**右クリック**: マークの追加・削除、セクションスタイルの指定を行います。
-- タイトルを**ダブルクリック**: 曲名を変更します。
+- **Double-click a chord** to edit it. Confirm an empty value to remove it.
+- **Double-click an empty position in a bar** to add a chord at that position.
+- **Double-click a rehearsal mark** to rename it.
+- **Right-click a bar or rehearsal mark** to add or remove a mark and assign a section style.
+- **Double-click the title** to rename the song.
 
-スタイルを指定したリハーサルマークの上には、**Swing / Latin / Bossa / Ballad**が表示されます。曲のデフォルトスタイルを使う場合は表示されません。
+Assigned section styles are shown above rehearsal marks as **Swing**, **Latin**, **Bossa**, or **Ballad**. The label is hidden when the song's default style is used.
 
-編集内容は一時的に反映されます。残したいときは、**Accompaniment**の**Save**を押してください。
+Edits are temporary until saved. Press **Save** in **Accompaniment** to keep them.
 
-## MixとMIDI
+## Mix and MIDI
 
-**Mix**では、Piano、Bass、Drumsの音量とミュートを調整できます。音量とミュートの設定は、次回も同じブラウザで使えるように保存されます。
+Use **Mix** to adjust the volume or mute Piano, Bass, and Drums. Volume and mute settings are remembered in the same browser.
 
-**Settings**では、次の設定ができます。
+Open **Settings** to choose:
 
-- MIDI inputの選択
-- MIDI outputの選択
-- MIDI thruの設定
+- MIDI input
+- MIDI output
+- MIDI Thru
 
-外部MIDI機器がなくても、**Built-in Trio**を選べばブラウザの音源で演奏できます。
+If no external MIDI device is available, choose **Built-in Trio** to play with the browser's built-in sounds.
 
-## 譜面の表示
+## Chart display
 
-- **− / +**: キーを半音ずつ変更します。
-- **Auto / ♭ / ♯**: コードの表記方法を選びます。
-- **Original**: 元の譜面どおりに表示します。
-- **Expanded**: リピートなどを演奏順に展開して表示します。
-- **Fit**: 譜面を画面に収まる大きさにします。
+- **− / +**: Transpose the key by semitones.
+- **Auto / ♭ / ♯**: Choose the chord accidental spelling.
+- **Original**: Show the chart as written.
+- **Expanded**: Expand repeats and navigation into playing order.
+- **Fit**: Scale the chart to fit the available space.
 
-スマートフォンでは、上部のSession操作を残したまま譜面を縦にスクロールできます。Mixは譜面の下にあります。
+On smartphones, the Session controls remain available at the top while the chart scrolls vertically. The Mix controls are below the chart.
 
-## 保存について
+## Saving and browser data
 
-曲や設定は、現在使っているブラウザに保存されます。ブラウザのデータを削除した場合や、別の端末で開いた場合は、曲をもう一度インポートしてください。
+Songs and settings are saved in the current browser. If you clear browser data or open Jampanion2 on another device, import your songs again.
