@@ -1683,7 +1683,7 @@ function openEditorAtPoint(left, top, value, commit, width = 64) {
     input.addEventListener("blur", () => void finish(true));
     doc.body.appendChild(input);
     input.focus();
-    input.select();
+    input.setSelectionRange(0, 0);
 }
 
 function closeEditor(commit = false) {
