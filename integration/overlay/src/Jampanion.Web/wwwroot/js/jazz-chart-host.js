@@ -463,7 +463,10 @@ function installChartListeners() {
     observer.observe(doc, { childList: true, subtree: true });
 
     for (const id of ["keyDown", "keyUp", "accidentalGroup", "viewModeGroup", "scale", "scaleAuto"]) {
-        doc.getElementById(id)?.addEventListener("click", () => queueBootstrapNotification(), true);
+        doc.getElementById(id)?.addEventListener("click", () => {
+            updateStandaloneSaveButton();
+            queueBootstrapNotification();
+        }, true);
     }
 }
 
@@ -478,8 +481,8 @@ function installStandaloneSaveButton() {
     button.type = "button";
     button.className = "text-button standalone-save";
     button.textContent = "Save";
-    button.title = "Save chart edits";
-    button.setAttribute("aria-label", "Save chart edits");
+    button.title = "Save chart, key, tempo, and style";
+    button.setAttribute("aria-label", "Save chart, key, tempo, and style");
     button.addEventListener("click", async () => {
         button.disabled = true;
         try {
@@ -500,7 +503,7 @@ function installStandaloneSaveButton() {
     revertButton.id = "jampanionStandaloneRevert";
     revertButton.type = "button";
     revertButton.className = "text-button standalone-save";
-    revertButton.textContent = "Revert";
+    revertButton.textContent = "Rev.";
     revertButton.title = "Restore the original iReal chart";
     revertButton.setAttribute("aria-label", "Restore the original iReal chart");
     revertButton.hidden = true;
@@ -508,10 +511,10 @@ function installStandaloneSaveButton() {
         revertButton.disabled = true;
         try {
             await revertCurrentSong();
-            revertButton.textContent = "Reverted";
-            window.setTimeout(() => { if (revertButton.isConnected) revertButton.textContent = "Revert"; }, 1200);
+            revertButton.textContent = "Rev.";
+            window.setTimeout(() => { if (revertButton.isConnected) revertButton.textContent = "Rev."; }, 1200);
         } catch (error) {
-            revertButton.textContent = "Revert";
+            revertButton.textContent = "Rev.";
             window.alert(error instanceof Error ? error.message : String(error));
         } finally {
             updateStandaloneSaveButton();
@@ -525,7 +528,8 @@ function installStandaloneSaveButton() {
 function updateStandaloneSaveButton() {
     if (!standaloneSaveButton) return;
     const song = currentSong();
-    standaloneSaveButton.disabled = !editingEnabled || !song || song.source !== "native";
+    standaloneSaveButton.disabled = !editingEnabled || !song ||
+        (song.source !== "native" && !hasUnsavedStandaloneSettings(song));
     if (!standaloneRevertButton) return;
     const canRevert = Boolean(song && (
         (song.source === "native" && song.originalSourceRecord?.body) ||
@@ -790,6 +794,11 @@ function restoreStoredTranspose(song = currentSong()) {
     return changed;
 }
 
+function hasUnsavedStandaloneSettings(song = currentSong()) {
+    if (!song) return false;
+    return (Number(viewer?.state?.semitones) || 0) !== songSettings(song).semitoneShift;
+}
+
 export function saveSongSettings(identity, tempoBpm, accompanimentStyle, tempoExplicit = true, semitoneShift = 0) {
     if (!embeddedMode) {
         return requestEmbedded("saveSongSettings", { identity, tempoBpm, accompanimentStyle, tempoExplicit, semitoneShift }, 10000);
@@ -870,7 +879,10 @@ async function notifyBootstrap(value = getBootstrap()) {
 let notifyTimer;
 function queueBootstrapNotification() {
     clearTimeout(notifyTimer);
-    notifyTimer = setTimeout(() => void notifyBootstrap(), 80);
+    notifyTimer = setTimeout(() => {
+        updateStandaloneSaveButton();
+        void notifyBootstrap();
+    }, 80);
 }
 
 export function getState() { return embeddedMode ? getBootstrap() : requestEmbedded("getState", {}, 10000); }
@@ -1698,8 +1710,21 @@ export async function saveCurrentChart() {
     if (!embeddedMode) return await requestEmbedded("saveCurrentChart", {}, 10000);
     if (!editingEnabled) throw new Error("Stop playback before saving the chart.");
     const song = currentSong();
-    if (!song || song.source !== "native") return getBootstrap();
-    await persistNative(song);
+    if (!song) return getBootstrap();
+
+    // Viewer mode has no separate accompaniment Save control. Persist the
+    // complete current settings bundle here too, including the toolbar's
+    // current transposition, so a standalone Save behaves like integrated
+    // Save and the setting is restored on the next visit.
+    const settings = songSettings(song);
+    saveSongSettings(
+        songIdentity(song),
+        settings.tempoBpm,
+        settings.accompanimentStyle,
+        settings.tempoExplicit,
+        Number(viewer.state.semitones) || 0);
+
+    if (song.source === "native") await persistNative(song);
     updateStandaloneSaveButton();
     annotateRenderedBars();
     queueBootstrapNotification();

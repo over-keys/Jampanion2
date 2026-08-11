@@ -12,14 +12,14 @@ c04579d005698ab0055d526591a12798900b7c539173bcd235cad79586bf943c  ./integration/
 e4a7260858090fb015a617c2360a031a9589d8dd7bcc3ab77a258ee26efcfbf0  ./integration/overlay/src/Jampanion.Web/Pages/Home.razor
 c9bbb3104d9c8a5ab123a01a11cdb6df2f307f2231a1483b133b8854b1fe6019  ./integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs
 8dce4d18422b62b7f7c6c808cf88c784a0e6c11f296022e90cbeeb9cc6edd1db  ./integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css
-a9b100a786eab2988fcc2c2f5cf9536c34d0d2feb4f0e57bb95e1c640b1e3d93  ./integration/overlay/src/Jampanion.Web/wwwroot/js/jazz-chart-host.js
+a7054a794d36554809312b0b1aad6d1f94a7923ee494b3a1e4852d7efa328f49  ./integration/overlay/src/Jampanion.Web/wwwroot/js/jazz-chart-host.js
 e09c46e5f1832b328099af7c0a04aff18a0bd6ca9302637ac1da792a907e152e  ./scripts/build-integrated.sh
 85994f6be6834aff3f32a95235c2960cae6fa10e24ac0fb05031af678c744d6e  ./scripts/customize-help.mjs
 dec37c2778d99aa339848821da16c56e61a660b65267d56bc8accb612d9d8943  ./scripts/customize-help-en.mjs
 a294077e00b2254e34522786c9de1fc81b4cd169b64346789819149fa5737606  ./scripts/customize-viewer.mjs
 82387def5dd5dd2202c3f527b0c9f91f9e46fe870e2206cf34402208612b5ad9  ./scripts/prepare-pages.sh
 8b386cf94cdc14bed95cc61c381c4bf1db1d35cb2569ed0911f2956d9d011910  ./scripts/test-chart-bridge.sh
-668015f6b2c00f239e0f0114a8a258f7bb43b133b38c071c3f42e062d9837d52  ./scripts/test-integration-invariants.py
+59852532ebfd1341b3ca12ee23a99b8090259d5689340982d0200377bc2e1e10  ./scripts/test-integration-invariants.py
 9e71270fc8fcd8d0f30c6c29105a7f793b81bc26371a4701aa089eba2d2a640e  ./scripts/customize-shell.mjs
 f998f00dca511c1b9bd46329240a82b77337718829a10245868ccacfdb44d715  ./scripts/test-shell-contract.mjs
 4bb55dda1dd31a164e105b60157595318c8d337b32f0ce9bbbdd2490b0ccfe26  ./scripts/test-help-contract.mjs
