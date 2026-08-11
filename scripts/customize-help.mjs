@@ -51,9 +51,10 @@ const integratedSection = String.raw`      <section id="jampanion" class="help-s
           <tbody>
             <tr><th>Tempo</th><td>上下操作は5 BPMずつ変わります。数値を直接入力すれば、1 BPM単位の値も指定できます。</td></tr>
             <tr><th>Style</th><td>Swing、Ballad、Bossa Nova、Latinから伴奏スタイルを選びます。リハーサルマークごとに別のスタイルも指定できます。</td></tr>
-            <tr><th>Save</th><td>コード、リハーサルマーク、テンポ、スタイルの変更をまとめて保存します。Saveを押すまでは一時的な変更です。</td></tr>
+            <tr><th>Save</th><td>コード、リハーサルマーク、移調したキー、テンポ、スタイルの変更をまとめて保存します。Saveを押すまでは一時的な変更です。</td></tr>
           </tbody>
         </table>
+        <div class="note"><strong>Key</strong>−／＋で変更した移調キーも、Saveで曲ごとに保存され、次回自動復元されます。</div>
         <div class="note"><strong>演奏中の変更</strong>スタイル変更は次の4小節区切り、テンポ変更は次の小節区切りから適用されます。音を止めずに切り替え、スタイル変更によってテンポがデフォルトへ戻ることはありません。</div>
 
         <h3>コードとリハーサルマークを編集する</h3>

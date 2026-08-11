@@ -29,6 +29,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     private bool _savedTempoExplicit;
     private bool _savedTempoUserSet;
     private AccompanimentStyle _savedStyle = AccompanimentStyle.Swing;
+    private int _savedSemitoneShift;
 
     [Inject] public IJSRuntime JS { get; set; } = default!;
 
@@ -40,6 +41,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     protected int TempoBpm { get; set; } = 120;
     protected bool TempoIsExplicit { get; set; }
     protected bool TempoIsUserSet { get; set; }
+    protected int CurrentSemitoneShift { get; set; }
     protected AccompanimentStyle SelectedStyle { get; set; } = AccompanimentStyle.Swing;
     protected string StatusText { get; set; } = "Loading Jazz Chart Viewer";
 
@@ -76,7 +78,8 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         TempoBpm != _savedTempoBpm ||
         TempoIsExplicit != _savedTempoExplicit ||
         TempoIsUserSet != _savedTempoUserSet ||
-        SelectedStyle != _savedStyle;
+        SelectedStyle != _savedStyle ||
+        CurrentSemitoneShift != _savedSemitoneShift;
     protected bool HasUnsavedChanges => HasUnsavedChartChanges || HasUnsavedAccompanimentChanges;
 
 
@@ -122,7 +125,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         try
         {
             _self ??= DotNetObjectReference.Create(this);
-            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=27");
+            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=28");
             try { await _chartModule.InvokeVoidAsync("initializeMobileControlsScrollHint"); } catch { }
             var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("initialize", "jcv-frame", _self);
             ApplyBootstrap(bootstrap);
@@ -191,6 +194,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
 
         SelectedIdentity = incomingIdentity;
         CurrentKey = bootstrap.Key ?? "C";
+        CurrentSemitoneShift = bootstrap.SemitoneShift;
         CurrentMeter = bootstrap.TimeSignature ?? "4/4";
         CurrentSongIsNative = bootstrap.IsNative;
         CurrentNativeHasOriginalSource = bootstrap.HasOriginalSource;
@@ -277,7 +281,8 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             SelectedIdentity,
             TempoBpm,
             AccompanimentStyleNames.StorageName(SelectedStyle),
-            TempoIsUserSet);
+            TempoIsUserSet,
+            CurrentSemitoneShift);
     }
 
     protected async Task PrimarySessionActionAsync()
@@ -1054,6 +1059,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         _savedTempoExplicit = TempoIsExplicit;
         _savedTempoUserSet = TempoIsUserSet;
         _savedStyle = SelectedStyle;
+        _savedSemitoneShift = CurrentSemitoneShift;
     }
 
     private IntegratedMixerState MixerState() => new(

@@ -153,7 +153,7 @@ function installEmbeddedBridgeListener() {
             switch (data.action) {
                 case "getState": value = getBootstrap(); break;
                 case "compilePlayback": value = await compilePlayback(); break;
-                case "saveSongSettings": value = saveSongSettings(args.identity, args.tempoBpm, args.accompanimentStyle, args.tempoExplicit); break;
+                case "saveSongSettings": value = saveSongSettings(args.identity, args.tempoBpm, args.accompanimentStyle, args.tempoExplicit, args.semitoneShift); break;
                 case "saveCurrentChart": value = await saveCurrentChart(); break;
                 case "selectSong": value = selectSong(args.songId); break;
                 case "setPlaybackState": value = setPlaybackState(args.isPlaying, args.sourceIndex); break;
@@ -311,6 +311,7 @@ export async function initializeEmbeddedViewer() {
                 const changed = applyNativeOverrides();
                 if (changed) forceRender();
                 restoreLastSelectedSong();
+                restoreStoredTranspose();
                 annotateRenderedBars();
                 queueBootstrapNotification();
             } catch (error) {
@@ -479,6 +480,7 @@ function startLibraryWatcher() {
             queueBootstrapNotification();
         }
         if (lastSongRestorePending && libraryChanged) restoreLastSelectedSong();
+        else if (libraryChanged) restoreStoredTranspose();
     }, 700);
     lastLibrarySignature = librarySignature();
 }
@@ -529,7 +531,7 @@ function restoreLastSelectedSong() {
     const reference = readLastSongReference();
     if (!reference) {
         lastSongRestorePending = false;
-        return false;
+        return restoreStoredTranspose();
     }
     const target = (viewer?.state?.songs || []).find(song =>
         (reference.identity && songIdentity(song) === reference.identity) ||
@@ -540,9 +542,11 @@ function restoreLastSelectedSong() {
         // fallback until the saved song appears in a later library refresh.
         return false;
     }
-    const changed = viewer.state.selectedId !== target.id;
+    const selectionChanged = viewer.state.selectedId !== target.id;
+    const previousSemitoneShift = Number(viewer.state.semitones) || 0;
     viewer.state.selectedId = target.id;
-    viewer.state.semitones = 0;
+    viewer.state.semitones = songSettings(target).semitoneShift;
+    const changed = selectionChanged || previousSemitoneShift !== viewer.state.semitones;
     lastSongRestorePending = false;
     if (changed) {
         forceRender();
@@ -648,6 +652,7 @@ function songSettings(song) {
         : (stored.accompanimentStyle || sourcePlayerStyle || inferredStyle(song));
     const sourceTempo = validTempo(song?.tempoBpm) ?? iRealTempoForSong(song);
     const storedTempo = validTempo(stored.tempoBpm);
+    const storedSemitoneShift = Number(stored.semitoneShift);
 
     // A user-entered tempo has priority. Otherwise an iReal/source tempo is
     // authoritative. Only a chart with neither uses the style-aware Auto value.
@@ -664,13 +669,25 @@ function songSettings(song) {
         tempoBpm: clamp(tempoBpm, 40, 300),
         tempoExplicit,
         tempoUserExplicit: storedTempoExplicit,
-        accompanimentStyle
+        accompanimentStyle,
+        semitoneShift: Number.isFinite(storedSemitoneShift) ? Math.trunc(storedSemitoneShift) : 0
     };
 }
 
-export function saveSongSettings(identity, tempoBpm, accompanimentStyle, tempoExplicit = true) {
+function restoreStoredTranspose(song = currentSong()) {
+    const next = songSettings(song).semitoneShift;
+    const changed = (Number(viewer.state.semitones) || 0) !== next;
+    viewer.state.semitones = next;
+    if (changed) {
+        forceRender();
+        annotateRenderedBars();
+    }
+    return changed;
+}
+
+export function saveSongSettings(identity, tempoBpm, accompanimentStyle, tempoExplicit = true, semitoneShift = 0) {
     if (!embeddedMode) {
-        return requestEmbedded("saveSongSettings", { identity, tempoBpm, accompanimentStyle, tempoExplicit }, 10000);
+        return requestEmbedded("saveSongSettings", { identity, tempoBpm, accompanimentStyle, tempoExplicit, semitoneShift }, 10000);
     }
     if (!identity) return null;
     const map = loadSettingsMap();
@@ -679,7 +696,8 @@ export function saveSongSettings(identity, tempoBpm, accompanimentStyle, tempoEx
             ? clamp(Number(tempoBpm) || defaultTempoForStyle(accompanimentStyle), 40, 300)
             : null,
         tempoExplicit: tempoExplicit === true,
-        accompanimentStyle: String(accompanimentStyle || "Swing")
+        accompanimentStyle: String(accompanimentStyle || "Swing"),
+        semitoneShift: Number.isFinite(Number(semitoneShift)) ? Math.trunc(Number(semitoneShift)) : 0
     };
     saveSettingsMap(map);
     queueBootstrapNotification();
@@ -705,6 +723,7 @@ function summary(song) {
         tempoExplicit: settings.tempoExplicit,
         tempoUserExplicit: settings.tempoUserExplicit,
         accompanimentStyle: settings.accompanimentStyle,
+        semitoneShift: settings.semitoneShift,
         isNative: song.source === "native",
         hasOriginalSource: Boolean(song.originalSourceRecord?.body)
     };
@@ -725,6 +744,7 @@ function getBootstrap() {
         tempoExplicit: settings.tempoExplicit,
         tempoUserExplicit: settings.tempoUserExplicit,
         accompanimentStyle: settings.accompanimentStyle,
+        semitoneShift: Number(viewer.state.semitones) || 0,
         isNative: song?.source === "native",
         hasOriginalSource: Boolean(song?.originalSourceRecord?.body),
         viewMode: viewer.state.viewMode || "original"
@@ -754,7 +774,7 @@ export function selectSong(songId) {
     const song = viewer.state.songs.find(item => item.id === songId);
     if (!song) throw new Error("The selected song is no longer in the library.");
     viewer.state.selectedId = song.id;
-    viewer.state.semitones = 0;
+    viewer.state.semitones = songSettings(song).semitoneShift;
     forceRender();
     annotateRenderedBars();
     rememberSelectedSong(song);
@@ -1714,7 +1734,7 @@ export async function createNewSong(title, barCount, meter, key, accompanimentSt
     await putNativeRecord(identity, song);
     viewer.state.songs.push(song);
     viewer.state.selectedId = id;
-    viewer.state.semitones = 0;
+    restoreStoredTranspose();
     saveSongSettings(identity, defaultTempoForStyle(meter === "3/4" ? "JazzWaltz" : accompanimentStyle || "Swing"), meter === "3/4" ? "JazzWaltz" : accompanimentStyle || "Swing", false);
     forceRender();
     annotateRenderedBars();
@@ -1757,7 +1777,7 @@ export async function deleteCurrentNativeSong() {
         viewer.state.songs = viewer.state.songs.filter(item => item.id !== song.id);
         viewer.state.selectedId = viewer.state.songs[0]?.id || "";
     }
-    viewer.state.semitones = 0;
+    restoreStoredTranspose();
     forceRender();
     annotateRenderedBars();
     rememberSelectedSong(currentSong());

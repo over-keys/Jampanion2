@@ -10,7 +10,8 @@ const requirements = [
   ["English session instructions", /Start session[\s\S]*Stop/],
   ["English head out instructions", /Back to head[\s\S]*Head Out[\s\S]*returns to the theme[\s\S]*Head out queued/],
   ["English head out distinction", /Stop vs Head Out[\s\S]*Stop stops the accompaniment[\s\S]*Head Out keeps playback running/],
-  ["English Save instructions", /chart edits, rehearsal marks, tempo, and style changes[\s\S]*press Save/],
+  ["English Save instructions", /chart edits, rehearsal marks, the transposed key, tempo, and style changes[\s\S]*press Save/],
+  ["English key persistence instructions", /Key[\s\S]*saved per song when you press Save and restored next time/],
   ["English four-bar style changes", /next four-bar boundary/]
 ];
 for (const [name, pattern] of requirements) {
