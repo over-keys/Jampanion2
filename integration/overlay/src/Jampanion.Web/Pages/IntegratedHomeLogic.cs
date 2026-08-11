@@ -39,6 +39,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     protected string CurrentMeter { get; set; } = "4/4";
     protected bool CurrentSongIsNative { get; set; }
     protected bool CurrentNativeHasOriginalSource { get; set; }
+    protected bool CurrentSongHasSavedOverrides { get; set; }
     protected int TempoBpm { get; set; } = 120;
     protected bool TempoIsExplicit { get; set; }
     protected bool TempoIsUserSet { get; set; }
@@ -83,6 +84,8 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         SelectedStyle != _savedStyle ||
         CurrentSemitoneShift != _savedSemitoneShift;
     protected bool HasUnsavedChanges => HasUnsavedChartChanges || HasUnsavedAccompanimentChanges;
+    protected bool CanRevertCurrentSong =>
+        (CurrentSongIsNative && CurrentNativeHasOriginalSource) || CurrentSongHasSavedOverrides;
 
 
     protected IReadOnlyList<AccompanimentStyle> StyleChoices => CurrentMeter == "3/4"
@@ -200,6 +203,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         CurrentMeter = bootstrap.TimeSignature ?? "4/4";
         CurrentSongIsNative = bootstrap.IsNative;
         CurrentNativeHasOriginalSource = bootstrap.HasOriginalSource;
+        CurrentSongHasSavedOverrides = bootstrap.HasSavedOverrides;
 
         // Tempo and accompaniment style belong to the accompaniment UI. The chart
         // bridge may emit bootstrap notifications for ordinary re-renders, key
@@ -1140,10 +1144,10 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
 
     protected async Task RevertCurrentSongAsync()
     {
-        if (IsPlaying || IsLoading || !CurrentSongIsNative || !CurrentNativeHasOriginalSource || _chartModule is null) return;
-        var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("deleteCurrentNativeSong");
-        ApplyBootstrap(bootstrap);
-        StatusText = "Original iReal chart restored";
+        if (IsPlaying || IsLoading || !CanRevertCurrentSong || _chartModule is null) return;
+        var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("revertCurrentSong");
+        ApplyBootstrap(bootstrap, forceAccompanimentSettings: true);
+        StatusText = "Changes reverted";
     }
 
     protected async Task DeleteCurrentNativeSongAsync()

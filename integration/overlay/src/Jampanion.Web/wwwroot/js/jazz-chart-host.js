@@ -157,6 +157,7 @@ function installEmbeddedBridgeListener() {
                 case "compilePlayback": value = await compilePlayback(); break;
                 case "saveSongSettings": value = saveSongSettings(args.identity, args.tempoBpm, args.accompanimentStyle, args.tempoExplicit, args.semitoneShift); break;
                 case "saveCurrentChart": value = await saveCurrentChart(); break;
+                case "revertCurrentSong": value = await revertCurrentSong(); break;
                 case "selectSong": value = selectSong(args.songId); break;
                 case "setPlaybackState": value = setPlaybackState(args.isPlaying, args.sourceIndex); break;
                 case "highlightSourceBar": value = highlightSourceBar(args.sourceIndex, args.occurrence); break;
@@ -506,7 +507,7 @@ function installStandaloneSaveButton() {
     revertButton.addEventListener("click", async () => {
         revertButton.disabled = true;
         try {
-            await deleteCurrentNativeSong();
+            await revertCurrentSong();
             revertButton.textContent = "Reverted";
             window.setTimeout(() => { if (revertButton.isConnected) revertButton.textContent = "Revert"; }, 1200);
         } catch (error) {
@@ -526,7 +527,10 @@ function updateStandaloneSaveButton() {
     const song = currentSong();
     standaloneSaveButton.disabled = !editingEnabled || !song || song.source !== "native";
     if (!standaloneRevertButton) return;
-    const canRevert = Boolean(song?.source === "native" && song.originalSourceRecord?.body);
+    const canRevert = Boolean(song && (
+        (song.source === "native" && song.originalSourceRecord?.body) ||
+        hasSavedSongOverrides(song)
+    ));
     standaloneRevertButton.hidden = !canRevert;
     standaloneRevertButton.disabled = !editingEnabled || !canRevert;
 }
@@ -641,6 +645,34 @@ function loadSettingsMap() {
 function saveSettingsMap(value) {
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(value)); }
     catch { /* current-session state remains usable */ }
+}
+
+function removeSongSettings(identity) {
+    if (!identity) return;
+    const map = loadSettingsMap();
+    if (!Object.prototype.hasOwnProperty.call(map, identity)) return;
+    delete map[identity];
+    saveSettingsMap(map);
+}
+
+function hasSavedSongOverrides(song) {
+    const stored = loadSettingsMap()[songIdentity(song)];
+    if (!stored) return false;
+    const semitoneShift = Number(stored.semitoneShift);
+    if (Number.isFinite(semitoneShift) && Math.trunc(semitoneShift) !== 0) return true;
+
+    const meter = String(song?.timeSignature || "4/4");
+    const sourceStyle = meter === "3/4"
+        ? "JazzWaltz"
+        : iRealPlayerStyleForSong(song) || inferredStyle(song);
+    if (stored.accompanimentStyle && stored.accompanimentStyle !== sourceStyle) return true;
+
+    if (stored.tempoExplicit === true) {
+        const storedTempo = validTempo(stored.tempoBpm);
+        const sourceTempo = validTempo(song?.tempoBpm) ?? iRealTempoForSong(song);
+        if (storedTempo != null && (sourceTempo == null || storedTempo !== sourceTempo)) return true;
+    }
+    return false;
 }
 
 function inferredStyle(song) {
@@ -798,7 +830,8 @@ function summary(song) {
         accompanimentStyle: settings.accompanimentStyle,
         semitoneShift: settings.semitoneShift,
         isNative: song.source === "native",
-        hasOriginalSource: Boolean(song.originalSourceRecord?.body)
+        hasOriginalSource: Boolean(song.originalSourceRecord?.body),
+        hasSavedOverrides: hasSavedSongOverrides(song)
     };
 }
 
@@ -820,6 +853,7 @@ function getBootstrap() {
         semitoneShift: Number(viewer.state.semitones) || 0,
         isNative: song?.source === "native",
         hasOriginalSource: Boolean(song?.originalSourceRecord?.body),
+        hasSavedOverrides: hasSavedSongOverrides(song),
         viewMode: viewer.state.viewMode || "original"
     };
 }
@@ -1804,6 +1838,7 @@ export async function deleteCurrentNativeSong() {
     if (!song || song.source !== "native") return getBootstrap();
     const identity = songIdentity(song);
     const originalRecord = song.originalSourceRecord ? structuredCloneSafe(song.originalSourceRecord) : null;
+    removeSongSettings(identity);
     nativeSongs.delete(identity);
     try {
         const database = await openNativeDb();
@@ -1836,6 +1871,22 @@ export async function deleteCurrentNativeSong() {
     forceRender();
     annotateRenderedBars();
     rememberSelectedSong(currentSong());
+    queueBootstrapNotification();
+    return getBootstrap();
+}
+
+export async function revertCurrentSong() {
+    if (!embeddedMode) return await requestEmbedded("revertCurrentSong", {}, 10000);
+    const song = currentSong();
+    if (!song) return getBootstrap();
+    removeSongSettings(songIdentity(song));
+    if (song.source === "native" && song.originalSourceRecord?.body) {
+        return await deleteCurrentNativeSong();
+    }
+    restoreStoredTranspose();
+    forceRender();
+    annotateRenderedBars();
+    rememberSelectedSong(song);
     queueBootstrapNotification();
     return getBootstrap();
 }

@@ -16,6 +16,7 @@ public sealed record JazzSongSummary(
     string AccompanimentStyle,
     bool IsNative,
     bool HasOriginalSource,
+    bool HasSavedOverrides,
     int SemitoneShift);
 
 public sealed record JazzChartBootstrap(
@@ -32,6 +33,7 @@ public sealed record JazzChartBootstrap(
     string AccompanimentStyle,
     bool IsNative,
     bool HasOriginalSource,
+    bool HasSavedOverrides,
     string ViewMode,
     int SemitoneShift);
 
