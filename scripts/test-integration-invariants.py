@@ -38,7 +38,7 @@ checks = {
     "mobile brand text is hidden": 'jamp-brand-row strong { display:none; }' in (root / "integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text(),
     "Jampanion2 brand is shown": '<strong>Jampanion2</strong>' in home and '<PageTitle>Jampanion2</PageTitle>' in home,
     "startup brand is customized": 'customize-shell.mjs' in (root / "scripts/build-integrated.sh").read_text() and 'Jampanion2' in (root / "scripts/customize-shell.mjs").read_text(),
-    "cache-busted page versions": 'APP_VERSION = "29"' in (root / "scripts/customize-shell.mjs").read_text() and 'help.html?v=29' in (root / "scripts/customize-viewer.mjs").read_text() and 'help.en.html?v=29' in (root / "scripts/customize-viewer.mjs").read_text() and 'jazz-chart-host.js?v=22' in (root / "scripts/customize-viewer.mjs").read_text() and 'help.css?v=29' in (root / "scripts/customize-help.mjs").read_text() and 'jazz-chart-host.js?v=34' in logic and 'viewer/index.html?integrated=13' in home,
+    "cache-busted page versions": 'APP_VERSION = "29"' in (root / "scripts/customize-shell.mjs").read_text() and 'help.html?v=29' in (root / "scripts/customize-viewer.mjs").read_text() and 'help.en.html?v=29' in (root / "scripts/customize-viewer.mjs").read_text() and 'jazz-chart-host.js?v=23' in (root / "scripts/customize-viewer.mjs").read_text() and 'help.css?v=29' in (root / "scripts/customize-help.mjs").read_text() and 'jazz-chart-host.js?v=35' in logic and 'viewer/index.html?integrated=13' in home,
     "English Jampanion help is built": 'customize-help-en.mjs' in (root / "scripts/build-integrated.sh").read_text() and 'test-help-en-contract.mjs' in (root / "scripts/build-integrated.sh").read_text(),
     "transpose is saved with accompaniment settings": 'CurrentSemitoneShift' in logic and 'SemitoneShift' in (root / "integration/overlay/src/Jampanion.Web/Models/JazzChartModels.cs").read_text() and 'semitoneShift' in host and 'saveSongSettings' in logic,
     "standalone viewer Save includes settings": 'installStandaloneSaveButton' in host and 'jampanionStandaloneSave' in host and 'window.parent !== window' in host and 'hasUnsavedStandaloneSettings' in host and 'Save chart, key, tempo, and style' in host and 'Number(viewer.state.semitones) || 0' in host,
@@ -73,6 +73,8 @@ checks = {
     "bootstrap ignores cross-song changes during playback": 'Stop the session before changing songs' in logic,
     "chart editing survives viewer re-render": 'doc.addEventListener("dblclick", handleDoubleClick, true)' in host and 'observer.observe(doc, { childList: true, subtree: true })' in host,
     "blank chord cells add at the clicked beat": 'A rendered chord slot can span several empty beat cells' in host and 'first?.classList.contains("cell-positioned-slot")' in host and 'resolvedMeterAt(song.bars, sourceIndex) === "3/4" ? 6 : 8' in host and 'const existingIndex = sourceSlots.findIndex' in host,
+    "existing chord double-click opens its value": 'const chord = event.target.closest?.(".chord")' in host and 'editChord(sourceIndex, slotIndex, slot)' in host,
+    "new chord input divisions are capped at eight": 'Math.min(8, Math.max(1, renderedTotal' in host,
     "chart edits require an explicit save": 'HasUnsavedChartChanges' in logic and 'saveCurrentChart' in host and 'stageNative(song)' in host,
     "mixer preferences persist": 'saveMixerPreferences' in logic and 'getMixerPreferences' in logic and 'MIXER_SETTINGS_KEY' in host,
 }

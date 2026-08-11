@@ -1435,6 +1435,18 @@ function handleDoubleClick(event) {
         }
         return;
     }
+    const chord = event.target.closest?.(".chord");
+    if (chord) {
+        const slot = chord.closest(".chord-slot");
+        const bar = slot?.closest(".bar");
+        const sourceIndex = Number(bar?.dataset.sourceIndex);
+        const slotIndex = Number(slot?.dataset.slotIndex);
+        if (bar && Number.isInteger(sourceIndex) && Number.isInteger(slotIndex)) {
+            event.preventDefault();
+            editChord(sourceIndex, slotIndex, slot);
+            return;
+        }
+    }
     const slot = event.target.closest?.(".chord-slot");
     if (slot) {
         event.preventDefault();
@@ -1530,7 +1542,7 @@ function addChordAtPoint(sourceIndex, barElement, clientX) {
     const renderedTotal = first?.classList.contains("cell-positioned-slot")
         ? Number(first.dataset.gridTotal)
         : 0;
-    const total = Math.max(1, renderedTotal || (resolvedMeterAt(song.bars, sourceIndex) === "3/4" ? 6 : 8));
+    const total = Math.min(8, Math.max(1, renderedTotal || (resolvedMeterAt(song.bars, sourceIndex) === "3/4" ? 6 : 8)));
     const rect = barElement.getBoundingClientRect();
     const fraction = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, .9999);
     const startCell = Math.min(total - 1, Math.round(fraction * total));
@@ -1646,20 +1658,20 @@ function openEditor(anchor, value, commit) {
     const isRehearsal = Boolean(anchor?.closest?.(".rehearsal-mark") || anchor?.closest?.(".system-lead"));
     const visualAnchor = isChord ? (anchor.querySelector?.(".chord") || anchor) : anchor;
     const rect = visualAnchor?.getBoundingClientRect?.() || { left: 20, top: 20, width: 140, height: 30 };
-    const width = isChord || isRehearsal ? 64 : Math.min(180, Math.max(120, rect.width));
-    const height = 28;
+    const width = isChord || isRehearsal ? rect.width : Math.min(180, Math.max(120, rect.width));
+    const height = isChord || isRehearsal ? rect.height : 28;
     const left = rect.left;
-    const top = rect.top + (rect.height - height) / 2;
-    openEditorAtPoint(left, top, value, commit, width);
+    const top = rect.top;
+    openEditorAtPoint(left, top, value, commit, width, height);
 }
 
-function openEditorAtPoint(left, top, value, commit, width = 64) {
+function openEditorAtPoint(left, top, value, commit, width = 64, height = 28) {
     closeEditor(false);
     const input = doc.createElement("input");
     input.className = "jamp-edit-input";
     input.value = value;
-    const inputWidth = Math.max(52, Math.min(width, 180));
-    const inputHeight = 28;
+    const inputWidth = Math.max(1, Math.min(width, 180));
+    const inputHeight = Math.max(1, Math.min(height, 180));
     const maxLeft = Math.max(4, (win.innerWidth || inputWidth + 8) - inputWidth - 4);
     const maxTop = Math.max(4, (win.innerHeight || inputHeight + 8) - inputHeight - 4);
     input.style.left = `${Math.max(4, Math.min(left, maxLeft))}px`;
