@@ -72,7 +72,7 @@ checks = {
     "tempo rollback preserves Auto/manual state": 'previousTempoExplicit' in logic and 'previousTempoUserSet' in logic,
     "bootstrap ignores cross-song changes during playback": 'Stop the session before changing songs' in logic,
     "chart editing survives viewer re-render": 'doc.addEventListener("dblclick", handleDoubleClick, true)' in host and 'observer.observe(doc, { childList: true, subtree: true })' in host,
-    "empty native slot adds a chord": 'const sourceSlot = currentSong()?.bars?.[sourceIndex]?.chordSlots?.[slotIndex]' in host and 'addChordAtPoint(sourceIndex, bar, event.clientX)' in host,
+    "blank chord cells add at the clicked beat": 'A rendered chord slot can span several empty beat cells' in host and 'first?.classList.contains("cell-positioned-slot")' in host and 'resolvedMeterAt(song.bars, sourceIndex) === "3/4" ? 6 : 8' in host and 'const existingIndex = sourceSlots.findIndex' in host,
     "chart edits require an explicit save": 'HasUnsavedChartChanges' in logic and 'saveCurrentChart' in host and 'stageNative(song)' in host,
     "mixer preferences persist": 'saveMixerPreferences' in logic and 'getMixerPreferences' in logic and 'MIXER_SETTINGS_KEY' in host,
 }

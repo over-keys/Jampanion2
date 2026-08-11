@@ -1438,15 +1438,12 @@ function handleDoubleClick(event) {
     if (slot) {
         event.preventDefault();
         const bar = slot.closest(".bar");
-        const sourceIndex = Number(bar?.dataset.sourceIndex);
-        const slotIndex = Number(slot.dataset.slotIndex);
-        const sourceSlot = currentSong()?.bars?.[sourceIndex]?.chordSlots?.[slotIndex];
-        if (sourceSlot) {
-            editChord(sourceIndex, slotIndex, slot);
-        } else if (bar) {
-            // Empty native bars render a placeholder slot even though there is
-            // no source chord yet. Treat that placeholder as an add target.
-            addChordAtPoint(sourceIndex, bar, event.clientX);
+        if (bar) {
+            // A rendered chord slot can span several empty beat cells. Let
+            // addChordAtPoint use the actual pointer position: it edits an
+            // existing chord only when that exact beat already has one, and
+            // otherwise opens a new editor at the clicked beat.
+            addChordAtPoint(Number(bar.dataset.sourceIndex), bar, event.clientX);
         }
         return;
     }
@@ -1529,7 +1526,10 @@ function addChordAtPoint(sourceIndex, barElement, clientX) {
     const sourceSlots = bar.chordSlots || (bar.chordSlots = []);
     const domSlots = [...barElement.querySelectorAll(".chord-slot")];
     const first = domSlots[0];
-    const total = Math.max(1, Number(first?.dataset.gridTotal) || (resolvedMeterAt(song.bars, sourceIndex) === "3/4" ? 6 : 8));
+    const renderedTotal = first?.classList.contains("cell-positioned-slot")
+        ? Number(first.dataset.gridTotal)
+        : 0;
+    const total = Math.max(1, renderedTotal || (resolvedMeterAt(song.bars, sourceIndex) === "3/4" ? 6 : 8));
     const rect = barElement.getBoundingClientRect();
     const fraction = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, .9999);
     const startCell = Math.min(total - 1, Math.round(fraction * total));
