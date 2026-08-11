@@ -40,6 +40,7 @@ let bridgeStartupError = null;
 let bridgeRequestId = 0;
 let lastSongRestorePending = true;
 let standaloneSaveButton;
+let standaloneRevertButton;
 const bridgePending = new Map();
 const bridgeReadyWaiters = new Set();
 const BRIDGE_CHANNEL = "jampanion-jcv-v12";
@@ -85,7 +86,7 @@ function installParentBridgeListener() {
             return;
         }
         if (data.type === "event") {
-            if (data.name === "bootstrapChanged") {
+        if (data.name === "bootstrapChanged") {
                 void dotNet?.invokeMethodAsync("ChartBootstrapChanged", data.value);
             } else if (data.name === "edited") {
                 void dotNet?.invokeMethodAsync("ChartEdited", String(data.message || "Chart updated"));
@@ -445,7 +446,10 @@ function installChartListeners() {
     doc.addEventListener("contextmenu", handleContextMenu, true);
     doc.addEventListener("click", event => {
         if (!event.target.closest?.("[data-song-id]")) return;
-        setTimeout(() => rememberSelectedSong(), 0);
+        setTimeout(() => {
+            rememberSelectedSong();
+            updateStandaloneSaveButton();
+        }, 0);
     }, true);
     doc.addEventListener("pointerdown", event => {
         if (contextMenu && !event.target.closest?.(".jamp-context-menu")) closeContextMenu();
@@ -490,6 +494,30 @@ function installStandaloneSaveButton() {
     });
     standaloneSaveButton = button;
     utilityGroup.insertBefore(button, settingsButton);
+
+    const revertButton = doc.createElement("button");
+    revertButton.id = "jampanionStandaloneRevert";
+    revertButton.type = "button";
+    revertButton.className = "text-button standalone-save";
+    revertButton.textContent = "Revert";
+    revertButton.title = "Restore the original iReal chart";
+    revertButton.setAttribute("aria-label", "Restore the original iReal chart");
+    revertButton.hidden = true;
+    revertButton.addEventListener("click", async () => {
+        revertButton.disabled = true;
+        try {
+            await deleteCurrentNativeSong();
+            revertButton.textContent = "Reverted";
+            window.setTimeout(() => { if (revertButton.isConnected) revertButton.textContent = "Revert"; }, 1200);
+        } catch (error) {
+            revertButton.textContent = "Revert";
+            window.alert(error instanceof Error ? error.message : String(error));
+        } finally {
+            updateStandaloneSaveButton();
+        }
+    });
+    standaloneRevertButton = revertButton;
+    utilityGroup.insertBefore(revertButton, settingsButton);
     updateStandaloneSaveButton();
 }
 
@@ -497,6 +525,10 @@ function updateStandaloneSaveButton() {
     if (!standaloneSaveButton) return;
     const song = currentSong();
     standaloneSaveButton.disabled = !editingEnabled || !song || song.source !== "native";
+    if (!standaloneRevertButton) return;
+    const canRevert = Boolean(song?.source === "native" && song.originalSourceRecord?.body);
+    standaloneRevertButton.hidden = !canRevert;
+    standaloneRevertButton.disabled = !editingEnabled || !canRevert;
 }
 
 function startLibraryWatcher() {
@@ -517,6 +549,7 @@ function startLibraryWatcher() {
             }
             annotateRenderedBars();
             queueBootstrapNotification();
+            updateStandaloneSaveButton();
         }
         if (lastSongRestorePending && libraryChanged) restoreLastSelectedSong();
         else if (libraryChanged) restoreStoredTranspose();
@@ -591,6 +624,7 @@ function restoreLastSelectedSong() {
         forceRender();
         annotateRenderedBars();
     }
+    updateStandaloneSaveButton();
     return changed;
 }
 

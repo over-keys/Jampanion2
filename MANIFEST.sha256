@@ -12,14 +12,14 @@ c63eda965bc5167c9cdb73f9ee6659643e3f9e81ecacc06a5687e65ce81285a2  ./integration/
 59410a51f34d8bc83be65f94efb476a162b0f0f097b504490a2b1693a3a6d029  ./integration/overlay/src/Jampanion.Web/Pages/Home.razor
 6da449290bee896123e916ec82dd65f63476772141d54f282bb40fe3cd9dd9d5  ./integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs
 68c11440ba1b5b7348f58c69b7d8c5e0498662faaacecdf180c1345ad80fd97f  ./integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css
-e61232719b22261ed3d1dd4cbc8695450bd3ec5a7657dbc38866a85c8c065b4d  ./integration/overlay/src/Jampanion.Web/wwwroot/js/jazz-chart-host.js
+bf826eb36e4d5601f1bc30465514a4ca3b859e07659ab4353d617a8fd0ad90b7  ./integration/overlay/src/Jampanion.Web/wwwroot/js/jazz-chart-host.js
 e09c46e5f1832b328099af7c0a04aff18a0bd6ca9302637ac1da792a907e152e  ./scripts/build-integrated.sh
 173909458aa63bb857ee24996e9d1feb8d1fbc0381c48792bb4238cbfa4ddc19  ./scripts/customize-help.mjs
 eab461db16d46268dcce72f29e4beee346ea326efe1838dda4e8aaccc8aebabc  ./scripts/customize-help-en.mjs
-85d0bd1097d36546bee692f7f47f59b48dca7b5485927335a2749198177a29f8  ./scripts/customize-viewer.mjs
+a294077e00b2254e34522786c9de1fc81b4cd169b64346789819149fa5737606  ./scripts/customize-viewer.mjs
 82387def5dd5dd2202c3f527b0c9f91f9e46fe870e2206cf34402208612b5ad9  ./scripts/prepare-pages.sh
 8b386cf94cdc14bed95cc61c381c4bf1db1d35cb2569ed0911f2956d9d011910  ./scripts/test-chart-bridge.sh
-78b102d2075937de0d3723542c9eba3d166f3804181a0eb11c7ed554dd24a64a  ./scripts/test-integration-invariants.py
+09b0a06219b60315fe53d9dd02f3b1a87c7ed947362c2b46e52be1ebc0e7046a  ./scripts/test-integration-invariants.py
 9e71270fc8fcd8d0f30c6c29105a7f793b81bc26371a4701aa089eba2d2a640e  ./scripts/customize-shell.mjs
 f998f00dca511c1b9bd46329240a82b77337718829a10245868ccacfdb44d715  ./scripts/test-shell-contract.mjs
 e11df553dc3e3f2bf154b75df723f3228fdb27957f8565c9514d96d88763327a  ./scripts/test-help-contract.mjs
@@ -27,4 +27,4 @@ f2adbc7585e3089f48daa7afd57094b7a12f387406ea765b61d337be0746d9c5  ./scripts/test
 e13b1f3d453bc7acaec4f6a8e6bfb3663fef44d3e72c72c3be97ce28974db5a1  ./scripts/test-jazz-timing.mjs
 91d314a0abddcb68de32a6f4d7ed0e0aa596a95e05881df3d83dfe57bb85b0b9  ./scripts/test-tempo-state.sh
 9b0eb57d9cc372ff4870ed9363ac638f11ebb6acff22843e27bfa28d9e12e035  ./scripts/test-viewer-contract.mjs
-90f993e68201cf3f56b121388f647d9ff9237acd5f7bee750c9374511da3d02b  ./scripts/validate-static.sh
+94436208775ddefc5d26099ade2ed0a316bbea8bb8a1cc082ca692f396ffe6e8  ./scripts/validate-static.sh

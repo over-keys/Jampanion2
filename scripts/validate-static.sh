@@ -45,7 +45,7 @@ grep -q 'APP_VERSION = "29"' "$ROOT/scripts/customize-shell.mjs"
 grep -q 'help.html?v=29' "$ROOT/scripts/customize-viewer.mjs"
 grep -q 'help.en.html?v=29' "$ROOT/scripts/customize-viewer.mjs"
 grep -q 'help.css?v=29' "$ROOT/scripts/customize-help.mjs"
-grep -q 'jazz-chart-host.js?v=20' "$ROOT/scripts/customize-viewer.mjs"
+grep -q 'jazz-chart-host.js?v=21' "$ROOT/scripts/customize-viewer.mjs"
 grep -q 'jazz-chart-host.js?v=33' "$ROOT/integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs"
 
 # Native IndexedDB loading is asynchronous and must not block ChartReady.
