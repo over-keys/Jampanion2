@@ -32,6 +32,8 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     private bool _savedTempoUserSet;
     private AccompanimentStyle _savedStyle = AccompanimentStyle.Swing;
     private int _savedSemitoneShift;
+    private bool? _lastToolbarDirty;
+    private bool? _lastToolbarRevertVisible;
 
     [Inject] public IJSRuntime JS { get; set; } = default!;
 
@@ -88,7 +90,9 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         CurrentSemitoneShift != _savedSemitoneShift;
     protected bool HasUnsavedChanges => HasUnsavedChartChanges || HasUnsavedAccompanimentChanges;
     protected bool CanRevertCurrentSong =>
-        (CurrentSongIsNative && CurrentNativeHasOriginalSource) || CurrentSongHasSavedOverrides;
+        HasUnsavedAccompanimentChanges ||
+        CurrentSongHasSavedOverrides ||
+        (CurrentSongIsNative && CurrentNativeHasOriginalSource);
 
 
     protected IReadOnlyList<AccompanimentStyle> StyleChoices => CurrentMeter == "3/4"
@@ -116,16 +120,37 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
-
-        // The chart pane is independently usable. A transient bridge failure must
-        // never permanently disable Session controls; Start Session retries the
-        // bridge against the currently selected chart.
-        if (await TryConnectChartAsync(reportFailure: false))
+        if (firstRender)
         {
-            await RestoreMixerPreferencesAsync();
+            // The chart pane is independently usable. A transient bridge failure must
+            // never permanently disable Session controls; Start Session retries the
+            // bridge against the currently selected chart.
+            if (await TryConnectChartAsync(reportFailure: false))
+            {
+                await RestoreMixerPreferencesAsync();
+            }
+            await InvokeAsync(StateHasChanged);
         }
-        await InvokeAsync(StateHasChanged);
+        await SyncToolbarRevertAsync();
+    }
+
+    private async Task SyncToolbarRevertAsync()
+    {
+        if (!ChartReady || _chartModule is null) return;
+        var dirty = HasUnsavedChanges;
+        var visible = CanRevertCurrentSong;
+        if (_lastToolbarDirty == dirty && _lastToolbarRevertVisible == visible) return;
+        _lastToolbarDirty = dirty;
+        _lastToolbarRevertVisible = visible;
+        try
+        {
+            await _chartModule.InvokeVoidAsync("setToolbarState", dirty, visible);
+        }
+        catch
+        {
+            _lastToolbarDirty = null;
+            _lastToolbarRevertVisible = null;
+        }
     }
 
     private async Task<bool> TryConnectChartAsync(bool reportFailure)
@@ -133,7 +158,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         try
         {
             _self ??= DotNetObjectReference.Create(this);
-            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=37");
+            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=42");
             try { await _chartModule.InvokeVoidAsync("initializeMobileControlsScrollHint"); } catch { }
             var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("initialize", "jcv-frame", _self);
             ApplyBootstrap(bootstrap);
@@ -188,6 +213,13 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     public async Task RevertChartFromToolbarAsync()
     {
         await RevertCurrentSongAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable("NewSongFromToolbar")]
+    public async Task NewSongFromToolbarAsync()
+    {
+        OpenNewSong();
         await InvokeAsync(StateHasChanged);
     }
 
@@ -1126,6 +1158,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             {
                 await SaveSongSettingsAsync();
                 CaptureAccompanimentSettingsBaseline();
+                CurrentSongHasSavedOverrides = true;
             }
 
             StatusText = "Changes saved";

@@ -28,7 +28,7 @@ if grep -q 'storedTempo !== 140' "$HOST"; then
   echo 'Legacy 140 migration heuristic must not be present.' >&2
   exit 1
 fi
-grep -q './js/jazz-chart-host.js?v=37' "$LOGIC"
+grep -q './js/jazz-chart-host.js?v=42' "$LOGIC"
 grep -q 'viewer/index.html?integrated=13' "$HOME_RAZOR"
 echo 'Style-aware tempo regression checks passed.'
 
@@ -42,7 +42,7 @@ grep -q 'validTempo(song?.tempoBpm) ?? iRealTempoForSong(song)' "$HOST"
 grep -q 'TempoIsUserSet = bootstrap.TempoUserExplicit;' "$LOGIC"
 ! grep -q 'ResetTempoAutoAsync' "$LOGIC"
 grep -q 'SaveAccompanimentSettingsAsync' "$LOGIC"
-grep -q 'HasUnsavedChanges' "$HOME_RAZOR"
+grep -q 'HasUnsavedChanges' "$LOGIC"
 grep -q 'extractIRealPlayerStyleFromRecord' "$HOST"
 grep -q 'stored.accompanimentStyle || sourcePlayerStyle || inferredStyle(song)' "$HOST"
 grep -q 'step="5"' "$HOME_RAZOR"

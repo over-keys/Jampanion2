@@ -39,8 +39,11 @@ let bridgeReady = false;
 let bridgeStartupError = null;
 let bridgeRequestId = 0;
 let lastSongRestorePending = true;
+let standaloneNewButton;
 let standaloneSaveButton;
 let standaloneRevertButton;
+let toolbarHasUnsavedChanges = false;
+let toolbarRevertVisible = false;
 const bridgePending = new Map();
 const bridgeReadyWaiters = new Set();
 const BRIDGE_CHANNEL = "jampanion-jcv-v12";
@@ -96,6 +99,8 @@ function installParentBridgeListener() {
                 invokeToolbarAction("SaveChartFromToolbar", "save");
             } else if (data.name === "toolbarRevert") {
                 invokeToolbarAction("RevertChartFromToolbar", "revert");
+            } else if (data.name === "toolbarNew") {
+                void dotNet?.invokeMethodAsync("NewSongFromToolbar");
             } else if (data.name === "layoutChanged") {
                 applyEmbeddedFrameHeight(data.value?.height);
             }
@@ -185,6 +190,8 @@ function installEmbeddedBridgeListener() {
                 case "highlightSourceBar": value = highlightSourceBar(args.sourceIndex, args.occurrence); break;
                 case "createNewSong": value = await createNewSong(args.title, args.barCount, args.meter, args.key, args.accompanimentStyle); break;
                 case "deleteCurrentNativeSong": value = await deleteCurrentNativeSong(); break;
+                case "setToolbarState": value = setToolbarState(args.dirty, args.canRevert); break;
+                case "setToolbarRevertVisible": value = setToolbarRevertVisible(args.visible); break;
                 default: throw new Error(`Unknown Jazz Chart Viewer bridge action: ${data.action}`);
             }
             postToParent({ type: "response", id: data.id, ok: true, value });
@@ -319,12 +326,14 @@ export async function initializeEmbeddedViewer() {
     embeddedMode = true;
     win = window;
     doc = document;
-    doc.body.classList.add("jampanion-embedded");
+    if (window.parent !== window) doc.body.classList.add("jampanion-embedded");
     await waitForLocalViewer();
     if (!initialized) {
         try { installIntegrationCss(); } catch (error) { console.warn("Integration CSS setup failed", error); }
         try { installChartListeners(); } catch (error) { console.warn("Chart listener setup failed", error); }
-        try { installStandaloneSaveButton(); } catch (error) { console.warn("Standalone Save setup failed", error); }
+        // Both integrated and standalone Viewer modes use one compact toolbar
+        // row for Fit, New, Save, and Revert.
+        try { installStandaloneSaveButton(); } catch (error) { console.warn("Toolbar action setup failed", error); }
         try { annotateRenderedBars(); } catch (error) { console.warn("Chart annotation failed", error); }
         try { startLibraryWatcher(); } catch (error) { console.warn("Library watcher setup failed", error); }
         try { installEmbeddedShortcuts(); } catch (error) { console.warn("Embedded shortcut setup failed", error); }
@@ -339,6 +348,7 @@ export async function initializeEmbeddedViewer() {
                 restoreLastSelectedSong();
                 restoreStoredTranspose();
                 annotateRenderedBars();
+                syncStandaloneRevertState();
                 queueBootstrapNotification();
             } catch (error) {
                 console.warn("Native song merge failed", error);
@@ -457,10 +467,12 @@ function installIntegrationCss() {
       }
       .utility-group .standalone-save,
       .scale-group .standalone-save {
-        box-sizing:border-box; flex:0 0 48px; width:48px; min-width:48px;
+        box-sizing:border-box; flex:0 0 auto; width:auto; min-width:0;
         padding-inline:4px; text-align:center; white-space:nowrap;
         display:inline-flex; align-items:center; justify-content:center;
       }
+      .utility-group .standalone-save[hidden],
+      .scale-group .standalone-save[hidden] { display:none !important; }
     `;
     doc.head.appendChild(style);
 }
@@ -493,6 +505,7 @@ function installChartListeners() {
 
     for (const id of ["keyDown", "keyUp", "accidentalGroup", "viewModeGroup", "scale", "scaleAuto"]) {
         doc.getElementById(id)?.addEventListener("click", () => {
+            if (id === "keyDown" || id === "keyUp") setToolbarRevertVisible(true);
             updateStandaloneSaveButton();
             queueBootstrapNotification();
         }, true);
@@ -508,9 +521,9 @@ function handleToolbarResult(data) {
         updateStandaloneSaveButton();
         return;
     }
-    button.textContent = data.action === "save" ? "Saved" : "Rev.";
+    button.textContent = data.action === "save" ? "Saved" : "Revert";
     window.setTimeout(() => {
-        if (button.isConnected) button.textContent = data.action === "save" ? "Save" : "Rev.";
+        if (button.isConnected) button.textContent = data.action === "save" ? "Save" : "Revert";
     }, 1200);
     updateStandaloneSaveButton();
 }
@@ -519,6 +532,32 @@ function installStandaloneSaveButton() {
     if (standaloneSaveButton) return;
     const fitButton = doc.getElementById("scaleAuto");
     if (!fitButton) return;
+
+    const newButton = doc.createElement("button");
+    newButton.id = "jampanionStandaloneNew";
+    newButton.type = "button";
+    newButton.className = "text-button standalone-save";
+    newButton.textContent = "New";
+    newButton.title = "Create a new editable chart";
+    newButton.setAttribute("aria-label", "Create a new editable chart");
+    newButton.addEventListener("click", async () => {
+        if (newButton.disabled) return;
+        if (window.parent !== window) {
+            postToParent({ type: "event", name: "toolbarNew" });
+            return;
+        }
+        const title = window.prompt("Song title", "Untitled");
+        if (title === null) return;
+        newButton.disabled = true;
+        try {
+            await createNewSong(title, 32, "4/4", "C", "Swing");
+        } catch (error) {
+            window.alert(error instanceof Error ? error.message : String(error));
+        } finally {
+            updateStandaloneSaveButton();
+        }
+    });
+    standaloneNewButton = newButton;
 
     const button = doc.createElement("button");
     button.id = "jampanionStandaloneSave";
@@ -550,7 +589,7 @@ function installStandaloneSaveButton() {
     revertButton.id = "jampanionStandaloneRevert";
     revertButton.type = "button";
     revertButton.className = "text-button standalone-save";
-    revertButton.textContent = "Rev.";
+    revertButton.textContent = "Revert";
     revertButton.title = "Restore the original iReal chart";
     revertButton.setAttribute("aria-label", "Restore the original iReal chart");
     revertButton.addEventListener("click", async () => {
@@ -560,18 +599,18 @@ function installStandaloneSaveButton() {
                 postToParent({ type: "event", name: "toolbarRevert" });
             } else {
                 await revertCurrentSong();
-                revertButton.textContent = "Rev.";
-                window.setTimeout(() => { if (revertButton.isConnected) revertButton.textContent = "Rev."; }, 1200);
+                revertButton.textContent = "Revert";
+                window.setTimeout(() => { if (revertButton.isConnected) revertButton.textContent = "Revert"; }, 1200);
             }
         } catch (error) {
-            revertButton.textContent = "Rev.";
+            revertButton.textContent = "Revert";
             window.alert(error instanceof Error ? error.message : String(error));
         } finally {
             updateStandaloneSaveButton();
         }
     });
     standaloneRevertButton = revertButton;
-    fitButton.after(button, revertButton);
+    fitButton.after(newButton, button, revertButton);
     updateStandaloneSaveButton();
 }
 
@@ -579,15 +618,31 @@ function updateStandaloneSaveButton() {
     if (!standaloneSaveButton) return;
     const song = currentSong();
     const embeddedToolbar = window.parent !== window;
-    standaloneSaveButton.disabled = !editingEnabled || !song ||
-        (!embeddedToolbar && song.source !== "native" && !hasUnsavedStandaloneSettings(song));
+    const hasChanges = embeddedToolbar
+        ? toolbarHasUnsavedChanges
+        : toolbarHasUnsavedChanges || hasUnsavedStandaloneSettings(song);
+    standaloneSaveButton.disabled = !editingEnabled || !song || !hasChanges;
+    if (standaloneNewButton) standaloneNewButton.disabled = !editingEnabled;
     if (!standaloneRevertButton) return;
-    const canRevert = Boolean(song && (
-        (song.source === "native" && song.originalSourceRecord?.body) ||
-        hasSavedSongOverrides(song)
-    ));
-    standaloneRevertButton.hidden = false;
-    standaloneRevertButton.disabled = !editingEnabled || !canRevert;
+    standaloneRevertButton.hidden = !toolbarRevertVisible;
+    standaloneRevertButton.disabled = !editingEnabled || !toolbarRevertVisible;
+}
+
+export function setToolbarState(dirty, canRevert = dirty) {
+    if (!embeddedMode) return requestEmbedded("setToolbarState", { dirty, canRevert }, 10000);
+    toolbarHasUnsavedChanges = Boolean(dirty);
+    toolbarRevertVisible = Boolean(canRevert);
+    updateStandaloneSaveButton();
+}
+
+export function setToolbarRevertVisible(visible) {
+    if (!embeddedMode) return requestEmbedded("setToolbarRevertVisible", { visible }, 10000);
+    toolbarHasUnsavedChanges = Boolean(visible);
+    toolbarRevertVisible = Boolean(visible);
+    if (standaloneRevertButton) {
+        standaloneRevertButton.hidden = !toolbarRevertVisible;
+        standaloneRevertButton.disabled = !editingEnabled || !toolbarRevertVisible;
+    }
 }
 
 function startLibraryWatcher() {
@@ -728,6 +783,19 @@ function hasSavedSongOverrides(song) {
         if (storedTempo != null && (sourceTempo == null || storedTempo !== sourceTempo)) return true;
     }
     return false;
+}
+
+function canRevertSong(song) {
+    return Boolean(song && (
+        hasSavedSongOverrides(song) ||
+        (song.source === "native" && song.originalSourceRecord?.body)
+    ));
+}
+
+function syncStandaloneRevertState(song = currentSong()) {
+    if (window.parent !== window) return;
+    toolbarRevertVisible = canRevertSong(song);
+    updateStandaloneSaveButton();
 }
 
 function inferredStyle(song) {
@@ -945,6 +1013,7 @@ export function selectSong(songId) {
     if (!song) throw new Error("The selected song is no longer in the library.");
     viewer.state.selectedId = song.id;
     viewer.state.semitones = songSettings(song).semitoneShift;
+    setToolbarState(false, canRevertSong(song));
     forceRender();
     annotateRenderedBars();
     rememberSelectedSong(song);
@@ -1494,6 +1563,19 @@ function handleDoubleClick(event) {
         }
         return;
     }
+    const clickedBar = event.target.closest?.(".bar:not(.spacer)");
+    if (clickedBar) {
+        const sourceIndex = Number(clickedBar.dataset.sourceIndex);
+        const grid = chordInputGrid(sourceIndex, clickedBar, event.clientX);
+        // The pointer position decides the beat before hit-testing the chord
+        // text. A long first-beat chord must not steal a double-click that is
+        // visibly placed on beats 2–4.
+        if (Number.isInteger(sourceIndex) && grid.startCell > 0) {
+            event.preventDefault();
+            addChordAtPoint(sourceIndex, clickedBar, event.clientX);
+            return;
+        }
+    }
     const chord = event.target.closest?.(".chord");
     if (chord) {
         const slot = chord.closest(".chord-slot");
@@ -1604,15 +1686,8 @@ function addChordAtPoint(sourceIndex, barElement, clientX) {
     const bar = song?.bars?.[sourceIndex];
     if (!bar) return;
     const sourceSlots = bar.chordSlots || (bar.chordSlots = []);
-    const domSlots = [...barElement.querySelectorAll(".chord-slot")];
-    const first = domSlots[0];
-    const renderedTotal = first?.classList.contains("cell-positioned-slot")
-        ? Number(first.dataset.gridTotal)
-        : 0;
-    const total = Math.min(8, Math.max(1, renderedTotal || (resolvedMeterAt(song.bars, sourceIndex) === "3/4" ? 6 : 8)));
+    const { domSlots, total, startCell } = chordInputGrid(sourceIndex, barElement, clientX);
     const rect = barElement.getBoundingClientRect();
-    const fraction = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, .9999);
-    const startCell = Math.min(total - 1, Math.round(fraction * total));
 
     normalizeBarGridFromDom(bar, barElement, total);
     const existingIndex = sourceSlots.findIndex(slot => Number(slot.cell) === startCell && !slot.hidden);
@@ -1635,6 +1710,27 @@ function addChordAtPoint(sourceIndex, barElement, clientX) {
         forceRender();
         await edited("Chord added");
     });
+}
+
+function chordInputGrid(sourceIndex, barElement, clientX) {
+    const song = currentSong();
+    const domSlots = [...(barElement?.querySelectorAll?.(".chord-slot") || [])];
+    const first = domSlots[0];
+    const renderedTotal = first?.classList.contains("cell-positioned-slot")
+        ? Number(first.dataset.gridTotal)
+        : 0;
+    const meter = song ? resolvedMeterAt(song.bars, sourceIndex) : "4/4";
+    const maxInputCells = meter === "3/4" ? 3 : 4;
+    const total = Math.min(maxInputCells, Math.max(1, renderedTotal || maxInputCells));
+    const rect = barElement?.getBoundingClientRect?.();
+    const fraction = rect
+        ? clamp((clientX - rect.left) / Math.max(1, rect.width), 0, .9999)
+        : 0;
+    return {
+        domSlots,
+        total,
+        startCell: Math.min(total - 1, Math.round(fraction * total))
+    };
 }
 
 function normalizeBarGridFromDom(bar, barElement, total) {
@@ -1775,6 +1871,7 @@ function closeEditor(commit = false) {
 
 async function edited(message) {
     annotateRenderedBars();
+    setToolbarState(true, canRevertSong(currentSong()));
     updateStandaloneSaveButton();
     queueBootstrapNotification();
     if (embeddedMode) postToParent({ type: "event", name: "edited", message });
@@ -1824,6 +1921,7 @@ export async function saveCurrentChart() {
         Number(viewer.state.semitones) || 0);
 
     if (song.source === "native") await persistNative(song);
+    setToolbarState(false, canRevertSong(song));
     updateStandaloneSaveButton();
     annotateRenderedBars();
     queueBootstrapNotification();
@@ -2003,6 +2101,7 @@ export async function revertCurrentSong() {
     if (!embeddedMode) return await requestEmbedded("revertCurrentSong", {}, 10000);
     const song = currentSong();
     if (!song) return getBootstrap();
+    setToolbarState(false, false);
     removeSongSettings(songIdentity(song));
     if (song.source === "native" && song.originalSourceRecord?.body) {
         return await deleteCurrentNativeSong();

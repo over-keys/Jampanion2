@@ -3,16 +3,11 @@
 @implements IAsyncDisposable
 
 <PageTitle>Jampanion2</PageTitle>
-<link rel="stylesheet" href="css/jazz-integration.css?v=21" />
+<link rel="stylesheet" href="css/jazz-integration.css?v=23" />
 
 <div class="jamp-shell @(IsPlaying ? "is-playing" : string.Empty)">
     <aside class="jamp-sidebar">
         <div class="jamp-mobile-controls">
-            <section class="jamp-brand-row">
-                <strong>Jampanion2</strong>
-                <button class="tiny" @onclick="OpenNewSong" disabled="@(IsPlaying || IsLoading)">New</button>
-            </section>
-
             <section class="jamp-panel session-panel">
                 <h2>Session</h2>
                 <div class="session-controls">
@@ -53,6 +48,11 @@
                         Volume="DrumsVolume" VolumeChanged="OnDrumsVolumeChanged" />
             <MixerStrip Name="MIDI thru" Enabled="MidiThruEnabled" EnabledChanged="OnMidiThruEnabledChanged"
                         Volume="VibraphoneVolume" VolumeChanged="OnVibraphoneVolumeChanged" />
+        </section>
+
+        <section class="jamp-brand-row">
+            <img src="icons/jampanion-32.png?v=21" alt="" width="22" height="22" />
+            <strong>Jampanion2</strong>
         </section>
 
     </aside>
