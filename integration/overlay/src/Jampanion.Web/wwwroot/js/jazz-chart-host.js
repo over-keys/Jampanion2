@@ -410,9 +410,10 @@ function installIntegrationCss() {
         }
       }
       .jamp-edit-input {
-        position:fixed; z-index:99999; box-sizing:border-box; min-width:72px;
-        height:34px; padding:3px 7px; border:2px solid #1f5f74; border-radius:5px;
-        background:white; color:#111; font:600 20px/1.1 Arial,sans-serif; box-shadow:0 4px 14px #0002;
+        position:fixed; z-index:99999; box-sizing:border-box; min-width:0;
+        height:28px; padding:2px 5px; border:1.5px solid #1f5f74; border-radius:4px;
+        background:white; color:#111; font:600 15px/1 Arial,sans-serif;
+        text-align:center; box-shadow:0 2px 8px #0002;
       }
       .jamp-context-menu {
         position:fixed; z-index:100000; min-width:190px; padding:5px;
@@ -1541,7 +1542,7 @@ function addChordAtPoint(sourceIndex, barElement, clientX) {
         return;
     }
 
-    openEditorAtPoint(clientX, rect.top + 12, "", async value => {
+    openEditorAtPoint(clientX - 32, rect.top + 12, "", async value => {
         const chord = value.trim();
         if (!chord) return;
         promoteNative(song);
@@ -1641,18 +1642,30 @@ function closeContextMenu() {
 }
 
 function openEditor(anchor, value, commit) {
-    const rect = anchor?.getBoundingClientRect?.() || { left: 20, top: 20, width: 140, height: 30 };
-    openEditorAtPoint(rect.left, rect.top, value, commit, Math.max(100, rect.width));
+    const isChord = Boolean(anchor?.closest?.(".chord-slot"));
+    const isRehearsal = Boolean(anchor?.closest?.(".rehearsal-mark") || anchor?.closest?.(".system-lead"));
+    const visualAnchor = isChord ? (anchor.querySelector?.(".chord") || anchor) : anchor;
+    const rect = visualAnchor?.getBoundingClientRect?.() || { left: 20, top: 20, width: 140, height: 30 };
+    const width = isChord || isRehearsal ? 64 : Math.min(180, Math.max(120, rect.width));
+    const height = 28;
+    const left = rect.left + (rect.width - width) / 2;
+    const top = rect.top + (rect.height - height) / 2;
+    openEditorAtPoint(left, top, value, commit, width);
 }
 
-function openEditorAtPoint(left, top, value, commit, width = 120) {
+function openEditorAtPoint(left, top, value, commit, width = 64) {
     closeEditor(false);
     const input = doc.createElement("input");
     input.className = "jamp-edit-input";
     input.value = value;
-    input.style.left = `${Math.max(4, left)}px`;
-    input.style.top = `${Math.max(4, top)}px`;
-    input.style.width = `${Math.max(80, Math.min(width, 240))}px`;
+    const inputWidth = Math.max(52, Math.min(width, 180));
+    const inputHeight = 28;
+    const maxLeft = Math.max(4, (win.innerWidth || inputWidth + 8) - inputWidth - 4);
+    const maxTop = Math.max(4, (win.innerHeight || inputHeight + 8) - inputHeight - 4);
+    input.style.left = `${Math.max(4, Math.min(left, maxLeft))}px`;
+    input.style.top = `${Math.max(4, Math.min(top, maxTop))}px`;
+    input.style.width = `${inputWidth}px`;
+    input.style.height = `${inputHeight}px`;
     editInput = input;
     let finished = false;
     const finish = async shouldCommit => {
