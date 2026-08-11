@@ -413,7 +413,7 @@ function installIntegrationCss() {
         position:fixed; z-index:99999; box-sizing:border-box; min-width:0;
         height:28px; padding:2px 5px; border:1.5px solid #1f5f74; border-radius:4px;
         background:white; color:#111; font:600 15px/1 Arial,sans-serif;
-        text-align:center; box-shadow:0 2px 8px #0002;
+        text-align:left; box-shadow:0 2px 8px #0002;
       }
       .jamp-context-menu {
         position:fixed; z-index:100000; min-width:190px; padding:5px;
@@ -1542,7 +1542,7 @@ function addChordAtPoint(sourceIndex, barElement, clientX) {
         return;
     }
 
-    openEditorAtPoint(clientX - 32, rect.top + 12, "", async value => {
+    openEditorAtPoint(clientX, rect.top + 12, "", async value => {
         const chord = value.trim();
         if (!chord) return;
         promoteNative(song);
@@ -1648,7 +1648,7 @@ function openEditor(anchor, value, commit) {
     const rect = visualAnchor?.getBoundingClientRect?.() || { left: 20, top: 20, width: 140, height: 30 };
     const width = isChord || isRehearsal ? 64 : Math.min(180, Math.max(120, rect.width));
     const height = 28;
-    const left = rect.left + (rect.width - width) / 2;
+    const left = rect.left;
     const top = rect.top + (rect.height - height) / 2;
     openEditorAtPoint(left, top, value, commit, width);
 }
