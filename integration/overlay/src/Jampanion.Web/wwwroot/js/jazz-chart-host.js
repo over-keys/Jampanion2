@@ -1410,6 +1410,19 @@ export function gridCellToTick(startCell, totalCells, meter) {
     return Math.max(0, Math.min(ticks - 1, Math.round(start / total * ticks)));
 }
 
+function rehearsalBandHeight(row) {
+    const reference = row?.querySelector?.(".system-lead .rehearsal-mark") || doc.querySelector(".rehearsal-mark");
+    const height = Number(reference?.getBoundingClientRect?.().height || 0);
+    return height > 0 ? height : 24;
+}
+
+function isRehearsalEditPoint(event, bar) {
+    const rect = bar?.getBoundingClientRect?.();
+    if (!rect) return false;
+    const bandHeight = rehearsalBandHeight(bar.closest?.(".system-row"));
+    return event.clientY >= rect.top && event.clientY <= rect.top + bandHeight;
+}
+
 function handleDoubleClick(event) {
     if (!editingEnabled || viewer.state.viewMode !== "original") return;
     const title = event.target.closest?.(".score-header h1");
@@ -1429,7 +1442,7 @@ function handleDoubleClick(event) {
     if (lead) {
         const firstBar = lead.closest(".system-row")?.querySelector(".bar:not(.spacer)");
         const sourceIndex = Number(firstBar?.dataset.sourceIndex);
-        if (Number.isInteger(sourceIndex)) {
+        if (Number.isInteger(sourceIndex) && isRehearsalEditPoint(event, firstBar)) {
             event.preventDefault();
             editRehearsal(sourceIndex, lead);
         }
@@ -1447,6 +1460,15 @@ function handleDoubleClick(event) {
             return;
         }
     }
+    const bar = event.target.closest?.(".bar:not(.spacer)");
+    if (bar && isRehearsalEditPoint(event, bar)) {
+        const sourceIndex = Number(bar.dataset.sourceIndex);
+        if (Number.isInteger(sourceIndex)) {
+            event.preventDefault();
+            editRehearsal(sourceIndex, bar);
+        }
+        return;
+    }
     const slot = event.target.closest?.(".chord-slot");
     if (slot) {
         event.preventDefault();
@@ -1460,7 +1482,6 @@ function handleDoubleClick(event) {
         }
         return;
     }
-    const bar = event.target.closest?.(".bar:not(.spacer)");
     if (bar) {
         event.preventDefault();
         addChordAtPoint(Number(bar.dataset.sourceIndex), bar, event.clientX);
@@ -1655,11 +1676,11 @@ function closeContextMenu() {
 
 function openEditor(anchor, value, commit) {
     const isChord = Boolean(anchor?.closest?.(".chord-slot"));
-    const isRehearsal = Boolean(anchor?.closest?.(".rehearsal-mark") || anchor?.closest?.(".system-lead"));
+    const isRehearsal = Boolean(anchor?.closest?.(".rehearsal-mark") || anchor?.closest?.(".system-lead") || anchor?.classList?.contains?.("bar"));
     const visualAnchor = isChord ? (anchor.querySelector?.(".chord") || anchor) : anchor;
     const rect = visualAnchor?.getBoundingClientRect?.() || { left: 20, top: 20, width: 140, height: 30 };
-    const width = isChord || isRehearsal ? rect.width : Math.min(180, Math.max(120, rect.width));
-    const height = isChord || isRehearsal ? rect.height : 28;
+    const width = isChord ? rect.width : isRehearsal ? 64 : Math.min(180, Math.max(120, rect.width));
+    const height = isChord ? rect.height : 28;
     const left = rect.left;
     const top = rect.top;
     openEditorAtPoint(left, top, value, commit, width, height);
