@@ -23,8 +23,8 @@ html = html
     "iReal形式のジャズ・コード譜をブラウザで表示し、移調やリピート展開を行うためのビューアーです。Jazz 1460の取り込みから譜面の読み方、表記設定まで、実際に使うために必要な操作をまとめています。",
     "iReal形式のジャズ・コード譜を表示し、ピアノ・ベース・ドラムの伴奏に合わせて練習・演奏できるアプリです。コードやリハーサルマークの編集、移調、リピート展開など、Jampanion2を使うために必要な操作をまとめています。"
   )
-  .replace('href="./help.css"', 'href="./help.css?v=27"')
-  .replaceAll('href="./help.en.html"', 'href="./help.en.html?v=27"')
+  .replace('href="./help.css"', 'href="./help.css?v=28"')
+  .replaceAll('href="./help.en.html"', 'href="./help.en.html?v=28"')
   .replace("曲は、現在開いているサイトURL専用のIndexedDBへローカル保存され、表示設定は同じURLのlocalStorageへ保存されます。", "曲と表示設定は、現在開いているサイト専用のブラウザ内に保存されます。")
   .replace(
     '      <a href="#quick-start">まず使ってみる</a>',
@@ -61,8 +61,8 @@ const integratedSection = String.raw`      <section id="jampanion" class="help-s
         <ul>
           <li>コードを<strong>ダブルクリック</strong>して編集します。入力を空にして確定すると、そのコードを削除します。</li>
           <li>小節内の空いている場所を<strong>ダブルクリック</strong>すると、その拍位置にコードを追加できます。</li>
-          <li>リハーサルマークを<strong>ダブルクリック</strong>して名前を変更します。</li>
-          <li>小節またはリハーサルマークを<strong>右クリック</strong>すると、マークの追加・削除とセクションスタイルの指定ができます。</li>
+          <li>マークのない行の左側を<strong>ダブルクリック</strong>してリハーサルマークを追加し、既存のマークを<strong>ダブルクリック</strong>して名前を変更します。入力を空にして確定すると削除できます。</li>
+          <li>リハーサルマークまたはその小節を<strong>右クリック</strong>すると、セクションスタイルだけを指定できます。</li>
           <li>スタイルを指定したリハーサルマークの上には、<strong>Swing / Latin / Bossa / Ballad</strong>が表示されます。曲のデフォルトを使う場合は表示されません。</li>
           <li>タイトルも<strong>ダブルクリック</strong>で変更できます。</li>
         </ul>

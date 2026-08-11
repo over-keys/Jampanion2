@@ -39,8 +39,8 @@ Stop playback before editing the chart.
 
 - **Double-click a chord** to edit it. Confirm an empty value to remove it.
 - **Double-click an empty position in a bar** to add a chord at that position.
-- **Double-click a rehearsal mark** to rename it.
-- **Right-click a bar or rehearsal mark** to add or remove a mark and assign a section style.
+- **Double-click the left side of a row without a mark** to add a rehearsal mark. **Double-click an existing mark** to rename it. Confirm an empty value to remove it.
+- **Right-click a rehearsal mark or its bar** to assign a section style only.
 - **Double-click the title** to rename the song.
 
 Assigned section styles are shown above rehearsal marks as **Swing**, **Latin**, **Bossa**, or **Ballad**. The label is hidden when the song's default style is used.

@@ -14,6 +14,8 @@ const requirements = [
   ["key persistence instructions", /Key[\s\S]*移調キーも、Saveで曲ごとに保存され、次回自動復元/],
   ["four-bar style changes", /次の4小節区切り/],
   ["chord editing instructions", /コードを<strong>ダブルクリック<\/strong>/],
+  ["rehearsal mark editing instructions", /マークのない行の左側を<strong>ダブルクリック<\/strong>[\s\S]*入力を空にして確定すると削除/],
+  ["rehearsal style context instructions", /右クリック<\/strong>すると、セクションスタイルだけを指定/],
   ["rehearsal style instructions", /Swing \/ Latin \/ Bossa \/ Ballad/],
   ["mixer persistence instructions", /Piano、Bass、Drumsの音量とミュート[\s\S]*保存/],
   ["MIDI instructions", /Audio &amp; MIDI[\s\S]*MIDI input[\s\S]*MIDI output/]

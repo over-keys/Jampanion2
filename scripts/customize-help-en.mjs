@@ -24,8 +24,8 @@ html = html
     "Display, transpose, and read iReal-format jazz chord charts directly in your browser. This guide covers the complete workflow from importing Jazz 1460 to expanding repeats and adjusting notation.",
     "Jampanion2 displays iReal-format jazz chord charts and lets you practice or play along with piano, bass, and drums. This guide covers accompaniment, chart editing, importing songs, transposition, and repeat expansion."
   )
-  .replace('href="./help.css"', 'href="./help.css?v=27"')
-  .replaceAll('href="./help.html"', 'href="./help.html?v=27"')
+  .replace('href="./help.css"', 'href="./help.css?v=28"')
+  .replaceAll('href="./help.html"', 'href="./help.html?v=28"')
   .replace(
     '      <a href="#quick-start">Quick start</a>',
     '      <a href="#jampanion">Accompaniment and editing</a>\n      <a href="#quick-start">Quick start</a>'
@@ -62,8 +62,8 @@ const integratedSection = String.raw`      <section id="jampanion" class="help-s
         <ul>
           <li><strong>Double-click a chord</strong> to edit it. Confirm an empty value to remove it.</li>
           <li><strong>Double-click an empty position in a bar</strong> to add a chord at that beat.</li>
-          <li><strong>Double-click a rehearsal mark</strong> to rename it.</li>
-          <li><strong>Right-click a bar or rehearsal mark</strong> to add or remove a mark and assign a section style.</li>
+          <li><strong>Double-click the left side of a row without a mark</strong> to add a rehearsal mark. <strong>Double-click an existing mark</strong> to rename it. Confirm an empty value to remove it.</li>
+          <li><strong>Right-click a rehearsal mark or its bar</strong> to assign a section style only.</li>
           <li>Assigned styles appear above rehearsal marks as <strong>Swing / Latin / Bossa / Ballad</strong>. The label is hidden when the song default is used.</li>
           <li><strong>Double-click the title</strong> to rename the song.</li>
         </ul>
