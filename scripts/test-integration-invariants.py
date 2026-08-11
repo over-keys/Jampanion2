@@ -66,6 +66,7 @@ checks = {
     "MIDI preferences persist": 'saveDevicePreferences' in host and 'getDevicePreferences' in logic,
     "MIDI Thru restores saved input": 'RestorePreferredInputForMidiThruAsync' in logic,
     "Built-in Trio remains usable without Web MIDI": 'Built-in Trio available · Web MIDI unavailable' in logic,
+    "MIDI Settings guard unsupported browsers": 'typeof navigator !== \'undefined\' && typeof navigator.requestMIDIAccess === \'function\'' in logic and 'SetMidiUnavailableStatus' in logic and 'disabled="@MidiUnavailable"' in home,
     "tempo rollback preserves Auto/manual state": 'previousTempoExplicit' in logic and 'previousTempoUserSet' in logic,
     "bootstrap ignores cross-song changes during playback": 'Stop the session before changing songs' in logic,
     "chart editing survives viewer re-render": 'doc.addEventListener("dblclick", handleDoubleClick, true)' in host and 'observer.observe(doc, { childList: true, subtree: true })' in host,

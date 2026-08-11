@@ -32,7 +32,9 @@
                         @if (CanRevertCurrentSong)
                         {
                             <button class="tiny" @onclick="RevertCurrentSongAsync"
-                                    disabled="@(IsPlaying || IsLoading)">Revert</button>
+                                    disabled="@(IsPlaying || IsLoading)"
+                                    aria-label="Revert"
+                                    title="Revert">Rev.</button>
                         }
                     </div>
                 </div>
@@ -85,13 +87,13 @@
         <section>
             <div class="jamp-heading-row"><h3>Audio &amp; MIDI</h3><button class="tiny" @onclick="RefreshMidiAsync">Refresh</button></div>
             <label class="dialog-field"><span>MIDI input</span>
-                <select value="@SelectedMidiInputId" @onchange="SelectMidiInputAsync">
+                <select value="@SelectedMidiInputId" @onchange="SelectMidiInputAsync" disabled="@MidiUnavailable">
                     <option value="">No MIDI input</option>
                     @foreach (var device in MidiInputs) { <option value="@device.Id">@device.Name</option> }
                 </select>
             </label>
             <label class="dialog-field"><span>Output</span>
-                <select value="@SelectedMidiOutputId" @onchange="SelectMidiOutputAsync" disabled="@(IsPlaying || IsLoading)">
+                <select value="@SelectedMidiOutputId" @onchange="SelectMidiOutputAsync" disabled="@(MidiUnavailable || IsPlaying || IsLoading)">
                     <option value="">Built-in Trio</option>
                     @foreach (var device in MidiOutputs) { <option value="@device.Id">@device.Name</option> }
                 </select>

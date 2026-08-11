@@ -68,6 +68,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     protected IReadOnlyList<MidiDeviceChoice> MidiOutputs { get; set; } = Array.Empty<MidiDeviceChoice>();
     protected string SelectedMidiInputId { get; set; } = string.Empty;
     protected string SelectedMidiOutputId { get; set; } = string.Empty;
+    protected bool MidiUnavailable { get; set; }
     protected string MidiStatusText { get; set; } = "Built-in Trio selected · MIDI devices have not been queried.";
 
     protected string NewSongTitle { get; set; } = "Untitled";
@@ -852,58 +853,90 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
 
     protected async Task RefreshMidiAsync()
     {
-        var audio = await EnsureAudioModuleAsync();
-        if (_chartModule is not null)
+        try
         {
-            try
+            // Do not import the large audio module on browsers such as iPhone
+            // Safari, where Web MIDI is not available. Importing it solely to
+            // populate Settings can turn a harmless capability gap into a
+            // Blazor event error before the dialog has rendered.
+            var webMidiAvailable = await JS.InvokeAsync<bool>(
+                "eval",
+                "typeof navigator !== 'undefined' && typeof navigator.requestMIDIAccess === 'function'");
+            if (!webMidiAvailable)
             {
-                var preferences = await _chartModule.InvokeAsync<MidiDevicePreferences>("getDevicePreferences");
-                SelectedMidiInputId = preferences.InputId ?? string.Empty;
-                SelectedMidiOutputId = preferences.OutputId ?? string.Empty;
+                SetMidiUnavailableStatus();
+                return;
             }
-            catch { }
-        }
 
-        Exception? midiError = null;
-        try { MidiInputs = await audio.InvokeAsync<MidiDeviceChoice[]>("getMidiInputs"); }
-        catch (Exception exception) { MidiInputs = Array.Empty<MidiDeviceChoice>(); midiError = exception; }
-        try { MidiOutputs = await audio.InvokeAsync<MidiDeviceChoice[]>("getMidiOutputs"); }
-        catch (Exception exception) { MidiOutputs = Array.Empty<MidiDeviceChoice>(); midiError ??= exception; }
-
-        if (midiError is not null)
-        {
-            SelectedMidiInputId = string.Empty;
-            SelectedMidiOutputId = string.Empty;
-            MidiStatusText = $"Built-in Trio available · Web MIDI unavailable: {midiError.Message}";
-            return;
-        }
-
-        if (!IsPlaying)
-        {
-            if (!string.IsNullOrWhiteSpace(SelectedMidiOutputId) && MidiOutputs.Any(device => device.Id == SelectedMidiOutputId))
+            var audio = await EnsureAudioModuleAsync();
+            if (_chartModule is not null)
             {
-                try { await audio.InvokeVoidAsync("selectMidiOutput", SelectedMidiOutputId); }
-                catch { SelectedMidiOutputId = string.Empty; }
+                try
+                {
+                    var preferences = await _chartModule.InvokeAsync<MidiDevicePreferences>("getDevicePreferences");
+                    SelectedMidiInputId = preferences.InputId ?? string.Empty;
+                    SelectedMidiOutputId = preferences.OutputId ?? string.Empty;
+                }
+                catch { }
+            }
+
+            Exception? midiError = null;
+            try { MidiInputs = await audio.InvokeAsync<MidiDeviceChoice[]>("getMidiInputs"); }
+            catch (Exception exception) { MidiInputs = Array.Empty<MidiDeviceChoice>(); midiError = exception; }
+            try { MidiOutputs = await audio.InvokeAsync<MidiDeviceChoice[]>("getMidiOutputs"); }
+            catch (Exception exception) { MidiOutputs = Array.Empty<MidiDeviceChoice>(); midiError ??= exception; }
+
+            if (midiError is not null)
+            {
+                SetMidiUnavailableStatus();
+                return;
+            }
+
+            MidiUnavailable = false;
+            if (!IsPlaying)
+            {
+                if (!string.IsNullOrWhiteSpace(SelectedMidiOutputId) && MidiOutputs.Any(device => device.Id == SelectedMidiOutputId))
+                {
+                    try { await audio.InvokeVoidAsync("selectMidiOutput", SelectedMidiOutputId); }
+                    catch { SelectedMidiOutputId = string.Empty; }
+                }
+                else
+                {
+                    SelectedMidiOutputId = string.Empty;
+                    await audio.InvokeVoidAsync("selectMidiOutput", "");
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(SelectedMidiInputId) && MidiInputs.Any(device => device.Id == SelectedMidiInputId))
+            {
+                try { await audio.InvokeVoidAsync("selectMidiInput", SelectedMidiInputId, (object?)null); }
+                catch { SelectedMidiInputId = string.Empty; }
             }
             else
             {
-                SelectedMidiOutputId = string.Empty;
-                await audio.InvokeVoidAsync("selectMidiOutput", "");
+                SelectedMidiInputId = string.Empty;
+                try { await audio.InvokeVoidAsync("selectMidiInput", "", (object?)null); } catch { }
             }
-        }
 
-        if (!string.IsNullOrWhiteSpace(SelectedMidiInputId) && MidiInputs.Any(device => device.Id == SelectedMidiInputId))
-        {
-            try { await audio.InvokeVoidAsync("selectMidiInput", SelectedMidiInputId, (object?)null); }
-            catch { SelectedMidiInputId = string.Empty; }
+            MidiStatusText = $"Built-in Trio available · {MidiInputs.Count} MIDI input(s), {MidiOutputs.Count} MIDI output(s)";
         }
-        else
+        catch
         {
-            SelectedMidiInputId = string.Empty;
-            try { await audio.InvokeVoidAsync("selectMidiInput", "", (object?)null); } catch { }
+            // Settings is still useful on a device without Web MIDI. Keep all
+            // browser/permission details out of the visible UI and, most
+            // importantly, do not let a rejected MIDI promise break the page.
+            SetMidiUnavailableStatus();
         }
+    }
 
-        MidiStatusText = $"Built-in Trio available · {MidiInputs.Count} MIDI input(s), {MidiOutputs.Count} MIDI output(s)";
+    private void SetMidiUnavailableStatus()
+    {
+        MidiInputs = Array.Empty<MidiDeviceChoice>();
+        MidiOutputs = Array.Empty<MidiDeviceChoice>();
+        SelectedMidiInputId = string.Empty;
+        SelectedMidiOutputId = string.Empty;
+        MidiUnavailable = true;
+        MidiStatusText = "Built-in Trio available · Web MIDI unavailable on this device or browser.";
     }
 
     protected async Task SelectMidiInputAsync(ChangeEventArgs args)
