@@ -41,12 +41,16 @@ grep -q 'test-help-contract.mjs.*VIEWER/help.html' "$ROOT/scripts/build-integrat
 grep -q 'test-help-en-contract.mjs.*VIEWER/help.en.html' "$ROOT/scripts/build-integrated.sh"
 grep -q 'customize-shell.mjs' "$ROOT/scripts/build-integrated.sh"
 grep -q 'test-shell-contract.mjs' "$ROOT/scripts/build-integrated.sh"
+grep -q 'customize-background-playback.mjs' "$ROOT/scripts/build-integrated.sh"
+! grep -q 'visibilityHandler' "$HOST"
+! grep -q 'StopSessionFromVisibility' "$HOST"
+grep -q 'jampanion-audio.js?v=30' "$LOGIC"
 grep -q 'APP_VERSION = "31"' "$ROOT/scripts/customize-shell.mjs"
 grep -q 'help.html?v=31' "$ROOT/scripts/customize-viewer.mjs"
 grep -q 'help.en.html?v=31' "$ROOT/scripts/customize-viewer.mjs"
 grep -q 'help.css?v=31' "$ROOT/scripts/customize-help.mjs"
-grep -q 'jazz-chart-host.js?v=32' "$ROOT/scripts/customize-viewer.mjs"
-grep -q 'jazz-chart-host.js?v=44' "$ROOT/integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs"
+grep -q 'jazz-chart-host.js?v=33' "$ROOT/scripts/customize-viewer.mjs"
+grep -q 'jazz-chart-host.js?v=45' "$ROOT/integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs"
 
 # Native IndexedDB loading is asynchronous and must not block ChartReady.
 grep -q 'void loadNativeSongs().then' "$HOST"

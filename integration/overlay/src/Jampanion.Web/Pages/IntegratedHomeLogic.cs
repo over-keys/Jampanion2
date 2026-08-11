@@ -158,7 +158,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         try
         {
             _self ??= DotNetObjectReference.Create(this);
-            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=44");
+            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=45");
             try { await _chartModule.InvokeVoidAsync("initializeMobileControlsScrollHint"); } catch { }
             var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("initialize", "jcv-frame", _self);
             ApplyBootstrap(bootstrap);
@@ -230,15 +230,6 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         await PrimarySessionActionAsync();
         await InvokeAsync(StateHasChanged);
     }
-
-    [JSInvokable]
-    public async Task StopSessionFromVisibility()
-    {
-        if (!IsPlaying && !IsLoading) return;
-        await StopSessionAsync();
-        await InvokeAsync(StateHasChanged);
-    }
-
 
     private void ApplyBootstrap(JazzChartBootstrap bootstrap, bool forceAccompanimentSettings = false)
     {
@@ -1283,7 +1274,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     }
 
     private async Task<IJSObjectReference> EnsureAudioModuleAsync() =>
-        _audioModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-audio.js?v=29");
+        _audioModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-audio.js?v=30");
 
     private static string FormatTime(double seconds)
     {

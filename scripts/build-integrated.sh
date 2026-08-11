@@ -24,6 +24,10 @@ git -C "$WORK/Jampanion" checkout --quiet "$JAMP_SHA"
 
 # Complete integration files replace/add files inside the disposable build checkout.
 cp -R "$ROOT/integration/overlay/." "$WORK/Jampanion/"
+node "$ROOT/scripts/customize-background-playback.mjs" \
+  "$WORK/Jampanion/src/Jampanion.Web/web-src/jampanion-browser.js" \
+  "$WORK/Jampanion/src/Jampanion.Web/web-src/jampanion-audio.js" \
+  "$WORK/Jampanion/src/Jampanion.Web/Pages/Home.razor.cs"
 node "$ROOT/scripts/customize-shell.mjs" \
   "$WORK/Jampanion/src/Jampanion.Web/wwwroot/index.html" \
   "$WORK/Jampanion/src/Jampanion.Web/App.razor" \

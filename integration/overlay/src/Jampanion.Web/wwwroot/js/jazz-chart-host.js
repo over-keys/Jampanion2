@@ -27,7 +27,6 @@ let editInput;
 let contextMenu;
 let notifying = false;
 let globalKeyHandler;
-let visibilityHandler;
 let embeddedKeyHandler;
 let playbackLockedSongId = "";
 let initialized = false;
@@ -376,14 +375,6 @@ function installParentShortcuts() {
             void dotNet?.invokeMethodAsync("HandleSpaceShortcut");
         };
         document.addEventListener("keydown", globalKeyHandler);
-    }
-    if (!visibilityHandler) {
-        visibilityHandler = () => {
-            if (document.visibilityState === "hidden") {
-                void dotNet?.invokeMethodAsync("StopSessionFromVisibility");
-            }
-        };
-        document.addEventListener("visibilitychange", visibilityHandler);
     }
 }
 
@@ -2238,10 +2229,8 @@ export function dispose() {
     observer?.disconnect();
     mobileControlsScrollCleanup?.();
     if (globalKeyHandler) document.removeEventListener("keydown", globalKeyHandler);
-    if (visibilityHandler) document.removeEventListener("visibilitychange", visibilityHandler);
     if (embeddedKeyHandler) document.removeEventListener("keydown", embeddedKeyHandler);
     globalKeyHandler = null;
-    visibilityHandler = null;
     observer = null;
     if (libraryTimer) clearInterval(libraryTimer);
     libraryTimer = null;
