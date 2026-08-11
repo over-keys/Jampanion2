@@ -15,7 +15,8 @@ public sealed record JazzSongSummary(
     bool TempoUserExplicit,
     string AccompanimentStyle,
     bool IsNative,
-    bool HasOriginalSource);
+    bool HasOriginalSource,
+    int SemitoneShift);
 
 public sealed record JazzChartBootstrap(
     IReadOnlyList<JazzSongSummary> Songs,
@@ -31,7 +32,8 @@ public sealed record JazzChartBootstrap(
     string AccompanimentStyle,
     bool IsNative,
     bool HasOriginalSource,
-    string ViewMode);
+    string ViewMode,
+    int SemitoneShift);
 
 public sealed record JazzChordEventDto(
     long StartTick,
