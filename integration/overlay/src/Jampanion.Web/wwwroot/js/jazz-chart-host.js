@@ -1567,9 +1567,21 @@ function handleDoubleClick(event) {
     if (clickedBar) {
         const sourceIndex = Number(clickedBar.dataset.sourceIndex);
         const grid = chordInputGrid(sourceIndex, clickedBar, event.clientX);
+        const clickedChord = event.target.closest?.(".chord");
+        const clickedChordSlot = clickedChord?.closest?.(".chord-slot");
+        const clickedChordBar = clickedChordSlot?.closest?.(".bar");
+        const clickedSlotIndex = Number(clickedChordSlot?.dataset.slotIndex);
         // The pointer position decides the beat before hit-testing the chord
         // text. A long first-beat chord must not steal a double-click that is
-        // visibly placed on beats 2–4.
+        // visibly placed on beats 2–4. A blank part of a chord slot remains
+        // an insertion point, so only the chord text itself can edit a slot.
+        if (Number.isInteger(sourceIndex) && clickedChord && clickedChordBar === clickedBar &&
+            Number.isInteger(clickedSlotIndex) &&
+            chordSlotBeat(clickedChordSlot, grid.total, grid.renderedTotal) === grid.startCell) {
+            event.preventDefault();
+            editChord(sourceIndex, clickedSlotIndex, clickedChordSlot);
+            return;
+        }
         if (Number.isInteger(sourceIndex) && grid.startCell > 0) {
             event.preventDefault();
             addChordAtPoint(sourceIndex, clickedBar, event.clientX);
@@ -1686,24 +1698,27 @@ function addChordAtPoint(sourceIndex, barElement, clientX) {
     const bar = song?.bars?.[sourceIndex];
     if (!bar) return;
     const sourceSlots = bar.chordSlots || (bar.chordSlots = []);
-    const { domSlots, total, startCell } = chordInputGrid(sourceIndex, barElement, clientX);
+    const hasVisibleSlot = sourceSlots.some(slot => !slot.hidden);
+    const { total, startCell, insertCell, inputLeft } = chordInputGrid(sourceIndex, barElement, clientX);
     const rect = barElement.getBoundingClientRect();
 
     normalizeBarGridFromDom(bar, barElement, total);
-    const existingIndex = sourceSlots.findIndex(slot => Number(slot.cell) === startCell && !slot.hidden);
-    if (existingIndex >= 0) {
-        editChord(sourceIndex, existingIndex, domSlots.find(el => Number(el.dataset.slotIndex) === existingIndex) || barElement);
-        return;
-    }
 
     const inputHeight = 28;
     const chordTop = rect.top + (rect.height - inputHeight) / 2;
-    openEditorAtPoint(clientX, chordTop, "", async value => {
+    openEditorAtPoint(inputLeft, chordTop, "", async value => {
         const chord = value.trim();
         if (!chord) return;
         promoteNative(song);
         bar.jampanionNoChord = false;
-        sourceSlots.push({ chord, alternates: [], cell: startCell, small: false, fermata: false, hidden: false });
+        const sourceCell = hasVisibleSlot ? insertCell : startCell;
+        if (!hasVisibleSlot && startCell > 0 && !sourceSlots.some(slot => slot.hidden && Number(slot.cell) === 0)) {
+            // The Viewer intentionally places a lone chord on beat 1. Keep a
+            // hidden hold anchor so a first chord entered on beats 2–4 keeps
+            // its requested position without adding visible harmony.
+            sourceSlots.push({ chord: "/", alternates: [], cell: 0, small: false, fermata: false, hidden: true });
+        }
+        sourceSlots.push({ chord, alternates: [], cell: sourceCell, small: false, fermata: false, hidden: false });
         sourceSlots.sort((a, b) => Number(a.cell || 0) - Number(b.cell || 0));
         rebuildChordList(bar);
         stageNative(song);
@@ -1722,15 +1737,43 @@ function chordInputGrid(sourceIndex, barElement, clientX) {
     const meter = song ? resolvedMeterAt(song.bars, sourceIndex) : "4/4";
     const maxInputCells = meter === "3/4" ? 3 : 4;
     const total = Math.min(maxInputCells, Math.max(1, renderedTotal || maxInputCells));
-    const rect = barElement?.getBoundingClientRect?.();
+    const rect = barElement?.querySelector?.(".chords")?.getBoundingClientRect?.() ||
+        barElement?.getBoundingClientRect?.();
     const fraction = rect
         ? clamp((clientX - rect.left) / Math.max(1, rect.width), 0, .9999)
         : 0;
+    const startCell = Math.min(total - 1, Math.floor(fraction * total));
+    const insertCell = renderedTotal > 1
+        ? Math.round(startCell * renderedTotal / total)
+        : startCell;
+    const visualOffset = domSlots.map(slot => {
+        const slotRect = slot.getBoundingClientRect?.();
+        const chordRect = slot.querySelector?.(".chord")?.getBoundingClientRect?.();
+        return slotRect && chordRect ? chordRect.left - slotRect.left : null;
+    }).find(value => Number.isFinite(value)) || 0;
     return {
         domSlots,
         total,
-        startCell: Math.min(total - 1, Math.round(fraction * total))
+        renderedTotal,
+        startCell,
+        insertCell,
+        inputLeft: rect
+            ? rect.left + (renderedTotal > 1
+                ? insertCell / renderedTotal
+                : startCell / total) * rect.width + visualOffset
+            : clientX
     };
+}
+
+function chordSlotBeat(slot, total, renderedTotal) {
+    if (!slot) return -1;
+    const start = Math.max(0, Number(slot.dataset.gridStart) || 0);
+    if (renderedTotal > 1) {
+        return Math.max(0, Math.min(total - 1, Math.floor(start / (renderedTotal / total))));
+    }
+    const count = Math.max(1, Number(slot.dataset.slotCount) || 1);
+    const index = Math.max(0, Number(slot.dataset.slotIndex) || 0);
+    return Math.max(0, Math.min(total - 1, Math.floor(index * total / count)));
 }
 
 function normalizeBarGridFromDom(bar, barElement, total) {
