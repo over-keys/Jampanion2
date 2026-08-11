@@ -24,8 +24,8 @@ html = html
     "Display, transpose, and read iReal-format jazz chord charts directly in your browser. This guide covers the complete workflow from importing Jazz 1460 to expanding repeats and adjusting notation.",
     "Jampanion2 displays iReal-format jazz chord charts and lets you practice or play along with piano, bass, and drums. This guide covers accompaniment, chart editing, importing songs, transposition, and repeat expansion."
   )
-  .replace('href="./help.css"', 'href="./help.css?v=28"')
-  .replaceAll('href="./help.html"', 'href="./help.html?v=28"')
+  .replace('href="./help.css"', 'href="./help.css?v=29"')
+  .replaceAll('href="./help.html"', 'href="./help.html?v=29"')
   .replace(
     '      <a href="#quick-start">Quick start</a>',
     '      <a href="#jampanion">Accompaniment and editing</a>\n      <a href="#quick-start">Quick start</a>'
@@ -56,7 +56,7 @@ const integratedSection = String.raw`      <section id="jampanion" class="help-s
           </tbody>
         </table>
         <div class="note"><strong>Key</strong>The transposition made with − / + is also saved per song when you press Save and restored next time.</div>
-        <div class="note"><strong>Changes during playback</strong>Style changes take effect at the next four-bar boundary. Tempo changes take effect at the next bar boundary without interrupting the sound. Changing the style does not reset the tempo.</div>
+        <div class="note"><strong>Changes during playback</strong>Style changes take effect at the next four-bar boundary. Tempo changes take effect at the next bar boundary.</div>
 
         <h3>Editing chords and rehearsal marks</h3>
         <ul>

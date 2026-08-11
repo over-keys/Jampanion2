@@ -31,7 +31,7 @@ Use **Accompaniment** to choose the tempo and style.
 - **Back to head / Head Out**: During playback, press **Back to head** to queue a head out. The accompaniment returns to the theme, plays it through, and then ends naturally. The button changes to **Head out queued** while it is queued.
 - **Save**: Saves chart edits, rehearsal marks, transposed key, tempo, and style changes together.
 
-During playback, a style change takes effect at the next four-bar boundary. A tempo change takes effect at the next bar boundary so the sound continues smoothly. Changing the style does not reset the tempo.
+During playback, a style change takes effect at the next four-bar boundary. A tempo change takes effect at the next bar boundary.
 
 ## Editing a chart
 

@@ -23,8 +23,8 @@ html = html
     "iReal形式のジャズ・コード譜をブラウザで表示し、移調やリピート展開を行うためのビューアーです。Jazz 1460の取り込みから譜面の読み方、表記設定まで、実際に使うために必要な操作をまとめています。",
     "iReal形式のジャズ・コード譜を表示し、ピアノ・ベース・ドラムの伴奏に合わせて練習・演奏できるアプリです。コードやリハーサルマークの編集、移調、リピート展開など、Jampanion2を使うために必要な操作をまとめています。"
   )
-  .replace('href="./help.css"', 'href="./help.css?v=28"')
-  .replaceAll('href="./help.en.html"', 'href="./help.en.html?v=28"')
+  .replace('href="./help.css"', 'href="./help.css?v=29"')
+  .replaceAll('href="./help.en.html"', 'href="./help.en.html?v=29"')
   .replace("曲は、現在開いているサイトURL専用のIndexedDBへローカル保存され、表示設定は同じURLのlocalStorageへ保存されます。", "曲と表示設定は、現在開いているサイト専用のブラウザ内に保存されます。")
   .replace(
     '      <a href="#quick-start">まず使ってみる</a>',
@@ -55,7 +55,7 @@ const integratedSection = String.raw`      <section id="jampanion" class="help-s
           </tbody>
         </table>
         <div class="note"><strong>Key</strong>−／＋で変更した移調キーも、Saveで曲ごとに保存され、次回自動復元されます。</div>
-        <div class="note"><strong>演奏中の変更</strong>スタイル変更は次の4小節区切り、テンポ変更は次の小節区切りから適用されます。音を止めずに切り替え、スタイル変更によってテンポがデフォルトへ戻ることはありません。</div>
+        <div class="note"><strong>演奏中の変更</strong>スタイル変更は次の4小節区切り、テンポ変更は次の小節区切りから適用されます。</div>
 
         <h3>コードとリハーサルマークを編集する</h3>
         <ul>
