@@ -11,7 +11,7 @@ c04579d005698ab0055d526591a12798900b7c539173bcd235cad79586bf943c  ./integration/
 786a3f445c0867dcc809b3a16722d4bfbff41af767f4305de87e75ef8f044673  ./integration/overlay/src/Jampanion.Web/Models/JazzChartModels.cs
 0d3d15ac63fd1881b77ffff56a2fac3025ffc092e26ddef5778d1c19663f6de5  ./integration/overlay/src/Jampanion.Web/Pages/Home.razor
 175ca9f3c5f40aeb99f28390ff9ab6d658a60084f5574c3d5a8c37a0b04e14f0  ./integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs
-68c11440ba1b5b7348f58c69b7d8c5e0498662faaacecdf180c1345ad80fd97f  ./integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css
+8dce4d18422b62b7f7c6c808cf88c784a0e6c11f296022e90cbeeb9cc6edd1db  ./integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css
 a9b100a786eab2988fcc2c2f5cf9536c34d0d2feb4f0e57bb95e1c640b1e3d93  ./integration/overlay/src/Jampanion.Web/wwwroot/js/jazz-chart-host.js
 e09c46e5f1832b328099af7c0a04aff18a0bd6ca9302637ac1da792a907e152e  ./scripts/build-integrated.sh
 85994f6be6834aff3f32a95235c2960cae6fa10e24ac0fb05031af678c744d6e  ./scripts/customize-help.mjs
