@@ -24,6 +24,14 @@ git -C "$WORK/Jampanion" checkout --quiet "$JAMP_SHA"
 
 # Complete integration files replace/add files inside the disposable build checkout.
 cp -R "$ROOT/integration/overlay/." "$WORK/Jampanion/"
+node "$ROOT/scripts/customize-shell.mjs" \
+  "$WORK/Jampanion/src/Jampanion.Web/wwwroot/index.html" \
+  "$WORK/Jampanion/src/Jampanion.Web/App.razor" \
+  "$WORK/Jampanion/src/Jampanion.Web/wwwroot/manifest.webmanifest"
+node "$ROOT/scripts/test-shell-contract.mjs" \
+  "$WORK/Jampanion/src/Jampanion.Web/wwwroot/index.html" \
+  "$WORK/Jampanion/src/Jampanion.Web/App.razor" \
+  "$WORK/Jampanion/src/Jampanion.Web/wwwroot/manifest.webmanifest"
 
 # Jazz Chart Viewer itself is bundled unchanged under viewer/. This is the chart source
 # of truth at runtime; Jampanion does not convert it to ChordPro.
@@ -39,6 +47,8 @@ mkdir -p "$VIEWER"
 # postMessage bridge so accompaniment never depends on direct iframe DOM access.
 node "$ROOT/scripts/customize-viewer.mjs" "$VIEWER/index.html"
 node "$ROOT/scripts/test-viewer-contract.mjs" "$VIEWER/index.html"
+node "$ROOT/scripts/customize-help.mjs" "$VIEWER/help.html"
+node "$ROOT/scripts/test-help-contract.mjs" "$VIEWER/help.html"
 
 # Build the exact Jampanion browser audio backend from the pinned source.
 (
