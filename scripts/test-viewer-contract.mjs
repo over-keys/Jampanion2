@@ -16,6 +16,7 @@ const requirements = [
   ["customized-song removal control", /id="deleteCustomized"[\s\S]*Delete customized songs[\s\S]*Delete all imported songs/],
   ["song-library action order", /id="openImport"[\s\S]*id="deleteAll"[\s\S]*id="deleteCustomized"[\s\S]*data-jampanion-customized-songs-layout="v2"/],
   ["customized-song removal runtime", /removeSongsByIds[\s\S]*saveSongLibrary[\s\S]*jampanion-library-cleared/],
+  ["song selection preserves host-managed transpose", /function selectSong\(songId\) \{[\s\S]*state\.selectedId = songId;[\s\S]*state\.searchOpen = false;[\s\S]*JAMPANION_SELECTION_TRANSPOSE_V1/],
   ["XyQ three-chord 4/4 normalization", /meterTop === 4 && meterBottom === 4 && chordSlots\.length === 3[\s\S]*rawCells\[2\] === 3[\s\S]*starts = \[0, Math\.floor\(totalCells \/ 2\), Math\.floor\(totalCells \* 3 \/ 4\)\]/],
   ["four-column responsive layout", /function\s+responsiveColumns\s*\([^)]*\)\s*\{\s*return\s+4\s*;/s],
   ["embedded v12 bridge", /data-jampanion-embedded-bridge="v12"/]

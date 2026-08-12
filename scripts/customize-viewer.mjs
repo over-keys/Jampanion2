@@ -270,6 +270,36 @@ if (!html.includes(librarySearchUnlockMarker) && html.includes('function renderL
   changed = true;
 }
 
+// Keep the Viewer from clearing the transient transpose during selection. In
+// Jampanion, transpose is a per-song saved setting; the host reapplies that
+// setting after the Viewer selection event, and unsaved songs correctly fall
+// back to zero.
+const selectionTransposeMarker = 'JAMPANION_SELECTION_TRANSPOSE_V1';
+const oldSelectSong = `function selectSong(songId) {
+  state.selectedId = songId;
+  state.semitones = 0;
+  state.searchOpen = false;
+  state.searchActiveIndex = -1;
+  render();
+  saveLastSong(currentSong());
+  el.search.blur();
+}`;
+const newSelectSong = `function selectSong(songId) {
+  state.selectedId = songId;
+  state.searchOpen = false;
+  state.searchActiveIndex = -1;
+  render();
+  saveLastSong(currentSong());
+  el.search.blur();
+}
+// ${selectionTransposeMarker}`;
+if (!html.includes(selectionTransposeMarker)) {
+  if (html.includes(oldSelectSong)) {
+    html = html.replace(oldSelectSong, newSelectSong);
+    changed = true;
+  }
+}
+
 // Keep the generated Viewer patch idempotent when a previously customized
 // .build directory is reused instead of being freshly cloned.
 const customizedSongsRuntimeMarker = 'JAMPANION_CUSTOMIZED_SONGS_V1';

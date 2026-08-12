@@ -6,6 +6,7 @@ logic = (root / "integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic
 planner = (root / "integration/overlay/src/Jampanion.Web/Audio/IntegratedSessionPlanner.cs").read_text()
 home = (root / "integration/overlay/src/Jampanion.Web/Pages/Home.razor").read_text()
 css = (root / "integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text()
+customize_viewer = (root / "scripts/customize-viewer.mjs").read_text()
 style_change_method = logic[logic.find('protected async Task ChangeStyleAsync'):logic.find('private static int DefaultTempoForStyle')]
 tempo_change_method = logic[logic.find('private async Task RebuildLiveTempoAsync'):logic.find('private async Task QueueStyleChangeAsync')]
 
@@ -37,6 +38,7 @@ checks = {
     "Ending appends the native final tonic hold": 'EndingPlanBuilder.Build' in planner and 'headOutRendered = true' in planner and 'Ending / final tonic' in planner,
     "Ending retains the root-hold plan inputs": 'headOutExactTune.TonicChord' in planner and 'endingPlan.LengthTicks' in planner,
     "all edits share one explicit save": 'SaveAccompanimentSettingsAsync' in logic and 'HasUnsavedChanges' in logic and 'saveCurrentChart' in logic and 'SaveSongSettingsAsync' in logic,
+    "Save refreshes delayed key state": 'InvokeAsync<JazzChartBootstrap>("getState")' in logic and 'Refresh immediately before the dirty check' in logic and 'if (!HasUnsavedChanges || string.IsNullOrWhiteSpace(SelectedIdentity)) return;' in logic,
     "mobile controls are separated from the mix": 'jamp-mobile-controls' in home and 'position:fixed; top:0; left:0; right:0; z-index:30; order:1;' in (root / "integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text() and '.mix-panel { order:3;' in (root / "integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text(),
     "mobile controls stay compact": 'height:56px' in (root / "integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text() and 'height:50px' in (root / "integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text(),
     "integrated brand row has icon and text only": '<img src="icons/jampanion-32.png' in home and '<strong>Jampanion2</strong>' in home and 'jamp-brand-actions' not in home,
@@ -81,6 +83,10 @@ checks = {
     "tempo rollback preserves Auto/manual state": 'previousTempoExplicit' in logic and 'previousTempoUserSet' in logic,
     "bootstrap ignores cross-song changes during playback": 'Stop the session before changing songs' in logic,
     "chart editing survives viewer re-render": 'doc.addEventListener("dblclick", handleDoubleClick, true)' in host and 'observer.observe(doc, { childList: true, subtree: true })' in host,
+    "song selection reapplies saved transpose": 'Reapply the per-song saved key' in host and 'const restored = restoreStoredTranspose();' in host and 'if (restored) queueBootstrapNotification();' in host,
+    "Viewer selection does not clear transpose": 'JAMPANION_SELECTION_TRANSPOSE_V1' in customize_viewer and 'const newSelectSong = `function selectSong(songId) {' in customize_viewer and '  state.searchOpen = false;' in customize_viewer,
+    "Revert asks for concise confirmation": 'window.confirm("Revert saved changes?")' in host and 'export async function revertCurrentSong()' in host,
+    "title editor stays inside the title box": 'openTitleEditor(anchor, value, commit)' in host and '.score-header h1 .jamp-title-edit-input' in host and 'anchor.replaceChildren(input)' in host,
     "no-op rehearsal and style edits do not enable Save": 'const nextSection = label || null' in host and 'const nextStyle = value || null' in host and 'setToolbarState(true, true)' in host,
     "disabled Save is visibly and pointer-disabled": '.standalone-save:disabled' in host and 'pointer-events:none' in host and 'background:#edf0f1' in host,
     "mode switching uses matching-weight Viewer Mode link": 'jamp-mode-row' in home and '>Viewer Mode<' in home and 'jampanion-viewer.png' in home and '.jamp-mode-row img { width:22px; height:22px;' in css and 'font-size:15px; font-weight:400;' in css and '.jamp-mode-row a { font-size:12px; font-weight:400; }' in css and 'installStandaloneModeLink' in host and 'jampanion-viewer.png' in (root / "scripts/customize-viewer.mjs").read_text() and 'jampanion-mode-link' in host,

@@ -25,6 +25,7 @@ let embeddedFrameContentHeight = 0;
 let libraryTimer;
 let lastLibrarySignature = "";
 let editInput;
+let editRestore;
 let contextMenu;
 let notifying = false;
 let globalKeyHandler;
@@ -470,6 +471,12 @@ function installIntegrationCss() {
         background:white; color:#111; font:600 15px/1 Arial,sans-serif;
         text-align:left; box-shadow:0 2px 8px #0002;
       }
+      .score-header h1 .jamp-title-edit-input {
+        display:block; box-sizing:border-box; width:100%; height:100%; min-width:0;
+        margin:0; padding:0 4px; border:1.5px solid #1f5f74; border-radius:4px;
+        background:white; color:inherit; font:inherit; line-height:inherit;
+        letter-spacing:inherit; text-align:center; box-shadow:0 2px 8px #0002;
+      }
       .jamp-context-menu {
         position:fixed; z-index:100000; min-width:190px; padding:5px;
         border:1px solid #b8c2c7; border-radius:7px; background:#fff;
@@ -542,7 +549,12 @@ function installChartListeners() {
     doc.addEventListener("click", event => {
         if (!event.target.closest?.("[data-song-id]")) return;
         setTimeout(() => {
+            // Reapply the per-song saved key after the Viewer selection
+            // handler has completed, so selection and page reload use the
+            // same stored transpose.
+            const restored = restoreStoredTranspose();
             rememberSelectedSong();
+            if (restored) queueBootstrapNotification();
             updateStandaloneSaveButton();
         }, 0);
     }, true);
@@ -2105,6 +2117,10 @@ function closeContextMenu() {
 }
 
 function openEditor(anchor, value, commit) {
+    if (anchor?.matches?.(".score-header h1")) {
+        openTitleEditor(anchor, value, commit);
+        return;
+    }
     const isChord = Boolean(anchor?.closest?.(".chord-slot"));
     const isRehearsal = Boolean(anchor?.closest?.(".rehearsal-mark") || anchor?.closest?.(".system-lead") || anchor?.classList?.contains?.("bar"));
     const visualAnchor = isChord ? (anchor.querySelector?.(".chord") || anchor) : anchor;
@@ -2114,6 +2130,38 @@ function openEditor(anchor, value, commit) {
     const left = rect.left;
     const top = rect.top;
     openEditorAtPoint(left, top, value, commit, width, height);
+}
+
+function openTitleEditor(anchor, value, commit) {
+    closeEditor(false);
+    const originalText = anchor.textContent || "";
+    const input = doc.createElement("input");
+    input.className = "jamp-title-edit-input";
+    input.type = "text";
+    input.value = value;
+    anchor.replaceChildren(input);
+    editInput = input;
+    editRestore = () => {
+        if (anchor.isConnected) anchor.textContent = originalText;
+    };
+    let finished = false;
+    const finish = async shouldCommit => {
+        if (finished) return;
+        finished = true;
+        const next = input.value;
+        input.remove();
+        editRestore?.();
+        editRestore = null;
+        if (editInput === input) editInput = null;
+        if (shouldCommit) await commit(next);
+    };
+    input.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === "Tab") { event.preventDefault(); void finish(true); }
+        else if (event.key === "Escape") { event.preventDefault(); void finish(false); }
+    });
+    input.addEventListener("blur", () => void finish(true));
+    input.focus();
+    input.setSelectionRange(0, 0);
 }
 
 function openEditorAtPoint(left, top, value, commit, width = 64, height = 28) {
@@ -2152,7 +2200,12 @@ function openEditorAtPoint(left, top, value, commit, width = 64, height = 28) {
 function closeEditor(commit = false) {
     if (!editInput) return;
     if (commit) editInput.blur();
-    else { editInput.remove(); editInput = null; }
+    else {
+        editRestore?.();
+        editRestore = null;
+        editInput.remove();
+        editInput = null;
+    }
 }
 
 async function edited(message) {
@@ -2387,6 +2440,7 @@ export async function revertCurrentSong() {
     if (!embeddedMode) return await requestEmbedded("revertCurrentSong", {}, 10000);
     const song = currentSong();
     if (!song) return getBootstrap();
+    if (!window.confirm("Revert saved changes?")) return getBootstrap();
     setToolbarState(false, false);
     removeSongSettings(songIdentity(song));
     if (song.source === "native" && song.originalSourceRecord?.body) {

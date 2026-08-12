@@ -1151,9 +1151,24 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
 
     protected async Task SaveAccompanimentSettingsAsync()
     {
-        if (!HasUnsavedChanges || IsPlaying || IsLoading || _chartModule is null || string.IsNullOrWhiteSpace(SelectedIdentity)) return;
+        if (IsPlaying || IsLoading || _chartModule is null) return;
         try
         {
+            // Key changes are reported by the embedded Viewer asynchronously.
+            // Refresh immediately before the dirty check so a fast Save cannot
+            // persist the previous semitone shift.
+            try
+            {
+                var current = await _chartModule.InvokeAsync<JazzChartBootstrap>("getState");
+                ApplyBootstrap(current);
+            }
+            catch
+            {
+                // Keep the last bridge state if the refresh is transiently unavailable.
+            }
+
+            if (!HasUnsavedChanges || string.IsNullOrWhiteSpace(SelectedIdentity)) return;
+
             if (HasUnsavedChartChanges)
             {
                 var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("saveCurrentChart");
