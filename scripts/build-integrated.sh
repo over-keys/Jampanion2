@@ -51,6 +51,7 @@ mkdir -p "$VIEWER"
 # postMessage bridge so accompaniment never depends on direct iframe DOM access.
 node "$ROOT/scripts/customize-viewer.mjs" "$VIEWER/index.html"
 node "$ROOT/scripts/test-viewer-contract.mjs" "$VIEWER/index.html"
+node "$ROOT/scripts/test-viewer-navigation.mjs" "$VIEWER/index.html"
 node "$ROOT/scripts/customize-help.mjs" "$VIEWER/help.html"
 node "$ROOT/scripts/test-help-contract.mjs" "$VIEWER/help.html"
 node "$ROOT/scripts/customize-help-en.mjs" "$VIEWER/help.en.html"

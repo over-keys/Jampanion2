@@ -5,6 +5,7 @@ const {
   gridCellToTick,
   buildSoloSequenceWithExpander,
   buildHeadOutSequenceWithExpander,
+  materializeSequence,
   extractIRealTempoFromRecord,
   extractIRealPlayerStyleFromRecord
 } = await import(pathToFileURL(modulePath).href);
@@ -46,14 +47,102 @@ const dsSolo = buildSoloSequenceWithExpander(dsForm, 30, bars => {
   sawDirectiveInExpander = bars.some(bar => [...(bar.symbols || []), ...(bar.navigationSymbols || [])].some(x => /^D\.[CS]\./i.test(String(x))));
   return identityExpander(bars);
 }).map(x => x.sourceIndex);
-if (dsSolo.join(",") !== "30,31,32") throw new Error(`D.S. first-pass solo route wrong: ${dsSolo}`);
-if (sawDirectiveInExpander) throw new Error("D.S./D.C. directive was not stripped from solo-loop expansion");
+if (dsSolo.join(",") !== "30,31,32,33") throw new Error(`D.S. full-form solo route wrong: ${dsSolo}`);
+if (!sawDirectiveInExpander) throw new Error("D.S./D.C. directive was not passed to the full-form expander");
 
-console.log(`Timing/form tests passed (${cases.length} timing + 3 form cases).`);
+// Playback route policy must never create a second navigation algorithm. Both
+// solo and Head Out receive the complete written form, including the Coda
+// destination, and therefore agree for D.C./D.S. charts.
+const jumpRouteInputs = [];
+const jumpRouteExpander = bars => {
+  jumpRouteInputs.push(bars);
+  return identityExpander(bars);
+};
+const jumpSolo = buildSoloSequenceWithExpander(dsForm, 30, jumpRouteExpander)
+  .map(x => x.sourceIndex);
+const jumpHeadOut = buildHeadOutSequenceWithExpander(dsForm, 30, jumpRouteExpander)
+  .map(x => x.sourceIndex);
+if (jumpSolo.join(",") !== jumpHeadOut.join(",")) {
+  throw new Error(`D.S. solo/head-out routes diverged: solo=${jumpSolo}, headOut=${jumpHeadOut}`);
+}
+if (jumpRouteInputs.length !== 2 || jumpRouteInputs.some(input => input.length !== dsForm.length)) {
+  throw new Error("D.S. playback routes did not use the complete written form");
+}
 
-const headOutCoda = [{}, { codaEnd: true }, { note: "tag-to-skip" }, { codaStart: true }, {}];
+const dcThirdEndingForm = [
+  { startRepeat: true },
+  {},
+  { ending: 1, endRepeat: true },
+  { ending: 2, endRepeat: true },
+  { symbols: ["D.C. al 3rd End."], navigationSymbols: ["D.C. al 3rd End."], displayDirectives: ["D.C. al 3rd End."] },
+  { ending: 3, final: true }
+];
+const dcThirdEndingExpander = bars => {
+  const hasDirective = bars.some(bar => (bar.navigationSymbols || []).some(value => /^D\.C\./i.test(String(value))));
+  if (!hasDirective) return identityExpander(bars);
+  const route = [0, 1, 2, 0, 1, 3, 4, 0, 1, 5];
+  return route.map(index => ({ ...bars[index], _sourceIndex: index }));
+};
+const dcThirdEndingSolo = buildSoloSequenceWithExpander(dcThirdEndingForm, 50, dcThirdEndingExpander)
+  .map(x => x.sourceIndex);
+if (dcThirdEndingSolo.join(",") !== "50,51,52,50,51,53,54,50,51,55") {
+  throw new Error(`D.C. al 3rd End. route stopped before the target ending: ${dcThirdEndingSolo}`);
+}
+
+const playbackBar = (overrides = {}) => ({
+  repeatBar: false,
+  repeatTwoBars: false,
+  repeatTwoBarsContinuation: false,
+  chords: [],
+  jampanionNoChord: false,
+  ...overrides
+});
+const repeatSong = {
+  bars: [
+    playbackBar({ chords: ["C7"] }),
+    playbackBar({ chords: ["F7"] }),
+    playbackBar({ repeatBar: true }),
+    playbackBar({ chords: ["Bb7"] })
+  ]
+};
+const repeatTiming = new Map([
+  [0, { meter: "4/4", events: [{ startTick: 0, symbol: "C7" }] }],
+  [1, { meter: "4/4", events: [{ startTick: 0, symbol: "F7" }] }],
+  [2, { meter: "4/4", events: [{ startTick: 0, symbol: "%" }] }],
+  [3, { meter: "4/4", events: [{ startTick: 0, symbol: "Bb7" }] }]
+]);
+const repeatRoute = materializeSequence(
+  [0, 1, 2, 3, 0, 2].map(sourceIndex => ({ sourceIndex })),
+  repeatSong,
+  repeatTiming,
+  []
+).map(bar => bar.chords[0].symbol);
+if (repeatRoute.join(",") !== "C7,F7,F7,Bb7,C7,F7") {
+  throw new Error(`written % context was lost after a jump: ${repeatRoute}`);
+}
+
+const slashSong = {
+  bars: [playbackBar({ chords: ["C7"] }), playbackBar({ chords: ["/", "G7"] })]
+};
+const slashTiming = new Map([
+  [0, { meter: "4/4", events: [{ startTick: 0, symbol: "C7" }] }],
+  [1, { meter: "4/4", events: [{ startTick: 0, symbol: "/" }, { startTick: 960, symbol: "G7" }] }]
+]);
+const slashRoute = materializeSequence(
+  [0, 1, 0, 1].map(sourceIndex => ({ sourceIndex })),
+  slashSong,
+  slashTiming,
+  []
+).map(bar => bar.chords.map(chord => chord.symbol).join("/"));
+if (slashRoute.join(",") !== "C7,C7/G7,C7,C7/G7") {
+  throw new Error(`written slash context was lost after a jump: ${slashRoute}`);
+}
+
+console.log(`Timing/form tests passed (${cases.length} timing + 6 form cases).`);
+
+const headOutCoda = [{}, { codaEnd: true }, { codaStart: true }, {}];
 const headOutRoute = buildHeadOutSequenceWithExpander(headOutCoda, 40, identityExpander).map(x => x.sourceIndex);
-if (headOutRoute.join(",") !== "40,41,43,44") throw new Error(`standalone Coda head-out jump wrong: ${headOutRoute}`);
+if (headOutRoute.join(",") !== "40,41,42,43") throw new Error(`standalone Coda head-out route wrong: ${headOutRoute}`);
 console.log("Standalone Coda head-out test passed.");
 
 const irealTempo180 = extractIRealTempoFromRecord({

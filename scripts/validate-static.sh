@@ -34,6 +34,7 @@ grep -q 'node "$ROOT/scripts/customize-viewer.mjs" "$VIEWER/index.html"' "$ROOT/
 grep -q 'initializeEmbeddedViewer' "$ROOT/scripts/customize-viewer.mjs"
 ! grep -q 'toolbar-main.*display:none' "$HOST"
 grep -q 'customize-viewer.mjs.*VIEWER/index.html' "$ROOT/scripts/build-integrated.sh"
+grep -q 'test-viewer-navigation.mjs.*VIEWER/index.html' "$ROOT/scripts/build-integrated.sh"
 grep -q 'customize-help.mjs.*VIEWER/help.html' "$ROOT/scripts/build-integrated.sh"
 grep -q 'customize-help-en.mjs.*VIEWER/help.en.html' "$ROOT/scripts/build-integrated.sh"
 grep -q 'id="jampanion"' "$ROOT/scripts/customize-help.mjs"
@@ -114,7 +115,8 @@ grep -q 'TruncateHarmonyAtTick' "$ROOT/integration/overlay/src/Jampanion.Web/Aud
 # Interactive Space controls and exact first-bar deletion semantics.
 grep -q 'shortcutBelongsToInteractiveControl' "$HOST"
 grep -q 'tag === "button"' "$HOST"
-grep -q 'const prior = output.at(-1)?.chords?.at(-1)?.symbol || "N.C."' "$HOST"
+grep -q 'const priorTwo = sourceIndex > 1 ? resolveWrittenChords(sourceIndex - 2) : \[\]' "$HOST"
+grep -q 'const previous = prior.at(-1)?.symbol || "N.C."' "$HOST"
 
 # Tempo rollback must preserve the prior Auto/manual ownership state.
 grep -q 'previousTempoExplicit' "$LOGIC"

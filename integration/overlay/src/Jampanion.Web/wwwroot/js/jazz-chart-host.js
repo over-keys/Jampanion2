@@ -1578,62 +1578,40 @@ function buildHeadOutSequence(loopSource, sourceOffset) {
 }
 
 export function buildHeadOutSequenceWithExpander(loopSource, sourceOffset, expandChartBars) {
-    if (!loopSource.length) return [];
-    const hasJump = loopSource.some(bar =>
-        [...(bar.navigationSymbols || []), ...(bar.symbols || [])]
-            .some(value => /^D\.[CS]\./i.test(String(value))));
-    if (hasJump) {
-        return offsetExpanded(expandChartBars(loopSource), sourceOffset);
-    }
-
-    // Chart Viewer intentionally leaves a standalone To Coda/Coda pair in
-    // written order in Expanded view. Playback has a different requirement:
-    // reserve the destination for HeadOut and take the written To Coda only on
-    // the final chorus. Use the same Chart Viewer repeat expander on both sides
-    // of the jump; only the navigation edge is session-specific.
-    const codaStart = loopSource.findIndex((bar, index) => index > 0 && Boolean(bar.codaStart));
-    if (codaStart > 0) {
-        const toCoda = loopSource.findIndex((bar, index) => index < codaStart && Boolean(bar.codaEnd));
-        if (toCoda >= 0) {
-            const main = offsetExpanded(expandChartBars(loopSource.slice(0, toCoda + 1)), sourceOffset);
-            const coda = offsetExpanded(expandChartBars(loopSource.slice(codaStart)), sourceOffset + codaStart);
-            return [...main, ...coda];
-        }
-    }
-    return offsetExpanded(expandChartBars(loopSource), sourceOffset);
+    // Head Out follows the same complete, written-form expansion as Viewer.
+    // The ending/root hold is added by IntegratedSessionPlanner after this
+    // route; it must not cause the chart navigator to be interpreted again.
+    return buildCanonicalPlaybackSequence(loopSource, sourceOffset, expandChartBars);
 }
 
 export function buildSoloSequenceWithExpander(loopSource, sourceOffset, expandChartBars) {
-    if (!loopSource.length) return [];
-    let jumpIndex = -1;
-    for (let index = 0; index < loopSource.length; index++) {
-        const bar = loopSource[index];
-        const nav = [...(bar.navigationSymbols || []), ...(bar.symbols || [])];
-        if (nav.some(value => /^D\.[CS]\./i.test(String(value)))) {
-            jumpIndex = index;
-            break;
-        }
-    }
+    const expanded = buildCanonicalPlaybackSequence(loopSource, sourceOffset, expandChartBars);
+    if (!loopSource.length || hasJumpDirective(loopSource)) return expanded;
 
-    // A written Coda destination is a last-chorus destination. When no D.C./D.S.
-    // directive is present, Jazz Chart Viewer deliberately leaves it in written
-    // order for display; the accompaniment solo loop must still stop before that
-    // destination so Coda is reserved for HeadOut.
-    const independentCoda = jumpIndex < 0
-        ? loopSource.findIndex((bar, index) => index > 0 && Boolean(bar.codaStart))
-        : -1;
-    const firstPass = jumpIndex >= 0
-        ? loopSource.slice(0, jumpIndex + 1)
-        : independentCoda > 0
-            ? loopSource.slice(0, independentCoda)
-            : loopSource.slice();
-    const cleaned = firstPass.map(bar => ({
-        ...structuredCloneSafe(bar),
-        symbols: (bar.symbols || []).filter(value => !/^D\.[CS]\./i.test(String(value))),
-        navigationSymbols: [],
-        displayDirectives: (bar.displayDirectives || []).filter(value => !/^D\.[CS]\./i.test(String(value)))
-    }));
-    return offsetExpanded(expandChartBars(cleaned), sourceOffset);
+    // Jazz Chart Viewer deliberately keeps a standalone To Coda/Coda pair in
+    // written order (R-04). For an open-ended accompaniment loop, the Coda is
+    // the last-chorus destination reserved for Head Out. This is a playback
+    // route policy applied to the already-expanded result, not a second chart
+    // expansion and not a reinterpretation of D.C./D.S.
+    const codaStart = findStandaloneCodaStart(loopSource);
+    if (codaStart < 1) return expanded;
+    const codaSourceIndex = sourceOffset + codaStart;
+    return expanded.filter(item => item.sourceIndex < codaSourceIndex);
+}
+
+function buildCanonicalPlaybackSequence(loopSource, sourceOffset, expandChartBars) {
+    if (!loopSource.length) return [];
+    return offsetExpanded(expandChartBars(loopSource), sourceOffset);
+}
+
+function hasJumpDirective(bars) {
+    return (bars || []).some(bar =>
+        [...(bar.navigationSymbols || []), ...(bar.symbols || [])]
+            .some(value => /^D\.[CS]\./i.test(String(value))));
+}
+
+function findStandaloneCodaStart(bars) {
+    return (bars || []).findIndex((bar, index) => index > 0 && Boolean(bar.codaStart));
 }
 
 function offsetExpanded(bars, offset) {
@@ -1642,34 +1620,52 @@ function offsetExpanded(bars, offset) {
     }));
 }
 
-function materializeSequence(sequence, song, timing, styles) {
+export function materializeSequence(sequence, song, timing, styles) {
     const output = [];
-    for (const item of sequence) {
-        const sourceIndex = item.sourceIndex;
+    const writtenChords = new Map();
+    const resolving = new Set();
+
+    const resolveWrittenChords = sourceIndex => {
+        if (writtenChords.has(sourceIndex)) return cloneChords(writtenChords.get(sourceIndex));
         const sourceBar = song.bars?.[sourceIndex];
         const info = timing.get(sourceIndex);
-        if (!sourceBar || !info) continue;
+        if (!sourceBar || !info || resolving.has(sourceIndex)) return [];
+
+        resolving.add(sourceIndex);
+        const prior = sourceIndex > 0 ? resolveWrittenChords(sourceIndex - 1) : [];
+        const priorTwo = sourceIndex > 1 ? resolveWrittenChords(sourceIndex - 2) : [];
         let chords = info.events
             .filter(event => event.symbol)
             .map(event => ({ ...event }));
 
+        if (!chords.length && sourceBar.chords?.length) {
+            const values = sourceBar.chords.filter(Boolean);
+            const ticks = barTicks(info.meter);
+            values.forEach((symbol, position) => chords.push({
+                startTick: Math.floor(position * ticks / values.length), symbol
+            }));
+        }
+
         if (sourceBar.repeatTwoBars || sourceBar.repeatTwoBarsContinuation) {
-            chords = cloneChords(output.at(-2)?.chords || output.at(-1)?.chords || []);
+            // `r` is represented by two source bars. Both bars refer to the
+            // two written measures immediately before the marker, not to the
+            // bars that happen to precede them after a D.C./D.S. jump.
+            chords = cloneChords(priorTwo.length ? priorTwo : prior);
         } else if (sourceBar.repeatBar || chords.some(event => event.symbol === "%" || event.symbol === "%%")) {
-            chords = cloneChords(output.at(-1)?.chords || []);
+            chords = cloneChords(prior);
         } else {
             const resolved = [];
-            let active = output.at(-1)?.chords?.at(-1)?.symbol || null;
+            let active = prior.at(-1)?.symbol || null;
             for (const event of chords.sort((a, b) => a.startTick - b.startTick)) {
                 let symbol = event.symbol;
                 if (symbol === "/") {
                     if (!active) continue;
                     symbol = active;
                 }
-                const invisibleBass = String(symbol).match(/^[Ww]\/([A-G])([#b]?)$/);
+                const invisibleBass = String(symbol).match(/^[Ww]\/([A-G])([#b]?)/);
                 if (invisibleBass) {
-                    const prior = active || output.at(-1)?.chords?.at(-1)?.symbol || "C";
-                    const harmony = String(prior).replace(/\/[A-G][#b]?$/, "");
+                    const previous = active || prior.at(-1)?.symbol || "C";
+                    const harmony = String(previous).replace(/\/[A-G][#b]?$/, "");
                     symbol = `${harmony}/${invisibleBass[1]}${invisibleBass[2]}`;
                 }
                 if (symbol === "%" || symbol === "%%") continue;
@@ -1684,15 +1680,27 @@ function materializeSequence(sequence, song, timing, styles) {
         if (!chords.length) {
             chords = sourceBar.jampanionNoChord === true
                 ? [{ startTick: 0, symbol: "N.C." }]
-                : cloneChords(output.at(-1)?.chords || [{ startTick: 0, symbol: "N.C." }]);
+                : cloneChords(prior);
         }
-        if (chords[0].startTick !== 0) {
-            // A later written change must never be pulled early merely to satisfy
-            // TuneBar's tick-zero invariant. Carry the prior bar when one exists;
-            // the first bar remains N.C. until its first written chord.
-            const prior = output.at(-1)?.chords?.at(-1)?.symbol || "N.C.";
-            chords.unshift({ startTick: 0, symbol: prior });
+        if (chords.length && chords[0].startTick !== 0) {
+            // A later written change must never be pulled early merely to
+            // satisfy TuneBar's tick-zero invariant. Carry the preceding
+            // written bar, even when the route arrived here through a jump.
+            const previous = prior.at(-1)?.symbol || "N.C.";
+            chords.unshift({ startTick: 0, symbol: previous });
         }
+
+        resolving.delete(sourceIndex);
+        writtenChords.set(sourceIndex, chords);
+        return cloneChords(chords);
+    };
+
+    for (const item of sequence) {
+        const sourceIndex = item.sourceIndex;
+        const sourceBar = song.bars?.[sourceIndex];
+        const info = timing.get(sourceIndex);
+        if (!sourceBar || !info) continue;
+        const chords = resolveWrittenChords(sourceIndex);
 
         output.push({
             sourceIndex,
