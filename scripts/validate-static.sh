@@ -19,7 +19,7 @@ grep -q 'return getBootstrap();' "$HOST"
 # Song search remains the upstream Jazz Chart Viewer control. The Jampanion
 # sidebar must not contain a second search box or hide .toolbar-main.
 ! grep -q 'placeholder="Search title or composer"' "$HOME"
-grep -q 'src="viewer/index.html?integrated=13"' "$HOME"
+grep -q 'src="viewer/index.html?integrated=14"' "$HOME"
 grep -q '>Accompaniment<' "$HOME"
 grep -q 'TryConnectChartAsync' "$LOGIC"
 ! grep -q 'disabled="@(!ChartReady || IsLoading)"' "$HOME"
@@ -49,8 +49,8 @@ grep -q 'APP_VERSION = "31"' "$ROOT/scripts/customize-shell.mjs"
 grep -q 'help.html?v=31' "$ROOT/scripts/customize-viewer.mjs"
 grep -q 'help.en.html?v=31' "$ROOT/scripts/customize-viewer.mjs"
 grep -q 'help.css?v=31' "$ROOT/scripts/customize-help.mjs"
-grep -q 'jazz-chart-host.js?v=33' "$ROOT/scripts/customize-viewer.mjs"
-grep -q 'jazz-chart-host.js?v=45' "$ROOT/integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs"
+grep -q 'jazz-chart-host.js?v=34' "$ROOT/scripts/customize-viewer.mjs"
+grep -q 'jazz-chart-host.js?v=46' "$ROOT/integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs"
 
 # Native IndexedDB loading is asynchronous and must not block ChartReady.
 grep -q 'void loadNativeSongs().then' "$HOST"

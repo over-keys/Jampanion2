@@ -7,6 +7,7 @@ const NATIVE_STORE = "songs";
 const NATIVE_DB_VERSION = 1;
 const PPQ = 480;
 const IREAL_MUSIC_PREFIX = "1r34LbKcu7";
+const JAMPANION_ICON_PATH = "../icons/jampanion-32.png?v=21";
 
 let frame;
 let win;
@@ -330,6 +331,7 @@ export async function initializeEmbeddedViewer() {
     if (!initialized) {
         try { installIntegrationCss(); } catch (error) { console.warn("Integration CSS setup failed", error); }
         try { installChartListeners(); } catch (error) { console.warn("Chart listener setup failed", error); }
+        try { installStandaloneModeLink(); } catch (error) { console.warn("Mode link setup failed", error); }
         // Both integrated and standalone Viewer modes use one compact toolbar
         // row for Fit, New, Save, and Revert.
         try { installStandaloneSaveButton(); } catch (error) { console.warn("Toolbar action setup failed", error); }
@@ -386,6 +388,28 @@ function installEmbeddedShortcuts() {
         postToParent({ type: "event", name: "spaceShortcut" });
     };
     document.addEventListener("keydown", embeddedKeyHandler);
+}
+
+function installStandaloneModeLink() {
+    if (window.parent !== window || doc.getElementById("jampanionModeLink")) return;
+    const toolbarMain = doc.querySelector(".toolbar-main");
+    const searchWrap = doc.querySelector(".search-wrap");
+    if (!toolbarMain || !searchWrap) return;
+
+    const link = doc.createElement("a");
+    link.id = "jampanionModeLink";
+    link.className = "jampanion-mode-link";
+    link.href = "../";
+    link.title = "Open Jampanion2 accompaniment mode";
+    link.setAttribute("aria-label", "Open Jampanion2 accompaniment mode");
+
+    const icon = doc.createElement("img");
+    icon.src = JAMPANION_ICON_PATH;
+    icon.alt = "";
+    icon.width = 22;
+    icon.height = 22;
+    link.append(icon);
+    toolbarMain.insertBefore(link, searchWrap);
 }
 
 async function waitForViewer() {
@@ -468,6 +492,17 @@ function installIntegrationCss() {
       .scale-group .standalone-save:disabled {
         opacity:.45; cursor:default; pointer-events:none;
         border-color:#cbd2d5; background:#edf0f1; color:#68757b;
+      }
+      .jampanion-mode-link {
+        flex:0 0 30px; width:30px; height:30px; box-sizing:border-box;
+        display:inline-flex; align-items:center; justify-content:center;
+        border:1px solid #b9c4c8; border-radius:5px; background:#fff;
+        color:#253036; text-decoration:none;
+      }
+      .jampanion-mode-link:hover { border-color:#236b83; background:#eef5f7; }
+      .jampanion-mode-link img { width:22px; height:22px; border-radius:6px; object-fit:cover; }
+      @media (max-width: 700px) {
+        .jampanion-mode-link { flex-basis:30px; min-width:30px; }
       }
     `;
     doc.head.appendChild(style);

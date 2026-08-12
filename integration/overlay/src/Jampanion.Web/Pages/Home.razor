@@ -3,7 +3,7 @@
 @implements IAsyncDisposable
 
 <PageTitle>Jampanion2</PageTitle>
-<link rel="stylesheet" href="css/jazz-integration.css?v=23" />
+<link rel="stylesheet" href="css/jazz-integration.css?v=24" />
 
 <div class="jamp-shell @(IsPlaying ? "is-playing" : string.Empty)">
     <aside class="jamp-sidebar">
@@ -54,13 +54,19 @@
             <img src="icons/jampanion-32.png?v=21" alt="" width="22" height="22" />
             <strong>Jampanion2</strong>
         </section>
+        <section class="jamp-mode-row">
+            <a href="viewer/" title="Open Viewer mode" aria-label="Open Viewer mode">
+                <img src="icons/jampanion-viewer.png?v=2" alt="" width="16" height="16" />
+                <span>Viewer Mode</span>
+            </a>
+        </section>
 
     </aside>
 
     <main class="jamp-chart-area">
         <iframe id="jcv-frame"
                 title="Jazz chart"
-                src="viewer/index.html?integrated=13"
+                src="viewer/index.html?integrated=14"
                 allow="fullscreen"
                 referrerpolicy="no-referrer"></iframe>
     </main>

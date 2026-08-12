@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Jampanion2 Viewer">
+  <rect width="32" height="32" rx="7" fill="#53636a"/>
+  <path d="M7 10.5h18M7 15.5h18M7 20.5h18" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M11 8v14.2m0 0a2.7 2.7 0 1 0 1.2 2.2V13.8l8-2.1v9.2m0 0a2.7 2.7 0 1 0 1.2 2.2V8.8L11 11.9" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
