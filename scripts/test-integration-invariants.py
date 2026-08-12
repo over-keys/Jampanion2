@@ -11,6 +11,7 @@ tempo_change_method = logic[logic.find('private async Task RebuildLiveTempoAsync
 
 checks = {
     "playback disables original search": 'search.disabled = playing' in host,
+    "stopping clears search loading state": 'search.removeAttribute("aria-busy")' in host and 'if (playing)' in host,
     "playback locks selected song": 'playbackLockedSongId' in host,
     "embedded Space forwards to parent": 'name: "spaceShortcut"' in host,
     "Space shortcut ignores interactive controls": 'shortcutBelongsToInteractiveControl' in host and 'tag === "button"' in host and '.search-options' in host,
@@ -82,6 +83,10 @@ checks = {
     "no-op rehearsal and style edits do not enable Save": 'const nextSection = label || null' in host and 'const nextStyle = value || null' in host and 'setToolbarState(true, true)' in host,
     "disabled Save is visibly and pointer-disabled": '.standalone-save:disabled' in host and 'pointer-events:none' in host and 'background:#edf0f1' in host,
     "mode switching uses matching-weight Viewer Mode link": 'jamp-mode-row' in home and '>Viewer Mode<' in home and 'jampanion-viewer.png' in home and '.jamp-mode-row img { width:22px; height:22px;' in css and 'font-size:15px; font-weight:400;' in css and '.jamp-mode-row a { font-size:12px; font-weight:400; }' in css and 'installStandaloneModeLink' in host and 'jampanion-viewer.png' in (root / "scripts/customize-viewer.mjs").read_text() and 'jampanion-mode-link' in host,
+    "embedded startup waits for saved song": 'viewer.libraryReady' in host and 'libraryReady' in (root / "scripts/test-viewer-contract.mjs").read_text() and 'Loading saved song' in (root / "scripts/customize-viewer.mjs").read_text() and 'using demo fallback' in (root / "scripts/customize-viewer.mjs").read_text(),
+    "delete-all clears Jampanion restore state": 'jampanion-library-cleared' in (root / "scripts/customize-viewer.mjs").read_text() and 'handleLibraryCleared' in host and 'removeSongSettings(identity)' in host and 'localStorage.removeItem(LAST_SONG_KEY)' in host,
+    "customized songs keep normal title typography": '.jampanion-customized-title' in host and 'color:inherit' in host and 'font-size:inherit' in host and 'font-weight:inherit' in host,
+    "customized songs are marked and removable": 'annotateSongOptions' in host and 'jampanion-customized-marker' in host and 'updateCustomizedSearchTitle' in host and 'deleteCustomizedSongs' in host and 'removeSongsByIds' in (root / "scripts/customize-viewer.mjs").read_text(),
     "background playback does not stop on page visibility": 'visibilityHandler' not in host and 'StopSessionFromVisibility' not in host and 'customize-background-playback.mjs' in (root / "scripts/build-integrated.sh").read_text() and 'jampanion-audio.js?v=30' in logic,
     "blank chord cells add at the clicked beat": 'A rendered chord slot can span several empty beat cells' in host and 'first?.classList.contains("cell-positioned-slot")' in host and 'const maxInputCells = meter === "3/4" ? 3 : 4' in host and 'Math.min(maxInputCells, Math.max(1, renderedTotal || maxInputCells))' in host and 'openEditorAtPoint(inputLeft' in host and 'const sourceCell = hasVisibleSlot ? insertCell : startCell' in host and 'hidden: true' in host,
     "existing chord double-click opens its value": 'const clickedChord = event.target.closest?.(".chord")' in host and 'editChord(sourceIndex, clickedSlotIndex, clickedChordSlot)' in host,

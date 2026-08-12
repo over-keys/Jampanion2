@@ -35,6 +35,7 @@ let embeddedMode = false;
 let frameOrigin = null;
 let parentBridgeListenerInstalled = false;
 let embeddedBridgeListenerInstalled = false;
+let libraryActionsInstalled = false;
 let bridgeReady = false;
 let bridgeStartupError = null;
 let bridgeRequestId = 0;
@@ -190,6 +191,7 @@ function installEmbeddedBridgeListener() {
                 case "highlightSourceBar": value = highlightSourceBar(args.sourceIndex, args.occurrence); break;
                 case "createNewSong": value = await createNewSong(args.title, args.barCount, args.meter, args.key, args.accompanimentStyle); break;
                 case "deleteCurrentNativeSong": value = await deleteCurrentNativeSong(); break;
+                case "deleteCustomizedSongs": value = await deleteCustomizedSongs(); break;
                 case "setToolbarState": value = setToolbarState(args.dirty, args.canRevert); break;
                 case "setToolbarRevertVisible": value = setToolbarRevertVisible(args.visible); break;
                 default: throw new Error(`Unknown Jazz Chart Viewer bridge action: ${data.action}`);
@@ -210,7 +212,12 @@ async function waitForLocalViewer(timeoutMs = 15000) {
     const deadline = performance.now() + timeoutMs;
     while (performance.now() < deadline) {
         viewer = window.__chartViewer || null;
-        if (viewer?.state && typeof viewer.expandChartBars === "function") return;
+        if (viewer?.state && typeof viewer.expandChartBars === "function") {
+            if (viewer.libraryReady && typeof viewer.libraryReady.then === "function") {
+                await viewer.libraryReady;
+            }
+            return;
+        }
         await delay(40);
     }
     throw new Error("Jazz Chart Viewer did not expose its chart API.");
@@ -331,6 +338,7 @@ export async function initializeEmbeddedViewer() {
     if (!initialized) {
         try { installIntegrationCss(); } catch (error) { console.warn("Integration CSS setup failed", error); }
         try { installChartListeners(); } catch (error) { console.warn("Chart listener setup failed", error); }
+        try { installLibraryActions(); } catch (error) { console.warn("Library action setup failed", error); }
         try { installStandaloneModeLink(); } catch (error) { console.warn("Mode link setup failed", error); }
         // Both integrated and standalone Viewer modes use one compact toolbar
         // row for Fit, New, Save, and Revert.
@@ -493,6 +501,20 @@ function installIntegrationCss() {
         opacity:.45; cursor:default; pointer-events:none;
         border-color:#cbd2d5; background:#edf0f1; color:#68757b;
       }
+      .search-options button.jampanion-customized-option {
+        padding-right:12px;
+      }
+      .search-options button.jampanion-customized-option > strong {
+        display:flex; min-width:0; align-items:baseline; gap:4px;
+      }
+      .jampanion-customized-marker {
+        flex:0 0 auto; color:#53636a; font:700 15px/1 system-ui,sans-serif;
+      }
+      .search-options button.jampanion-customized-option > strong .jampanion-customized-title {
+        min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+        color:inherit; font-size:inherit; font-weight:inherit; line-height:inherit;
+        text-align:inherit; background:transparent; border-radius:0;
+      }
       .jampanion-mode-link {
         flex:0 0 30px; width:30px; height:30px; box-sizing:border-box;
         display:inline-flex; align-items:center; justify-content:center;
@@ -541,6 +563,128 @@ function installChartListeners() {
             queueBootstrapNotification();
         }, true);
     }
+}
+
+function installLibraryActions() {
+    if (libraryActionsInstalled || !doc) return;
+    libraryActionsInstalled = true;
+    window.addEventListener("jampanion-library-cleared", event => {
+        void handleLibraryCleared(event?.detail?.songs);
+    });
+    const button = doc.getElementById("deleteCustomized");
+    if (button) {
+        button.addEventListener("click", () => { void deleteCustomizedSongs(); });
+    }
+    updateCustomizedSongsButton();
+}
+
+function isCustomizedSong(song) {
+    return Boolean(song && (
+        hasSavedSongOverrides(song) ||
+        (song.source === "native" && song.originalSourceRecord?.body)
+    ));
+}
+
+function customizedSongs() {
+    return (viewer?.state?.songs || []).filter(isCustomizedSong);
+}
+
+function updateCustomizedSongsButton() {
+    const button = doc?.getElementById("deleteCustomized");
+    if (!button) return;
+    const count = customizedSongs().length;
+    button.disabled = !editingEnabled || count === 0;
+    button.title = count
+        ? `Delete ${count} customized song${count === 1 ? "" : "s"}`
+        : "No customized songs";
+}
+
+async function deleteNativeRecord(identity) {
+    if (!identity) return;
+    try {
+        const database = await openNativeDb();
+        await transactionRequest(database, "readwrite", store => store.delete(identity));
+        database.close();
+    } catch {
+        // The in-memory map is still cleared when IndexedDB is unavailable.
+    }
+}
+
+async function deleteCustomizedSongs() {
+    if (!embeddedMode) return requestEmbedded("deleteCustomizedSongs", {}, 10000);
+    if (!editingEnabled) return getBootstrap();
+    const targets = customizedSongs();
+    if (!targets.length) return getBootstrap();
+    const message = targets.length === 1
+        ? "Delete this customized song? The original imported chart will also be removed from the library."
+        : `Delete these ${targets.length} customized songs? Their original imported charts will also be removed from the library.`;
+    if (!window.confirm(message)) return getBootstrap();
+
+    const ids = targets.map(song => song.id);
+    const identities = targets.map(song => songIdentity(song)).filter(Boolean);
+    if (typeof viewer.removeSongsByIds !== "function") {
+        throw new Error("Customized-song deletion is not available in this Viewer build.");
+    }
+    await viewer.removeSongsByIds(ids);
+    for (const identity of identities) {
+        removeSongSettings(identity);
+        nativeSongs.delete(identity);
+        await deleteNativeRecord(identity);
+    }
+    const reference = readLastSongReference();
+    if (reference && targets.some(song =>
+        (reference.identity && reference.identity === songIdentity(song)) ||
+        (reference.id && reference.id === String(song.id || "")))) {
+        try { localStorage.removeItem(LAST_SONG_KEY); } catch {}
+        lastSongRestorePending = false;
+    }
+    lastLibrarySignature = librarySignature();
+    restoreStoredTranspose();
+    annotateRenderedBars();
+    updateCustomizedSongsButton();
+    syncStandaloneRevertState(currentSong());
+    queueBootstrapNotification();
+    return getBootstrap();
+}
+
+async function handleLibraryCleared(removedSongs = []) {
+    const targets = Array.isArray(removedSongs) ? removedSongs : [];
+    const identities = targets.map(song => songIdentity(song)).filter(Boolean);
+    const removedImportedIdentities = new Set(targets
+        .filter(song => song?.source !== "native" || song?.originalSourceRecord?.body)
+        .map(song => songIdentity(song))
+        .filter(Boolean));
+    for (const identity of identities) removeSongSettings(identity);
+
+    // Delete host-side edited copies only for imported charts. User-created
+    // native songs are intentionally kept by the Viewer action named
+    // "Delete all imported songs".
+    for (const song of targets) {
+        if (song?.source !== "native" || song?.originalSourceRecord?.body) {
+            const identity = songIdentity(song);
+            nativeSongs.delete(identity);
+            await deleteNativeRecord(identity);
+        }
+    }
+    if (removedImportedIdentities.size && viewer?.state?.songs) {
+        const before = viewer.state.songs.length;
+        const remaining = viewer.state.songs.filter(song => !removedImportedIdentities.has(songIdentity(song)));
+        if (remaining.length) viewer.state.songs = remaining;
+        if (remaining.length && !viewer.state.songs.some(song => song.id === viewer.state.selectedId)) {
+            viewer.state.selectedId = viewer.state.songs[0].id;
+        }
+        if (remaining.length && remaining.length !== before) forceRender();
+    }
+    const reference = readLastSongReference();
+    if (reference && targets.some(song =>
+        (reference.identity && reference.identity === songIdentity(song)) ||
+        (reference.id && reference.id === String(song.id || "")))) {
+        try { localStorage.removeItem(LAST_SONG_KEY); } catch {}
+        lastSongRestorePending = false;
+    }
+    lastLibrarySignature = librarySignature();
+    updateCustomizedSongsButton();
+    queueBootstrapNotification();
 }
 
 function handleToolbarResult(data) {
@@ -960,6 +1104,8 @@ export function saveSongSettings(identity, tempoBpm, accompanimentStyle, tempoEx
         semitoneShift: Number.isFinite(Number(semitoneShift)) ? Math.trunc(Number(semitoneShift)) : 0
     };
     saveSettingsMap(map);
+    annotateSongOptions();
+    updateCustomizedSongsButton();
     queueBootstrapNotification();
     return getBootstrap();
 }
@@ -1057,7 +1203,11 @@ export function setPlaybackState(isPlaying, sourceIndex = -1) {
     const search = doc.getElementById("search");
     if (search) {
         search.disabled = playing;
-        if (playing) search.blur();
+        if (playing) {
+            search.blur();
+        } else {
+            search.removeAttribute("aria-busy");
+        }
     }
     if (playing) {
         const options = doc.getElementById("searchOptions") || doc.querySelector(".search-options");
@@ -1135,6 +1285,7 @@ export function highlightSourceBar(sourceIndex, occurrence = 0) {
 
 function annotateRenderedBars() {
     if (!viewer?.state || !doc) return;
+    annotateSongOptions();
     const song = currentSong();
     if (!song) return;
     const displayed = viewer.state.viewMode === "expanded"
@@ -1179,6 +1330,57 @@ function annotateRenderedBars() {
     for (const { badge, lead } of styledSectionBadges) {
         fitSectionStyleBadge(badge, lead, commonFontSize);
     }
+}
+
+function annotateSongOptions() {
+    if (!viewer?.state || !doc) return;
+    const songs = viewer.state.songs || [];
+    for (const option of doc.querySelectorAll(".search-options [data-song-id]")) {
+        const song = songs.find(item => String(item.id) === String(option.dataset.songId || ""));
+        const customized = isCustomizedSong(song);
+        option.classList.toggle("jampanion-customized-option", customized);
+        option.setAttribute("data-customized", customized ? "true" : "false");
+        let marker = option.querySelector(".jampanion-customized-marker");
+        if (!customized) {
+            marker?.remove();
+            if (option.title === "Customized song") option.removeAttribute("title");
+            continue;
+        }
+        const titleElement = option.querySelector("strong");
+        if (!titleElement) continue;
+        let titleText = titleElement.querySelector(".jampanion-customized-title");
+        if (!titleText) {
+            titleText = doc.createElement("span");
+            titleText.className = "jampanion-customized-title";
+            titleText.textContent = [...titleElement.childNodes]
+                .filter(node => node !== marker)
+                .map(node => node.textContent || "")
+                .join("");
+            titleElement.replaceChildren(titleText);
+        }
+        if (!marker) {
+            marker = doc.createElement("span");
+            marker.className = "jampanion-customized-marker";
+            marker.textContent = "*";
+            marker.setAttribute("aria-hidden", "true");
+        }
+        if (marker.parentElement !== titleElement) titleElement.appendChild(marker);
+        option.title = "Customized song";
+    }
+    updateCustomizedSearchTitle();
+    updateCustomizedSongsButton();
+}
+
+function updateCustomizedSearchTitle() {
+    const search = doc?.getElementById("search");
+    const song = currentSong();
+    if (!search || !song || viewer?.state?.searchOpen) return;
+    const title = song.title || "";
+    const marker = isCustomizedSong(song) ? " *" : "";
+    const demoLabel = song.source === "demo" ? " (Demo)" : "";
+    const helpLabel = song.source === "demo" ? " [See Help ? to Import Songs]" : "";
+    const nextValue = `${title}${demoLabel}${marker}${helpLabel}`;
+    if (search.value !== nextValue) search.value = nextValue;
 }
 
 function sectionStyleAbbreviation(style) {
