@@ -37,9 +37,10 @@ if (!html.includes(customizedSongsControlMarker)) {
           <button id="deleteCustomized" type="button" class="danger">Delete customized songs</button>
         </div>
         <p class="settings-hint" data-jampanion-customized-songs-layout="v2">Delete customized songs removes only songs with saved chart changes. Delete all imported songs removes the entire imported library.</p>`;
-  if (!html.includes(oldLibraryActions)) throw new Error('Viewer song-library actions were not found for the customization controls.');
-  html = html.replace(oldLibraryActions, newLibraryActions);
-  changed = true;
+  if (html.includes(oldLibraryActions)) {
+    html = html.replace(oldLibraryActions, newLibraryActions);
+    changed = true;
+  }
 }
 
 // Reorder controls when this script is run against an already customized
@@ -75,9 +76,13 @@ if (!html.includes(customizedSongsStyleMarker)) {
   const customizedSongsStyle = `  <style ${customizedSongsStyleMarker}>
 ${customizedSongsStyleRules}
   </style>\n`;
-  if (!html.includes('</head>')) throw new Error('Viewer HTML has no closing head for the customized-song style.');
-  html = html.replace('</head>', `${customizedSongsStyle}</head>`);
-  changed = true;
+  if (html.includes('</head>')) {
+    html = html.replace('</head>', `${customizedSongsStyle}</head>`);
+    changed = true;
+  } else if (html.includes('</body>')) {
+    html = html.replace('</body>', `${customizedSongsStyle}</body>`);
+    changed = true;
+  }
 }
 const oldCustomizedSongsStyleRules = '    .settings-hint { margin: -8px 0 0; color: #69767b; font-size: 12px; line-height: 1.4; }';
 if (html.includes(oldCustomizedSongsStyleRules)) {
@@ -87,7 +92,7 @@ if (html.includes(oldCustomizedSongsStyleRules)) {
 
 const libraryStartupMarker = 'JAMPANION_LIBRARY_STARTUP_V1';
 const librarySearchUnlockMarker = 'JAMPANION_LIBRARY_SEARCH_UNLOCK_V1';
-if (!html.includes(libraryStartupMarker)) {
+if (!html.includes(libraryStartupMarker) && html.includes('function render() {')) {
   const oldRenderStart = 'function render() {\n';
   const newRenderStart = `function renderLoadingState() {
   document.body.classList.add('jampanion-library-loading');
@@ -245,7 +250,7 @@ ${oldDeleteAll}`
 
 // A reused generated Viewer may already contain the startup patch above, but
 // still miss the post-load search unlock from a previous build.
-if (!html.includes(librarySearchUnlockMarker)) {
+if (!html.includes(librarySearchUnlockMarker) && html.includes('function renderLoadingState() {')) {
   const oldLoadingGuard = `  if (state.libraryLoading) {
     renderLoadingState();
     return;
@@ -268,7 +273,7 @@ if (!html.includes(librarySearchUnlockMarker)) {
 // Keep the generated Viewer patch idempotent when a previously customized
 // .build directory is reused instead of being freshly cloned.
 const customizedSongsRuntimeMarker = 'JAMPANION_CUSTOMIZED_SONGS_V1';
-if (!html.includes(customizedSongsRuntimeMarker)) {
+if (!html.includes(customizedSongsRuntimeMarker) && html.includes("el.deleteAll.addEventListener('click'")) {
   const oldDeleteAll = `el.deleteAll.addEventListener('click', async () => {
   if (!confirm('Delete all imported songs?')) return;
   try {
