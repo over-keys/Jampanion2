@@ -37,6 +37,10 @@
                 </div>
             </section>
         </div>
+        @if (!string.IsNullOrWhiteSpace(PlaybackErrorText))
+        {
+            <p class="jamp-playback-error" role="alert"><strong>Playback error</strong><br />@PlaybackErrorText</p>
+        }
 
         <section class="jamp-panel mix-panel">
             <div class="jamp-heading-row"><h2>Mix</h2><button class="tiny" @onclick="ToggleSettingsAsync">Settings</button></div>
@@ -94,14 +98,6 @@
             <p class="dialog-note">@MidiStatusText</p>
             <p class="dialog-note">MIDI input is used only for MIDI Thru. Performance-energy analysis is disabled.</p>
         </section>
-        @if (CurrentSongIsNative && !CurrentNativeHasOriginalSource)
-        {
-            <section>
-                <h3>Native song</h3>
-                <p class="dialog-note">This new chart is stored in this browser.</p>
-                <button class="danger" @onclick="DeleteCurrentNativeSongAsync" disabled="@(IsPlaying || IsLoading)">Delete this native song</button>
-            </section>
-        }
         <footer><button @onclick="ToggleSettingsAsync">Close</button></footer>
     </section>
 }

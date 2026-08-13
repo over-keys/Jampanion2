@@ -50,8 +50,12 @@ grep -q 'APP_VERSION = "31"' "$ROOT/scripts/customize-shell.mjs"
 grep -q 'help.html?v=31' "$ROOT/scripts/customize-viewer.mjs"
 grep -q 'help.en.html?v=31' "$ROOT/scripts/customize-viewer.mjs"
 grep -q 'help.css?v=31' "$ROOT/scripts/customize-help.mjs"
-grep -q 'jazz-chart-host.js?v=37' "$ROOT/scripts/customize-viewer.mjs"
-grep -q 'jazz-chart-host.js?v=49' "$ROOT/integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs"
+grep -q 'jazz-chart-host.js?v=51' "$ROOT/scripts/customize-viewer.mjs"
+grep -q 'jazz-chart-host.js?v=51' "$ROOT/integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs"
+grep -q 'DeleteNativeSongFromToolbar' "$ROOT/integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs"
+grep -q 'setToolbarState(args.dirty, args.canRevert, args.canDelete)' "$HOST"
+grep -q 'Cannot interpret chord' "$ROOT/integration/overlay/src/Jampanion.Web/Audio/IntegratedSessionPlanner.cs"
+grep -q 'jamp-playback-error' "$HOME"
 
 # Native IndexedDB loading is part of embedded startup readiness so saved
 # chart/settings state is applied before the first visible chart render.

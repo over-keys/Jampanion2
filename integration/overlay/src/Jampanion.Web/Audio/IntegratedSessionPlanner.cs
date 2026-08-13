@@ -1,3 +1,4 @@
+using System.Globalization;
 using Jampanion.Core.Generation;
 using Jampanion.Core.Music;
 using Jampanion.Core.Playback;
@@ -514,13 +515,30 @@ public static class IntegratedSessionPlanner
                         throw new ArgumentException($"A chord in bar {source.SourceIndex + 1} lies outside the measure.");
                     }
 
-                    var symbol = NormalizeChordSymbol(change.Symbol);
-                    if (chart.SemitoneShift != 0)
+                    try
                     {
-                        symbol = TuneTransposer.TransposeChordSymbol(symbol, chart.SemitoneShift, chart.PreferFlats);
+                        var symbol = NormalizeChordSymbol(change.Symbol);
+                        if (chart.SemitoneShift != 0)
+                        {
+                            symbol = TuneTransposer.TransposeChordSymbol(symbol, chart.SemitoneShift, chart.PreferFlats);
+                        }
+                        var chord = ChordSymbolParser.Parse(symbol);
+                        return ChordChange.AtTick(change.StartTick, chord);
                     }
-                    var chord = ChordSymbolParser.Parse(symbol);
-                    return ChordChange.AtTick(change.StartTick, chord);
+                    catch (Exception exception)
+                    {
+                        var beat = (change.StartTick / (double)SessionConstants.Ppq) + 1d;
+                        var beatText = beat.ToString("0.##", CultureInfo.InvariantCulture);
+                        if (string.IsNullOrWhiteSpace(change.Symbol))
+                        {
+                            throw new FormatException(
+                                $"The chord at bar {source.SourceIndex + 1}, beat {beatText} is blank. Enter a chord symbol.",
+                                exception);
+                        }
+                        throw new FormatException(
+                            $"Cannot interpret chord \"{change.Symbol}\" in bar {source.SourceIndex + 1}, beat {beatText}. {exception.Message}",
+                            exception);
+                    }
                 })
                 .GroupBy(change => change.StartTick)
                 .Select(group => group.Last())

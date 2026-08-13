@@ -216,6 +216,10 @@ const newDeleteAll = `async function restoreSongsByIds(songIds) {
   const restoredById = new Map();
   for (const song of targets) {
     const original = song.originalSourceRecord;
+    if (song.originalSourceSong) {
+      restoredById.set(String(song.id), JSON.parse(JSON.stringify(song.originalSourceSong)));
+      continue;
+    }
     if (!original?.body || typeof parseIRealCollection !== 'function') {
       restoredById.set(String(song.id), song);
       continue;
@@ -239,7 +243,12 @@ const newDeleteAll = `async function restoreSongsByIds(songIds) {
 }
 
 ${oldDeleteAll}`
-    .replace("  if (!confirm('Delete all imported songs?')) return;", `  if (!confirm('Delete all imported songs?')) return;
+    .replace("  if (!confirm('Delete all imported songs?')) return;", `  const importedSongs = state.songs.filter((song) => song.source !== 'demo');
+  if (!importedSongs.length) {
+    alert('No imported songs to delete.');
+    return;
+  }
+  if (!confirm('Delete all imported songs?')) return;
   const removedSongs = state.songs.filter((song) => song.source !== 'demo').map((song) => ({
     id: song.id,
     nativeIdentity: song.nativeIdentity || '',
@@ -247,7 +256,8 @@ ${oldDeleteAll}`
     composer: song.composer || '',
     source: song.source || '',
     sourceRecord: song.sourceRecord || null,
-    originalSourceRecord: song.originalSourceRecord || null
+    originalSourceRecord: song.originalSourceRecord || null,
+    originalSourceSong: song.originalSourceSong || null
   }));`)
     .replace("  saveLastSong(DEMO_SONG);\n  el.settingsDialog.close();", "  saveLastSong(DEMO_SONG);\n  window.dispatchEvent(new CustomEvent('jampanion-library-cleared', { detail: { songs: removedSongs } }));\n  el.settingsDialog.close();");
   if (!html.includes(oldDeleteAll)) throw new Error('Viewer delete-all handler was not found for the customization controls.');
@@ -350,6 +360,10 @@ if (!html.includes(customizedSongsRuntimeMarker) && html.includes("el.deleteAll.
   const restoredById = new Map();
   for (const song of targets) {
     const original = song.originalSourceRecord;
+    if (song.originalSourceSong) {
+      restoredById.set(String(song.id), JSON.parse(JSON.stringify(song.originalSourceSong)));
+      continue;
+    }
     if (!original?.body || typeof parseIRealCollection !== 'function') {
       restoredById.set(String(song.id), song);
       continue;
@@ -373,7 +387,12 @@ if (!html.includes(customizedSongsRuntimeMarker) && html.includes("el.deleteAll.
 }
 
 ${oldDeleteAll}`
-    .replace("  if (!confirm('Delete all imported songs?')) return;", `  if (!confirm('Delete all imported songs?')) return;
+    .replace("  if (!confirm('Delete all imported songs?')) return;", `  const importedSongs = state.songs.filter((song) => song.source !== 'demo');
+  if (!importedSongs.length) {
+    alert('No imported songs to delete.');
+    return;
+  }
+  if (!confirm('Delete all imported songs?')) return;
   const removedSongs = state.songs.filter((song) => song.source !== 'demo').map((song) => ({
     id: song.id,
     nativeIdentity: song.nativeIdentity || '',
@@ -381,7 +400,8 @@ ${oldDeleteAll}`
     composer: song.composer || '',
     source: song.source || '',
     sourceRecord: song.sourceRecord || null,
-    originalSourceRecord: song.originalSourceRecord || null
+    originalSourceRecord: song.originalSourceRecord || null,
+    originalSourceSong: song.originalSourceSong || null
   }));`)
     .replace("  saveLastSong(DEMO_SONG);\n  el.settingsDialog.close();", "  saveLastSong(DEMO_SONG);\n  window.dispatchEvent(new CustomEvent('jampanion-library-cleared', { detail: { songs: removedSongs } }));\n  el.settingsDialog.close();");
   if (html.includes(oldDeleteAll)) html = html.replace(oldDeleteAll, runtime);
@@ -398,7 +418,7 @@ const marker = 'data-jampanion-embedded-bridge="v12"';
 if (!html.includes(marker)) {
   const bridge = `\n  <script type="module" ${marker}>\n    import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=22";\n    initializeEmbeddedViewer().catch(error => {\n      console.error("Jampanion embedded bridge failed", error);\n      document.documentElement.classList.remove("jampanion-startup-pending");\n      window.parent?.postMessage({\n        channel: "jampanion-jcv-v12",\n        type: "bridge-error",\n        error: error instanceof Error ? error.message : String(error)\n      }, "*");\n    });\n  </script>\n`;
   if (!html.includes('</body>')) throw new Error('Viewer HTML has no closing body tag.');
-  const freshBridge = bridge.replace('jazz-chart-host.js?v=22', 'jazz-chart-host.js?v=37');
+  const freshBridge = bridge.replace('jazz-chart-host.js?v=22', 'jazz-chart-host.js?v=51');
   html = html.replace('</body>', `${freshBridge}</body>`);
   changed = true;
 }

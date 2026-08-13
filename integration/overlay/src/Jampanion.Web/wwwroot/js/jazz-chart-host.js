@@ -52,6 +52,7 @@ let standaloneSaveButton;
 let standaloneRevertButton;
 let toolbarHasUnsavedChanges = false;
 let toolbarRevertVisible = false;
+let toolbarDeleteVisible = false;
 let settingsDialog;
 let settingsDialogKeydownHandler;
 let settingsDialogPreviousFocus;
@@ -110,6 +111,8 @@ function installParentBridgeListener() {
                 invokeToolbarAction("SaveChartFromToolbar", "save");
             } else if (data.name === "toolbarRevert") {
                 invokeToolbarAction("RevertChartFromToolbar", "revert");
+            } else if (data.name === "toolbarDelete") {
+                invokeToolbarAction("DeleteNativeSongFromToolbar", "delete");
             } else if (data.name === "toolbarNew") {
                 void dotNet?.invokeMethodAsync("NewSongFromToolbar");
             } else if (data.name === "layoutChanged") {
@@ -203,7 +206,7 @@ function installEmbeddedBridgeListener() {
                 case "createNewSong": value = await createNewSong(args.title, args.barCount, args.meter, args.key, args.accompanimentStyle); break;
                 case "deleteCurrentNativeSong": value = await deleteCurrentNativeSong(); break;
                 case "deleteCustomizedSongs": value = await deleteCustomizedSongs(); break;
-                case "setToolbarState": value = setToolbarState(args.dirty, args.canRevert); break;
+                case "setToolbarState": value = setToolbarState(args.dirty, args.canRevert, args.canDelete); break;
                 case "setToolbarRevertVisible": value = setToolbarRevertVisible(args.visible); break;
                 default: throw new Error(`Unknown Jazz Chart Viewer bridge action: ${data.action}`);
             }
@@ -411,7 +414,7 @@ export async function initializeEmbeddedViewer() {
         try { installLibraryActions(); } catch (error) { console.warn("Library action setup failed", error); }
         try { installStandaloneModeLink(); } catch (error) { console.warn("Mode link setup failed", error); }
         // Both integrated and standalone Viewer modes use one compact toolbar
-        // row for Fit, New, Save, and Revert.
+        // row for Fit, New, Save, and the contextual Revert/Delete action.
         try { installStandaloneSaveButton(); } catch (error) { console.warn("Toolbar action setup failed", error); }
         try { annotateRenderedBars(); } catch (error) { console.warn("Chart annotation failed", error); }
         try { startLibraryWatcher(); } catch (error) { console.warn("Library watcher setup failed", error); }
@@ -697,8 +700,16 @@ function installLibraryActions() {
 function isCustomizedSong(song) {
     return Boolean(song && (
         hasSavedSongOverrides(song) ||
-        (song.source === "native" && song.originalSourceRecord?.body)
+        hasOriginalChart(song)
     ));
+}
+
+function isDemoSong(song) {
+    return Boolean(song?.source === "demo" || song?.originalSourceSong?.source === "demo");
+}
+
+function hasOriginalChart(song) {
+    return Boolean(song && (song.originalSourceRecord?.body || song.originalSourceSong));
 }
 
 function customizedSongs() {
@@ -709,7 +720,9 @@ function updateCustomizedSongsButton() {
     const button = doc?.getElementById("deleteCustomized");
     if (!button) return;
     const count = customizedSongs().length;
-    button.disabled = !editingEnabled || count === 0;
+    // Keep the action clickable when there is nothing to revert so the user
+    // gets a clear explanation instead of a silent disabled control.
+    button.disabled = !editingEnabled;
     button.title = count
         ? `Delete ${count} customized song${count === 1 ? "" : "s"}`
         : "No customized songs";
@@ -730,10 +743,13 @@ async function deleteCustomizedSongs() {
     if (!embeddedMode) return requestEmbedded("deleteCustomizedSongs", {}, 10000);
     if (!editingEnabled) return getBootstrap();
     const targets = customizedSongs();
-    if (!targets.length) return getBootstrap();
+    if (!targets.length) {
+        window.alert?.("No customized songs to revert.");
+        return getBootstrap();
+    }
     const message = targets.length === 1
-        ? "Remove saved changes from 1 song? The original imported chart will be kept."
-        : `Remove saved changes from ${targets.length} songs? Their original imported charts will be kept.`;
+        ? "Remove saved changes from 1 song? The original chart will be kept."
+        : `Remove saved changes from ${targets.length} songs? Their original charts will be kept.`;
     if (!window.confirm(message)) return getBootstrap();
 
     const ids = targets.map(song => song.id);
@@ -762,7 +778,7 @@ async function handleLibraryCleared(removedSongs = []) {
     const targets = Array.isArray(removedSongs) ? removedSongs : [];
     const identities = targets.map(song => songIdentity(song)).filter(Boolean);
     const removedImportedIdentities = new Set(targets
-        .filter(song => song?.source !== "native" || song?.originalSourceRecord?.body)
+        .filter(song => song?.source !== "native" || hasOriginalChart(song))
         .map(song => songIdentity(song))
         .filter(Boolean));
     for (const identity of identities) removeSongSettings(identity);
@@ -771,7 +787,7 @@ async function handleLibraryCleared(removedSongs = []) {
     // native songs are intentionally kept by the Viewer action named
     // "Delete all imported songs".
     for (const song of targets) {
-        if (song?.source !== "native" || song?.originalSourceRecord?.body) {
+        if (song?.source !== "native" || hasOriginalChart(song)) {
             const identity = songIdentity(song);
             nativeSongs.delete(identity);
             await deleteNativeRecord(identity);
@@ -799,7 +815,9 @@ async function handleLibraryCleared(removedSongs = []) {
 }
 
 function handleToolbarResult(data) {
-    const button = data.action === "revert" ? standaloneRevertButton : standaloneSaveButton;
+    const button = data.action === "revert" || data.action === "delete"
+        ? standaloneRevertButton
+        : standaloneSaveButton;
     if (!button) return;
     if (!data.ok) {
         button.disabled = false;
@@ -874,15 +892,17 @@ function installStandaloneSaveButton() {
     revertButton.addEventListener("click", async () => {
         revertButton.disabled = true;
         try {
+            const deleteMode = toolbarDeleteVisible;
+            if (deleteMode && !window.confirm("Delete this new song?")) {
+                return;
+            }
             if (window.parent !== window) {
-                postToParent({ type: "event", name: "toolbarRevert" });
+                postToParent({ type: "event", name: deleteMode ? "toolbarDelete" : "toolbarRevert" });
             } else {
-                await revertCurrentSong();
-                revertButton.textContent = "Revert";
-                window.setTimeout(() => { if (revertButton.isConnected) revertButton.textContent = "Revert"; }, 1200);
+                if (deleteMode) await deleteCurrentNativeSong();
+                else await revertCurrentSong();
             }
         } catch (error) {
-            revertButton.textContent = "Revert";
             window.alert(error instanceof Error ? error.message : String(error));
         } finally {
             updateStandaloneSaveButton();
@@ -897,26 +917,37 @@ function updateStandaloneSaveButton() {
     if (!standaloneSaveButton) return;
     const song = currentSong();
     const embeddedToolbar = window.parent !== window;
+    if (!embeddedToolbar) {
+        toolbarDeleteVisible = Boolean(song?.source === "native" && !hasOriginalChart(song));
+        if (toolbarDeleteVisible) toolbarRevertVisible = false;
+    }
     const hasChanges = embeddedToolbar
         ? toolbarHasUnsavedChanges
         : toolbarHasUnsavedChanges || hasUnsavedStandaloneSettings(song);
     standaloneSaveButton.disabled = !editingEnabled || !song || !hasChanges;
     if (standaloneNewButton) standaloneNewButton.disabled = !editingEnabled;
     if (!standaloneRevertButton) return;
-    standaloneRevertButton.hidden = !toolbarRevertVisible;
-    standaloneRevertButton.disabled = !editingEnabled || !toolbarRevertVisible;
+    const actionVisible = toolbarDeleteVisible || toolbarRevertVisible;
+    standaloneRevertButton.textContent = toolbarDeleteVisible ? "Delete" : "Revert";
+    standaloneRevertButton.title = toolbarDeleteVisible ? "Delete this new song" : "Restore the original iReal chart";
+    standaloneRevertButton.setAttribute("aria-label", toolbarDeleteVisible ? "Delete this new song" : "Restore the original iReal chart");
+    standaloneRevertButton.hidden = !actionVisible;
+    standaloneRevertButton.disabled = !editingEnabled || !actionVisible;
 }
 
-export function setToolbarState(dirty, canRevert = dirty) {
-    if (!embeddedMode) return requestEmbedded("setToolbarState", { dirty, canRevert }, 10000);
+export function setToolbarState(dirty, canRevert = dirty, canDelete = false) {
+    if (!embeddedMode) return requestEmbedded("setToolbarState", { dirty, canRevert, canDelete }, 10000);
     toolbarHasUnsavedChanges = Boolean(dirty);
     toolbarRevertVisible = Boolean(canRevert);
+    toolbarDeleteVisible = Boolean(canDelete);
+    if (toolbarDeleteVisible) toolbarRevertVisible = false;
     updateStandaloneSaveButton();
 }
 
 export function setToolbarRevertVisible(visible) {
     if (!embeddedMode) return requestEmbedded("setToolbarRevertVisible", { visible }, 10000);
     toolbarRevertVisible = Boolean(visible);
+    if (toolbarRevertVisible) toolbarDeleteVisible = false;
     updateStandaloneSaveButton();
 }
 
@@ -1063,13 +1094,14 @@ function hasSavedSongOverrides(song) {
 function canRevertSong(song) {
     return Boolean(song && (
         hasSavedSongOverrides(song) ||
-        (song.source === "native" && song.originalSourceRecord?.body)
+        hasOriginalChart(song)
     ));
 }
 
 function syncStandaloneRevertState(song = currentSong()) {
     if (window.parent !== window) return;
-    toolbarRevertVisible = canRevertSong(song);
+    toolbarDeleteVisible = Boolean(song?.source === "native" && !hasOriginalChart(song));
+    toolbarRevertVisible = !toolbarDeleteVisible && canRevertSong(song);
     updateStandaloneSaveButton();
 }
 
@@ -1216,7 +1248,7 @@ export function saveSongSettings(identity, tempoBpm, accompanimentStyle, tempoEx
 
 function sidebarListTitle(song) {
     const title = song?.title || "Untitled";
-    return song?.source === "demo" ? `${title} (Demo)` : title;
+    return isDemoSong(song) ? `${title} (Demo)` : title;
 }
 
 function summary(song) {
@@ -1235,7 +1267,7 @@ function summary(song) {
         accompanimentStyle: settings.accompanimentStyle,
         semitoneShift: settings.semitoneShift,
         isNative: song.source === "native",
-        hasOriginalSource: Boolean(song.originalSourceRecord?.body),
+        hasOriginalSource: hasOriginalChart(song),
         hasSavedOverrides: hasSavedSongOverrides(song)
     };
 }
@@ -1257,7 +1289,7 @@ function getBootstrap() {
         accompanimentStyle: settings.accompanimentStyle,
         semitoneShift: Number(viewer.state.semitones) || 0,
         isNative: song?.source === "native",
-        hasOriginalSource: Boolean(song?.originalSourceRecord?.body),
+        hasOriginalSource: hasOriginalChart(song),
         hasSavedOverrides: hasSavedSongOverrides(song),
         viewMode: viewer.state.viewMode || "original"
     };
@@ -1481,8 +1513,8 @@ function updateCustomizedSearchTitle() {
     if (!search || !song || viewer?.state?.searchOpen) return;
     const title = song.title || "";
     const marker = isCustomizedSong(song) ? " *" : "";
-    const demoLabel = song.source === "demo" ? " (Demo)" : "";
-    const helpLabel = song.source === "demo" ? " [See Help ? to Import Songs]" : "";
+    const demoLabel = isDemoSong(song) ? " (Demo)" : "";
+    const helpLabel = isDemoSong(song) ? " [See Help ? to Import Songs]" : "";
     const nextValue = `${title}${demoLabel}${marker}${helpLabel}`;
     if (search.value !== nextValue) search.value = nextValue;
 }
@@ -1554,6 +1586,23 @@ function sectionStyleName(style) {
     }
 }
 
+function normalizeChordInput(value) {
+    let normalized = String(value || "").trim()
+        .replace(/[♯]/g, "#")
+        .replace(/[♭]/g, "b")
+        .replace(/−/g, "-");
+    if (/^n\.?c\.?$/i.test(normalized)) return "N.C.";
+
+    // Only the root and an optional accidental are normalized. The ASCII `b`
+    // in `Bm7b5` is a flat-five quality marker, not a request to spell the
+    // chord as B-flat minor-flat-five.
+    normalized = normalized.replace(/^([a-g])([#b]?)/i, (_, root, accidental) =>
+        `${root.toUpperCase()}${accidental}`);
+    normalized = normalized.replace(/\/\s*([a-g])([#b]?)(?=$|[),\s])/i, (_, root, accidental) =>
+        `/${root.toUpperCase()}${accidental}`);
+    return normalized;
+}
+
 function forceRender() {
     const group = doc.getElementById("viewModeGroup");
     if (!group) return;
@@ -1589,6 +1638,49 @@ function displayComposer(value) {
     catch { return value; }
 }
 
+function playbackBlankChordMessage(sourceIndex, beat = 1) {
+    const numericBeat = Number(beat) || 1;
+    const beatText = Number.isInteger(numericBeat)
+        ? String(numericBeat)
+        : numericBeat.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+    return `The chord at bar ${sourceIndex + 1}, beat ${beatText} is blank. Enter a chord symbol.`;
+}
+
+function playbackEmptyBarMessage(sourceIndex) {
+    return `Bar ${sourceIndex + 1} has no chord. Enter a chord symbol before starting playback.`;
+}
+
+function validateSongForPlayback(song) {
+    const bars = Array.isArray(song?.bars) ? song.bars : [];
+    for (let index = 0; index < bars.length; index++) {
+        const bar = bars[index] || {};
+        // Repeat markers and navigation-only bars borrow their harmony from
+        // another written bar. They are valid without a chord of their own.
+        if (bar.repeatBar || bar.repeatTwoBars || bar.repeatTwoBarsContinuation) continue;
+
+        const slots = Array.isArray(bar.chordSlots)
+            ? bar.chordSlots.filter(slot => !slot?.hidden)
+            : [];
+        const blankSlot = slots.find(slot => !String(slot?.chord || "").trim());
+        if (blankSlot) {
+            const total = Math.max(1, Number(bar.cellCount) || 32);
+            const cell = Math.max(0, Number(blankSlot.cell) || 0);
+            const beat = gridCellToTick(cell, total, resolvedMeterAt(bars, index)) / PPQ + 1;
+            throw new Error(playbackBlankChordMessage(index, beat));
+        }
+        if (slots.length) continue;
+
+        const rawChords = Array.isArray(bar.chords) ? bar.chords : [];
+        if (rawChords.some(chord => String(chord || "").trim())) continue;
+
+        // A native chart starts with empty bars marked as no-chord. That flag
+        // describes the editor's initial state, not a playable N.C. symbol.
+        // Imported charts may still use it for an intentional no-chord bar.
+        if (bar.jampanionNoChord === true && song.source !== "native") continue;
+        throw new Error(playbackEmptyBarMessage(index));
+    }
+}
+
 async function captureSourceTiming(song) {
     const restore = await ensureOriginalView();
     try {
@@ -1610,9 +1702,14 @@ async function captureSourceTiming(song) {
                 // compact 4/4 three-chord [1,2,4] -> written [1,3,4].
                 const total = Math.max(1, Number(slotElement.dataset.gridTotal) || 1);
                 const start = Math.max(0, Number(slotElement.dataset.gridStart) || 0);
+                const startTick = gridCellToTick(start, total, activeMeter);
+                const symbol = String(sourceSlot.chord || "").trim();
+                if (!symbol && sourceBar.jampanionNoChord !== true) {
+                    throw new Error(playbackBlankChordMessage(index, startTick / PPQ + 1));
+                }
                 events.push({
-                    startTick: gridCellToTick(start, total, activeMeter),
-                    symbol: String(sourceSlot.chord || "").trim()
+                    startTick,
+                    symbol
                 });
             }
             if (!events.length && sourceBar.chords?.length) {
@@ -1636,6 +1733,7 @@ export async function compilePlayback() {
     if (!embeddedMode) return await requestEmbedded("compilePlayback", {}, 60000);
     const song = currentSong();
     if (!song) throw new Error("No song is selected.");
+    validateSongForPlayback(song);
     const timing = await captureSourceTiming(song);
     const loopStart = findLoopStart(song.bars || []);
     const loopSource = (song.bars || []).slice(loopStart);
@@ -2041,7 +2139,7 @@ function editChord(sourceIndex, slotIndex, anchor) {
     const slot = bar?.chordSlots?.[slotIndex];
     if (!slot) return;
     openEditor(anchor, slot.chord || "", async value => {
-        const chord = value.trim();
+        const chord = normalizeChordInput(value);
         if (chord === slot.chord) return;
         promoteNative(song);
         if (!chord) {
@@ -2075,25 +2173,50 @@ function addChordAtPoint(sourceIndex, barElement, clientX) {
 
     const inputHeight = 28;
     const chordTop = rect.top + (rect.height - inputHeight) / 2;
-    openEditorAtPoint(inputLeft, chordTop, "", async value => {
-        const chord = value.trim();
+    const sourceCell = hasVisibleSlot ? insertCell : startCell;
+    const existingSlot = sourceSlots.find(slot =>
+        !slot.hidden && Number(slot.cell || 0) === Number(sourceCell));
+    // A double-click can land on the edge of a rendered chord while the
+    // pointer grid still resolves to that chord's cell. In that case this is
+    // an edit, not a blank insertion: show the existing value in the field.
+    const initialValue = existingSlot?.chord || "";
+    openEditorAtPoint(inputLeft, chordTop, initialValue, async value => {
+        const chord = normalizeChordInput(value);
         if (!chord) return;
         promoteNative(song);
         bar.jampanionNoChord = false;
-        const sourceCell = hasVisibleSlot ? insertCell : startCell;
         if (!hasVisibleSlot && startCell > 0 && !sourceSlots.some(slot => slot.hidden && Number(slot.cell) === 0)) {
             // The Viewer intentionally places a lone chord on beat 1. Keep a
             // hidden hold anchor so a first chord entered on beats 2–4 keeps
             // its requested position without adding visible harmony.
             sourceSlots.push({ chord: "/", alternates: [], cell: 0, small: false, fermata: false, hidden: true });
         }
-        sourceSlots.push({ chord, alternates: [], cell: sourceCell, small: false, fermata: false, hidden: false });
+        upsertChordSlotAtCell(sourceSlots, sourceCell, chord);
         sourceSlots.sort((a, b) => Number(a.cell || 0) - Number(b.cell || 0));
         rebuildChordList(bar);
         stageNative(song);
         forceRender();
-        await edited("Chord added");
+        await edited(existingSlot ? "Chord updated" : "Chord added");
     });
+}
+
+function upsertChordSlotAtCell(sourceSlots, cell, chord) {
+    const normalizedCell = Math.max(0, Number(cell) || 0);
+    const matching = sourceSlots
+        .map((slot, index) => ({ slot, index }))
+        .filter(({ slot }) => !slot.hidden && Number(slot.cell || 0) === normalizedCell);
+    if (!matching.length) {
+        sourceSlots.push({ chord, alternates: [], cell: normalizedCell, small: false, fermata: false, hidden: false });
+        return "added";
+    }
+
+    // A draft edit must not create two chord slots at one beat. Replace the
+    // existing slot and remove duplicates left by an earlier draft.
+    matching[0].slot.chord = chord;
+    for (let index = matching.length - 1; index > 0; index--) {
+        sourceSlots.splice(matching[index].index, 1);
+    }
+    return "updated";
 }
 
 function chordInputGrid(sourceIndex, barElement, clientX) {
@@ -2338,6 +2461,7 @@ function promoteNative(song) {
     if (song.source !== "native") {
         song.nativeIdentity = songIdentity(song);
         song.originalSourceRecord = song.sourceRecord ? structuredCloneSafe(song.sourceRecord) : null;
+        if (song.source === "demo") song.originalSourceSong = structuredCloneSafe(song);
         song.source = "native";
         song.nativeSchemaVersion = 1;
     }
@@ -2515,6 +2639,7 @@ export async function deleteCurrentNativeSong() {
     if (!song || song.source !== "native") return getBootstrap();
     const identity = songIdentity(song);
     const originalRecord = song.originalSourceRecord ? structuredCloneSafe(song.originalSourceRecord) : null;
+    const originalSong = song.originalSourceSong ? structuredCloneSafe(song.originalSourceSong) : null;
     removeSongSettings(identity);
     nativeSongs.delete(identity);
     try {
@@ -2525,7 +2650,9 @@ export async function deleteCurrentNativeSong() {
 
     const currentIndex = viewer.state.songs.findIndex(item => item.id === song.id);
     let restored = null;
-    if (originalRecord?.body && typeof viewer.parseIRealCollection === "function") {
+    if (originalSong) {
+        restored = originalSong;
+    } else if (originalRecord?.body && typeof viewer.parseIRealCollection === "function") {
         try {
             const protocol = /^(?:irealb|irealbook):\/\/$/i.test(originalRecord.protocol || "")
                 ? originalRecord.protocol
@@ -2556,10 +2683,10 @@ export async function revertCurrentSong() {
     if (!embeddedMode) return await requestEmbedded("revertCurrentSong", {}, 10000);
     const song = currentSong();
     if (!song) return getBootstrap();
-    if (!window.confirm("Revert saved changes?")) return getBootstrap();
-    setToolbarState(false, false);
+    if (!window.confirm("Revert changes?")) return getBootstrap();
+    setToolbarState(false, false, false);
     removeSongSettings(songIdentity(song));
-    if (song.source === "native" && song.originalSourceRecord?.body) {
+    if (song.source === "native" && hasOriginalChart(song)) {
         return await deleteCurrentNativeSong();
     }
     restoreStoredTranspose();
@@ -2696,4 +2823,5 @@ export function dispose() {
     standaloneRevertButton = null;
     toolbarHasUnsavedChanges = false;
     toolbarRevertVisible = false;
+    toolbarDeleteVisible = false;
 }

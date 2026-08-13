@@ -26,6 +26,8 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     private bool _endingInProgress;
     private string? _lastChartConnectionError;
     private bool _hasBootstrap;
+    private bool _preservePlaybackError;
+    private string? _playbackErrorIdentity;
     private int _savedTempoBpm = 120;
     private bool _savedTempoExplicit;
     private bool _savedTempoUserSet;
@@ -34,6 +36,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     private bool? _lastToolbarDirty;
     private bool? _lastToolbarRevertVisible;
     private bool _settingsDialogFocusActive;
+    private bool? _lastToolbarDeleteVisible;
 
     [Inject] public IJSRuntime JS { get; set; } = default!;
 
@@ -49,6 +52,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     protected int CurrentSemitoneShift { get; set; }
     protected AccompanimentStyle SelectedStyle { get; set; } = AccompanimentStyle.Swing;
     protected string StatusText { get; set; } = "Loading Jazz Chart Viewer";
+    protected string? PlaybackErrorText { get; private set; }
 
     protected bool IsPlaying { get; set; }
     protected bool IsLoading { get; set; }
@@ -92,6 +96,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         HasUnsavedAccompanimentChanges ||
         CurrentSongHasSavedOverrides ||
         (CurrentSongIsNative && CurrentNativeHasOriginalSource);
+    protected bool CanDeleteCurrentNativeSong => CurrentSongIsNative && !CurrentNativeHasOriginalSource;
 
 
     protected IReadOnlyList<AccompanimentStyle> StyleChoices => CurrentMeter == "3/4"
@@ -161,12 +166,14 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         if (!ChartReady || _chartModule is null) return;
         var dirty = HasUnsavedChanges;
         var visible = CanRevertCurrentSong;
-        if (_lastToolbarDirty == dirty && _lastToolbarRevertVisible == visible) return;
+        var deleteVisible = CanDeleteCurrentNativeSong;
+        if (_lastToolbarDirty == dirty && _lastToolbarRevertVisible == visible && _lastToolbarDeleteVisible == deleteVisible) return;
         _lastToolbarDirty = dirty;
         _lastToolbarRevertVisible = visible;
+        _lastToolbarDeleteVisible = deleteVisible;
         try
         {
-            await _chartModule.InvokeVoidAsync("setToolbarState", dirty, visible);
+            await _chartModule.InvokeVoidAsync("setToolbarState", dirty, visible, deleteVisible);
         }
         catch
         {
@@ -180,7 +187,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         try
         {
             _self ??= DotNetObjectReference.Create(this);
-            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=49");
+            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=51");
             try { await _chartModule.InvokeVoidAsync("initializeMobileControlsScrollHint"); } catch { }
             var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("initialize", "jcv-frame", _self);
             ApplyBootstrap(bootstrap);
@@ -213,6 +220,17 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         }
 
         ApplyBootstrap(bootstrap);
+        // Starting playback temporarily changes the bridge state while the
+        // session is prepared and rolled back. Do not let that internal
+        // notification erase the diagnostic that explains a failed start.
+        var isPlaybackRollback = _preservePlaybackError &&
+            string.Equals(_playbackErrorIdentity, incomingIdentity, StringComparison.Ordinal);
+        if (!isPlaybackRollback)
+        {
+            PlaybackErrorText = null;
+            _preservePlaybackError = false;
+            _playbackErrorIdentity = null;
+        }
         await InvokeAsync(StateHasChanged);
     }
 
@@ -220,6 +238,9 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     public async Task ChartEdited(string message)
     {
         HasUnsavedChartChanges = true;
+        PlaybackErrorText = null;
+        _preservePlaybackError = false;
+        _playbackErrorIdentity = null;
         StatusText = message;
         await InvokeAsync(StateHasChanged);
     }
@@ -235,6 +256,13 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     public async Task RevertChartFromToolbarAsync()
     {
         await RevertCurrentSongAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable("DeleteNativeSongFromToolbar")]
+    public async Task DeleteNativeSongFromToolbarAsync()
+    {
+        await DeleteCurrentNativeSongAsync();
         await InvokeAsync(StateHasChanged);
     }
 
@@ -372,6 +400,9 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     {
         if (IsPlaying || IsLoading) return;
         IsLoading = true;
+        PlaybackErrorText = null;
+        _preservePlaybackError = false;
+        _playbackErrorIdentity = null;
         StatusText = ChartReady ? "Preparing chart" : "Connecting to chart";
         var generationVersion = ++_generationVersion;
         IJSObjectReference? startedAudio = null;
@@ -441,12 +472,29 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         catch (Exception exception)
         {
             await RollbackStartAsync(startedAudio, audioStarted);
+            SetPlaybackError($"Playback could not start: {exception.Message}");
             StatusText = $"Session could not start: {exception.Message}";
         }
         finally
         {
             IsLoading = false;
         }
+    }
+
+    private void SetPlaybackError(string message)
+    {
+        // JS interop exceptions may append the JavaScript stack trace to the
+        // useful first line. Keep the visible diagnostic concise and
+        // actionable instead of exposing implementation details such as
+        // parentBridgeHandler and a generated bundle URL.
+        var cleanMessage = (message ?? string.Empty).Trim();
+        var lineBreak = cleanMessage.IndexOfAny(new[] { '\r', '\n' });
+        if (lineBreak >= 0) cleanMessage = cleanMessage[..lineBreak].Trim();
+        if (cleanMessage.StartsWith("Error: ", StringComparison.Ordinal))
+            cleanMessage = cleanMessage[7..].Trim();
+        PlaybackErrorText = cleanMessage;
+        _preservePlaybackError = true;
+        _playbackErrorIdentity = SelectedIdentity;
     }
 
     private async Task RollbackStartAsync(IJSObjectReference? startedAudio, bool audioStarted)
@@ -509,6 +557,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         catch (OperationCanceledException) { }
         catch (Exception exception)
         {
+            SetPlaybackError($"Playback expansion failed: {exception.Message}");
             StatusText = $"Playback continues with the prepared section; full-session expansion failed: {exception.Message}";
             await InvokeAsync(StateHasChanged);
         }
@@ -593,6 +642,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         catch (OperationCanceledException) { }
         catch (Exception exception)
         {
+            SetPlaybackError($"Head Out could not be queued: {exception.Message}");
             StatusText = $"Head out could not be queued: {exception.Message}";
         }
         finally
@@ -667,6 +717,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             TempoIsExplicit = previousTempoExplicit;
             TempoIsUserSet = previousTempoUserSet;
             StatusText = $"Tempo change failed: {exception.Message}";
+            SetPlaybackError($"Tempo change failed: {exception.Message}");
         }
     }
 
@@ -739,6 +790,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         {
             SelectedStyle = previousStyle;
             StatusText = $"Style change failed: {exception.Message}";
+            SetPlaybackError($"Style change failed: {exception.Message}");
         }
     }
 
@@ -1317,6 +1369,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         if (IsPlaying || IsLoading || !CurrentSongIsNative || CurrentNativeHasOriginalSource || _chartModule is null) return;
         var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("deleteCurrentNativeSong");
         ApplyBootstrap(bootstrap);
+        HasUnsavedChartChanges = false;
         StatusText = "Native song deleted";
     }
 
