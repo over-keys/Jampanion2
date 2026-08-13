@@ -14,7 +14,6 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     private IJSObjectReference? _audioModule;
     private DotNetObjectReference<IntegratedHomeLogic>? _self;
     private CancellationTokenSource? _progressCancellation;
-    private CancellationTokenSource? _saveFeedbackCancellation;
     private readonly SemaphoreSlim _planMutationGate = new(1, 1);
     private IntegratedSessionPlan? _sessionPlan;
     private JazzPlaybackFormDto? _compiledChart;
@@ -57,7 +56,6 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     protected bool HeadOutActive { get; set; }
     protected bool SettingsOpen { get; set; }
     protected bool NewSongOpen { get; set; }
-    protected string SaveButtonText { get; private set; } = "Save";
 
     protected bool PianoEnabled { get; set; } = true;
     protected bool BassEnabled { get; set; } = true;
@@ -1184,7 +1182,6 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             }
 
             StatusText = "Changes saved";
-            _ = ShowSaveConfirmationAsync();
         }
         catch (Exception exception)
         {
@@ -1199,31 +1196,6 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         _savedTempoUserSet = TempoIsUserSet;
         _savedStyle = SelectedStyle;
         _savedSemitoneShift = CurrentSemitoneShift;
-    }
-
-    private async Task ShowSaveConfirmationAsync()
-    {
-        _saveFeedbackCancellation?.Cancel();
-        _saveFeedbackCancellation?.Dispose();
-        var cancellation = new CancellationTokenSource();
-        _saveFeedbackCancellation = cancellation;
-        SaveButtonText = "Saved";
-        try
-        {
-            await Task.Delay(1200, cancellation.Token);
-            if (!ReferenceEquals(_saveFeedbackCancellation, cancellation)) return;
-            SaveButtonText = "Save";
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (OperationCanceledException) { }
-        finally
-        {
-            if (ReferenceEquals(_saveFeedbackCancellation, cancellation))
-            {
-                _saveFeedbackCancellation = null;
-                cancellation.Dispose();
-            }
-        }
     }
 
     private IntegratedMixerState MixerState() => new(
@@ -1302,8 +1274,6 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         _generationVersion++;
         _progressCancellation?.Cancel();
         _progressCancellation?.Dispose();
-        _saveFeedbackCancellation?.Cancel();
-        _saveFeedbackCancellation?.Dispose();
         if (_chartModule is not null)
         {
             try { await _chartModule.InvokeVoidAsync("dispose"); await _chartModule.DisposeAsync(); }

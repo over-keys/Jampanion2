@@ -703,10 +703,6 @@ function handleToolbarResult(data) {
         updateStandaloneSaveButton();
         return;
     }
-    button.textContent = data.action === "save" ? "Saved" : "Revert";
-    window.setTimeout(() => {
-        if (button.isConnected) button.textContent = data.action === "save" ? "Save" : "Revert";
-    }, 1200);
     updateStandaloneSaveButton();
 }
 
@@ -755,11 +751,8 @@ function installStandaloneSaveButton() {
                 postToParent({ type: "event", name: "toolbarSave" });
             } else {
                 await saveCurrentChart();
-                button.textContent = "Saved";
-                window.setTimeout(() => { if (button.isConnected) button.textContent = "Save"; }, 1200);
             }
         } catch (error) {
-            button.textContent = "Save";
             window.alert(error instanceof Error ? error.message : String(error));
         } finally {
             updateStandaloneSaveButton();
