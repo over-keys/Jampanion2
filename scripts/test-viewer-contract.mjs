@@ -13,7 +13,7 @@ const requirements = [
   ["search unlocks after library load", /state\.libraryLoading[\s\S]*el\.search\.disabled = false[\s\S]*el\.search\.removeAttribute\('aria-busy'\)/],
   ["demo is a true fallback", /using demo fallback[\s\S]*state\.songs = \[DEMO_SONG\]/],
   ["integrated last-song reference fallback", /jampanion-jazz-last-song-v1[\s\S]*findRememberedSong/],
-  ["customized-song removal control", /id="deleteCustomized"[\s\S]*Delete customized songs[\s\S]*Delete all imported songs/],
+  ["customized-song revert control", /id="deleteCustomized"[\s\S]*Revert all customized songs[\s\S]*Delete all imported songs/],
   ["song-library action order", /id="openImport"[\s\S]*id="deleteAll"[\s\S]*id="deleteCustomized"[\s\S]*data-jampanion-customized-songs-layout="v2"/],
   ["customized-song restoration runtime", /restoreSongsByIds[\s\S]*originalSourceRecord[\s\S]*saveSongLibrary/],
   ["song selection preserves host-managed transpose", /function selectSong\(songId\) \{[\s\S]*state\.selectedId = songId;[\s\S]*state\.searchOpen = false;[\s\S]*JAMPANION_SELECTION_TRANSPOSE_V1/],

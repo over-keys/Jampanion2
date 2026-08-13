@@ -47,9 +47,9 @@ if (!html.includes(customizedSongsControlMarker)) {
           <button id="deleteAll" type="button" class="danger">Delete all imported songs</button>
         </div>
         <div class="action-row">
-          <button id="deleteCustomized" type="button" class="danger">Delete customized songs</button>
+          <button id="deleteCustomized" type="button" class="danger">Revert all customized songs</button>
         </div>
-        <p class="settings-hint" data-jampanion-customized-songs-layout="v2">Delete customized songs removes only songs with saved chart changes. Delete all imported songs removes the entire imported library.</p>`;
+        <p class="settings-hint" data-jampanion-customized-songs-layout="v2">Revert all customized songs restores their original imported state. Delete all imported songs removes the entire imported library.</p>`;
   if (html.includes(oldLibraryActions)) {
     html = html.replace(oldLibraryActions, newLibraryActions);
     changed = true;
@@ -64,18 +64,18 @@ if (!html.includes(customizedSongsLayoutMarker)) {
           <button id="openImport" type="button" class="primary">Import iReal data</button>
         </div>
         <div class="action-row">
-          <button id="deleteCustomized" type="button" class="danger">Delete customized songs</button>
+          <button id="deleteCustomized" type="button" class="danger">Revert all customized songs</button>
           <button id="deleteAll" type="button" class="danger">Delete all imported songs</button>
         </div>
-        <p class="settings-hint">Delete customized songs removes only songs with saved chart changes. Delete all imported songs removes the entire imported library.</p>`;
+        <p class="settings-hint">Revert all customized songs restores their original imported state. Delete all imported songs removes the entire imported library.</p>`;
   const newCustomizedLayout = `        <div class="action-row">
           <button id="openImport" type="button" class="primary">Import iReal data</button>
           <button id="deleteAll" type="button" class="danger">Delete all imported songs</button>
         </div>
         <div class="action-row">
-          <button id="deleteCustomized" type="button" class="danger">Delete customized songs</button>
+          <button id="deleteCustomized" type="button" class="danger">Revert all customized songs</button>
         </div>
-        <p class="settings-hint" data-jampanion-customized-songs-layout="v2">Delete customized songs removes only songs with saved chart changes. Delete all imported songs removes the entire imported library.</p>`;
+        <p class="settings-hint" data-jampanion-customized-songs-layout="v2">Revert all customized songs restores their original imported state. Delete all imported songs removes the entire imported library.</p>`;
   if (html.includes(oldCustomizedLayout)) {
     html = html.replace(oldCustomizedLayout, newCustomizedLayout);
     changed = true;
