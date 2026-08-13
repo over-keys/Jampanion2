@@ -10,6 +10,7 @@ const resolved = path.resolve(target);
 if (!fs.existsSync(resolved)) throw new Error(`Viewer index not found: ${resolved}`);
 let html = fs.readFileSync(resolved, 'utf8');
 let changed = false;
+html = html.replaceAll('<title>Jazz Chart Viewer</title>', '<title>Jampanion2 Viewer</title>');
 html = html.replace('placeholder="irealbook://..."', 'placeholder="irealb://..."');
 html = html.replaceAll('href="./help.html"', 'href="./help.html?v=31"');
 html = html.replaceAll('href="./help.en.html"', 'href="./help.en.html?v=31"');

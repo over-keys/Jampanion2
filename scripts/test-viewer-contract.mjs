@@ -4,6 +4,7 @@ if (!file) throw new Error("usage: test-viewer-contract.mjs viewer/index.html");
 const source = fs.readFileSync(file, "utf8");
 const requirements = [
   ["Chart Viewer bridge API", /window\.__chartViewer\s*=\s*\{[^}]*expandChartBars/s],
+  ["Jampanion2 Viewer page title", /<title>Jampanion2 Viewer<\/title>/],
   ["iReal parser API", /parseIRealCollection/],
   ["rendered grid start", /data-grid-start/],
   ["rendered grid total", /data-grid-total/],
