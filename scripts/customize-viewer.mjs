@@ -23,6 +23,19 @@ if (!html.includes('jampanion-viewer.png')) {
   changed = true;
 }
 
+const startupGuardMarker = 'data-jampanion-startup-guard="v1"';
+if (!html.includes(startupGuardMarker)) {
+  const startupGuard = `  <style ${startupGuardMarker}>html.jampanion-startup-pending .app-shell { visibility:hidden; }</style>
+  <script ${startupGuardMarker}>
+    document.documentElement.classList.add('jampanion-startup-pending');
+  </script>
+`;
+  if (html.includes('</head>')) html = html.replace('</head>', `${startupGuard}</head>`);
+  else if (html.includes('<body>')) html = html.replace('<body>', `${startupGuard}<body>`);
+  else throw new Error('Viewer HTML has no closing head or body tag for the startup guard.');
+  changed = true;
+}
+
 const customizedSongsControlMarker = 'id="deleteCustomized"';
 if (!html.includes(customizedSongsControlMarker)) {
   const oldLibraryActions = `        <div class="action-row">
@@ -367,7 +380,7 @@ ${oldDeleteAll}`
 
 const marker = 'data-jampanion-embedded-bridge="v12"';
 if (!html.includes(marker)) {
-  const bridge = `\n  <script type="module" ${marker}>\n    import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=22";\n    initializeEmbeddedViewer().catch(error => {\n      console.error("Jampanion embedded bridge failed", error);\n      window.parent?.postMessage({\n        channel: "jampanion-jcv-v12",\n        type: "bridge-error",\n        error: error instanceof Error ? error.message : String(error)\n      }, "*");\n    });\n  </script>\n`;
+  const bridge = `\n  <script type="module" ${marker}>\n    import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=22";\n    initializeEmbeddedViewer().catch(error => {\n      console.error("Jampanion embedded bridge failed", error);\n      document.documentElement.classList.remove("jampanion-startup-pending");\n      window.parent?.postMessage({\n        channel: "jampanion-jcv-v12",\n        type: "bridge-error",\n        error: error instanceof Error ? error.message : String(error)\n      }, "*");\n    });\n  </script>\n`;
   if (!html.includes('</body>')) throw new Error('Viewer HTML has no closing body tag.');
   const freshBridge = bridge.replace('jazz-chart-host.js?v=22', 'jazz-chart-host.js?v=34');
   html = html.replace('</body>', `${freshBridge}</body>`);

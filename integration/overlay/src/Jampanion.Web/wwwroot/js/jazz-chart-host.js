@@ -351,20 +351,20 @@ export async function initializeEmbeddedViewer() {
         installEmbeddedBridgeListener();
         installEmbeddedLayoutObserver();
         initialized = true;
-        void loadNativeSongs().then(() => {
-            try {
-                const changed = applyNativeOverrides();
-                if (changed) forceRender();
-                restoreLastSelectedSong();
-                restoreStoredTranspose();
-                annotateRenderedBars();
-                syncStandaloneRevertState();
-                queueBootstrapNotification();
-            } catch (error) {
-                console.warn("Native song merge failed", error);
-            }
-        }).catch(error => console.warn("Native song storage unavailable", error));
+        await loadNativeSongs();
+        try {
+            const changed = applyNativeOverrides();
+            if (changed) forceRender();
+            restoreLastSelectedSong();
+            restoreStoredTranspose();
+            annotateRenderedBars();
+            syncStandaloneRevertState();
+            queueBootstrapNotification();
+        } catch (error) {
+            console.warn("Native song merge failed", error);
+        }
     }
+    doc?.documentElement?.classList.remove("jampanion-startup-pending");
     postToParent({ type: "ready" });
     queueBootstrapNotification();
     return getBootstrap();

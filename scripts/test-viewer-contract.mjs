@@ -19,7 +19,8 @@ const requirements = [
   ["song selection preserves host-managed transpose", /function selectSong\(songId\) \{[\s\S]*state\.selectedId = songId;[\s\S]*state\.searchOpen = false;[\s\S]*JAMPANION_SELECTION_TRANSPOSE_V1/],
   ["XyQ three-chord 4/4 normalization", /meterTop === 4 && meterBottom === 4 && chordSlots\.length === 3[\s\S]*rawCells\[2\] === 3[\s\S]*starts = \[0, Math\.floor\(totalCells \/ 2\), Math\.floor\(totalCells \* 3 \/ 4\)\]/],
   ["four-column responsive layout", /function\s+responsiveColumns\s*\([^)]*\)\s*\{\s*return\s+4\s*;/s],
-  ["embedded v12 bridge", /data-jampanion-embedded-bridge="v12"/]
+  ["embedded v12 bridge", /data-jampanion-embedded-bridge="v12"/],
+  ["embedded startup guard", /data-jampanion-startup-guard="v1"[\s\S]*jampanion-startup-pending/]
 ];
 for (const [name, pattern] of requirements) {
   if (!pattern.test(source)) throw new Error(`Pinned Jazz Chart Viewer contract missing: ${name}`);

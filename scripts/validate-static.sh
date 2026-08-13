@@ -53,9 +53,10 @@ grep -q 'help.css?v=31' "$ROOT/scripts/customize-help.mjs"
 grep -q 'jazz-chart-host.js?v=34' "$ROOT/scripts/customize-viewer.mjs"
 grep -q 'jazz-chart-host.js?v=46' "$ROOT/integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs"
 
-# Native IndexedDB loading is asynchronous and must not block ChartReady.
-grep -q 'void loadNativeSongs().then' "$HOST"
-! grep -q 'await loadNativeSongs();' "$HOST"
+# Native IndexedDB loading is part of embedded startup readiness so saved
+# chart/settings state is applied before the first visible chart render.
+grep -q 'await loadNativeSongs();' "$HOST"
+! grep -q 'void loadNativeSongs().then' "$HOST"
 grep -q 'initialized = true' "$HOST"
 
 grep -q 'StartTick' "$ROOT/integration/overlay/src/Jampanion.Core/Music/ChordChange.cs"
