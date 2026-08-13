@@ -208,26 +208,34 @@ const oldDeleteAll = `el.deleteAll.addEventListener('click', async () => {
   el.settingsDialog.close();
   render();
 });`;
-const newDeleteAll = `async function removeSongsByIds(songIds) {
+const newDeleteAll = `async function restoreSongsByIds(songIds) {
   const ids = new Set((Array.isArray(songIds) ? songIds : []).map((id) => String(id)));
-  if (!ids.size) return { removed: 0 };
-  const removedSongs = state.songs.filter((song) => ids.has(String(song.id)) && song.source !== 'demo');
-  if (!removedSongs.length) return { removed: 0 };
-  const removedTitles = new Set(removedSongs.map((song) => (song.title || '') + '\\n' + (song.composer || '')));
-  const remainingSongs = state.songs.filter((song) => !ids.has(String(song.id)) || song.source === 'demo');
-  const remainingPreservedEntries = state.preservedLibraryEntries.filter((entry) => {
-    const identity = libraryEntryIdentity(entry);
-    return !identity || !removedTitles.has(identity);
-  });
-  await saveSongLibrary(remainingSongs.filter((song) => song.source !== 'demo'), remainingPreservedEntries);
-  state.preservedLibraryEntries = remainingPreservedEntries;
-  state.libraryWarnings = state.preservedLibraryEntries.length ? state.libraryWarnings : [];
-  state.songs = remainingSongs.length ? remainingSongs : [DEMO_SONG];
-  if (!state.songs.some((song) => song.id === state.selectedId)) state.selectedId = state.songs[0].id;
+  if (!ids.size) return { restored: 0 };
+  const targets = state.songs.filter((song) => ids.has(String(song.id)) && song.source !== 'demo');
+  if (!targets.length) return { restored: 0 };
+  const restoredById = new Map();
+  for (const song of targets) {
+    const original = song.originalSourceRecord;
+    if (!original?.body || typeof parseIRealCollection !== 'function') {
+      restoredById.set(String(song.id), song);
+      continue;
+    }
+    try {
+      const protocol = /^(?:irealb|irealbook):\\/\\/$/i.test(original.protocol || '') ? original.protocol : 'irealb://';
+      restoredById.set(String(song.id), parseIRealCollection(\`\${protocol}\${encodeURIComponent(original.body)}\`).songs?.[0] || song);
+    } catch {
+      restoredById.set(String(song.id), song);
+    }
+  }
+  const restoredSongs = state.songs.map((song) => restoredById.get(String(song.id)) || song);
+  await saveSongLibrary(restoredSongs.filter((song) => song.source !== 'demo'), state.preservedLibraryEntries);
+  state.songs = restoredSongs;
+  const selectedReplacement = restoredById.get(String(state.selectedId));
+  if (selectedReplacement) state.selectedId = selectedReplacement.id;
   state.semitones = 0;
   saveLastSong(currentSong());
   render();
-  return { removed: removedSongs.length };
+  return { restored: targets.length };
 }
 
 ${oldDeleteAll}`
@@ -246,7 +254,7 @@ ${oldDeleteAll}`
   html = html.replace(oldDeleteAll, newDeleteAll);
 
   const oldExport = 'window.__chartViewer = { state, parseIRealCollection, buildRows, expandChartBars, deriveEndingNumbers, displayComposer, normaliseStaffText };\ninitialiseLibrary();';
-  const newExport = 'const libraryReady = initialiseLibrary();\nwindow.__chartViewer = { state, parseIRealCollection, buildRows, expandChartBars, deriveEndingNumbers, displayComposer, normaliseStaffText, libraryReady, removeSongsByIds };\n// JAMPANION_CUSTOMIZED_SONGS_V1';
+  const newExport = 'const libraryReady = initialiseLibrary();\nwindow.__chartViewer = { state, parseIRealCollection, buildRows, expandChartBars, deriveEndingNumbers, displayComposer, normaliseStaffText, libraryReady, restoreSongsByIds };\n// JAMPANION_CUSTOMIZED_SONGS_V1';
   if (!html.includes(oldExport)) throw new Error('Viewer export block was not found for the startup patch.');
   html = html.replace(oldExport, newExport);
 
@@ -334,26 +342,34 @@ if (!html.includes(customizedSongsRuntimeMarker) && html.includes("el.deleteAll.
   el.settingsDialog.close();
   render();
 });`;
-  const runtime = `async function removeSongsByIds(songIds) {
+  const runtime = `async function restoreSongsByIds(songIds) {
   const ids = new Set((Array.isArray(songIds) ? songIds : []).map((id) => String(id)));
-  if (!ids.size) return { removed: 0 };
-  const removedSongs = state.songs.filter((song) => ids.has(String(song.id)) && song.source !== 'demo');
-  if (!removedSongs.length) return { removed: 0 };
-  const removedTitles = new Set(removedSongs.map((song) => (song.title || '') + '\\n' + (song.composer || '')));
-  const remainingSongs = state.songs.filter((song) => !ids.has(String(song.id)) || song.source === 'demo');
-  const remainingPreservedEntries = state.preservedLibraryEntries.filter((entry) => {
-    const identity = libraryEntryIdentity(entry);
-    return !identity || !removedTitles.has(identity);
-  });
-  await saveSongLibrary(remainingSongs.filter((song) => song.source !== 'demo'), remainingPreservedEntries);
-  state.preservedLibraryEntries = remainingPreservedEntries;
-  state.libraryWarnings = state.preservedLibraryEntries.length ? state.libraryWarnings : [];
-  state.songs = remainingSongs.length ? remainingSongs : [DEMO_SONG];
-  if (!state.songs.some((song) => song.id === state.selectedId)) state.selectedId = state.songs[0].id;
+  if (!ids.size) return { restored: 0 };
+  const targets = state.songs.filter((song) => ids.has(String(song.id)) && song.source !== 'demo');
+  if (!targets.length) return { restored: 0 };
+  const restoredById = new Map();
+  for (const song of targets) {
+    const original = song.originalSourceRecord;
+    if (!original?.body || typeof parseIRealCollection !== 'function') {
+      restoredById.set(String(song.id), song);
+      continue;
+    }
+    try {
+      const protocol = /^(?:irealb|irealbook):\\/\\/$/i.test(original.protocol || '') ? original.protocol : 'irealb://';
+      restoredById.set(String(song.id), parseIRealCollection(\`\${protocol}\${encodeURIComponent(original.body)}\`).songs?.[0] || song);
+    } catch {
+      restoredById.set(String(song.id), song);
+    }
+  }
+  const restoredSongs = state.songs.map((song) => restoredById.get(String(song.id)) || song);
+  await saveSongLibrary(restoredSongs.filter((song) => song.source !== 'demo'), state.preservedLibraryEntries);
+  state.songs = restoredSongs;
+  const selectedReplacement = restoredById.get(String(state.selectedId));
+  if (selectedReplacement) state.selectedId = selectedReplacement.id;
   state.semitones = 0;
   saveLastSong(currentSong());
   render();
-  return { removed: removedSongs.length };
+  return { restored: targets.length };
 }
 
 ${oldDeleteAll}`
@@ -372,7 +388,7 @@ ${oldDeleteAll}`
   else throw new Error('Viewer delete-all handler was not found for the customized-song runtime patch.');
 
   const oldExport = 'window.__chartViewer = { state, parseIRealCollection, buildRows, expandChartBars, deriveEndingNumbers, displayComposer, normaliseStaffText, libraryReady };';
-  const newExport = 'window.__chartViewer = { state, parseIRealCollection, buildRows, expandChartBars, deriveEndingNumbers, displayComposer, normaliseStaffText, libraryReady, removeSongsByIds };';
+  const newExport = 'window.__chartViewer = { state, parseIRealCollection, buildRows, expandChartBars, deriveEndingNumbers, displayComposer, normaliseStaffText, libraryReady, restoreSongsByIds };';
   if (!html.includes(oldExport)) throw new Error('Viewer export block was not found for the customized-song runtime patch.');
   html = html.replace(oldExport, `${newExport}\n// ${customizedSongsRuntimeMarker}`);
   changed = true;

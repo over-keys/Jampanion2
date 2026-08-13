@@ -628,31 +628,26 @@ async function deleteCustomizedSongs() {
     const targets = customizedSongs();
     if (!targets.length) return getBootstrap();
     const message = targets.length === 1
-        ? "Delete this customized song? The original imported chart will also be removed from the library."
-        : `Delete these ${targets.length} customized songs? Their original imported charts will also be removed from the library.`;
+        ? "Remove saved changes from this song? The original imported chart will be kept."
+        : `Remove saved changes from these ${targets.length} songs? Their original imported charts will be kept.`;
     if (!window.confirm(message)) return getBootstrap();
 
     const ids = targets.map(song => song.id);
     const identities = targets.map(song => songIdentity(song)).filter(Boolean);
-    if (typeof viewer.removeSongsByIds !== "function") {
-        throw new Error("Customized-song deletion is not available in this Viewer build.");
+    if (typeof viewer.restoreSongsByIds !== "function") {
+        throw new Error("Customized-song restoration is not available in this Viewer build.");
     }
-    await viewer.removeSongsByIds(ids);
+    await viewer.restoreSongsByIds(ids);
     for (const identity of identities) {
         removeSongSettings(identity);
         nativeSongs.delete(identity);
         await deleteNativeRecord(identity);
     }
-    const reference = readLastSongReference();
-    if (reference && targets.some(song =>
-        (reference.identity && reference.identity === songIdentity(song)) ||
-        (reference.id && reference.id === String(song.id || "")))) {
-        try { localStorage.removeItem(LAST_SONG_KEY); } catch {}
-        lastSongRestorePending = false;
-    }
     lastLibrarySignature = librarySignature();
     restoreStoredTranspose();
+    forceRender();
     annotateRenderedBars();
+    rememberSelectedSong(currentSong());
     updateCustomizedSongsButton();
     syncStandaloneRevertState(currentSong());
     queueBootstrapNotification();
