@@ -33,6 +33,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     private int _savedSemitoneShift;
     private bool? _lastToolbarDirty;
     private bool? _lastToolbarRevertVisible;
+    private bool _settingsDialogFocusActive;
 
     [Inject] public IJSRuntime JS { get; set; } = default!;
 
@@ -129,7 +130,30 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             }
             await InvokeAsync(StateHasChanged);
         }
+        await SyncSettingsDialogFocusAsync();
         await SyncToolbarRevertAsync();
+    }
+
+    private async Task SyncSettingsDialogFocusAsync()
+    {
+        if (_chartModule is null) return;
+        try
+        {
+            if (SettingsOpen)
+            {
+                await _chartModule.InvokeVoidAsync("initializeSettingsDialog");
+                _settingsDialogFocusActive = true;
+            }
+            else if (_settingsDialogFocusActive)
+            {
+                await _chartModule.InvokeVoidAsync("disposeSettingsDialog");
+                _settingsDialogFocusActive = false;
+            }
+        }
+        catch
+        {
+            // Settings remains usable if focus management is unavailable.
+        }
     }
 
     private async Task SyncToolbarRevertAsync()
@@ -156,7 +180,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         try
         {
             _self ??= DotNetObjectReference.Create(this);
-            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=46");
+            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=49");
             try { await _chartModule.InvokeVoidAsync("initializeMobileControlsScrollHint"); } catch { }
             var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("initialize", "jcv-frame", _self);
             ApplyBootstrap(bootstrap);
@@ -393,7 +417,8 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                 SelectedStyle,
                 _sessionSeed,
                 generatedChoruses: 1,
-                endWithHeadOut: false);
+                endWithHeadOut: false,
+                generatedSegments: 2);
             _launchPlanDurationSeconds = _sessionPlan.DurationSeconds;
             _positionSeconds = 0;
             HeadOutQueued = false;
@@ -499,10 +524,14 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         _endingInProgress = true;
         var generationVersion = ++_generationVersion;
         var gateEntered = false;
+        const double schedulingGuardSeconds = 0.30d;
         try
         {
-            _positionSeconds = await _audioModule.InvokeAsync<double>("getPosition");
-            var headOutChorus = IntegratedSessionPlanner.ResolveNextHeadOutChorus(_sessionPlan, _positionSeconds);
+            var oldPlan = _sessionPlan;
+            var currentPosition = await _audioModule.InvokeAsync<double>("getPosition");
+            var headOutChorus = IntegratedSessionPlanner.ResolveNextHeadOutChorus(oldPlan, currentPosition);
+            var boundaryBar = NextFourBarBoundary(oldPlan, currentPosition, schedulingGuardSeconds)
+                ?? throw new InvalidOperationException("No later four-bar boundary is available for Head Out.");
             StatusText = "Preparing head out";
             await InvokeAsync(StateHasChanged);
 
@@ -523,10 +552,41 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             await _planMutationGate.WaitAsync();
             gateEntered = true;
             if (!IsPlaying || generationVersion != _generationVersion || _audioModule is null) return;
-            var current = await _audioModule.InvokeAsync<double>("getPosition");
-            await _audioModule.InvokeVoidAsync("replaceSession", replacement.Notes, replacement.DurationSeconds, current, false);
-            _sessionPlan = replacement;
-            _positionSeconds = current;
+
+            currentPosition = await _audioModule.InvokeAsync<double>("getPosition");
+            if (boundaryBar.StartSeconds - currentPosition <= schedulingGuardSeconds)
+            {
+                boundaryBar = NextFourBarBoundary(oldPlan, currentPosition, schedulingGuardSeconds)
+                    ?? throw new InvalidOperationException("The requested Head Out reached the next four-bar boundary.");
+            }
+
+            var replacementBoundary = replacement.PlaybackBars
+                .FirstOrDefault(bar => bar.SequenceIndex == boundaryBar.SequenceIndex)
+                ?? throw new InvalidOperationException("The Head Out plan does not contain the requested bar boundary.");
+            var delta = boundaryBar.StartSeconds - replacementBoundary.StartSeconds;
+            var continuation = replacement.Notes
+                .Where(note => note.StartSeconds >= replacementBoundary.StartSeconds - 0.001d)
+                .Select(note => note with { StartSeconds = note.StartSeconds + delta })
+                .ToArray();
+            var duration = boundaryBar.StartSeconds + Math.Max(0d, replacement.DurationSeconds - replacementBoundary.StartSeconds);
+
+            // Keep the currently scheduled audio intact. Head Out is a queued
+            // route change, so only replace notes at the next safe four-bar
+            // boundary, matching Jampanion's segment handoff. Replacing the
+            // whole timeline at the current position can mix the old tempo's
+            // queued notes with the new tempo's timeline.
+            await _audioModule.InvokeVoidAsync(
+                "replaceContinuation",
+                continuation,
+                duration,
+                boundaryBar.StartSeconds);
+            _sessionPlan = SplicePlanAtBoundary(
+                oldPlan,
+                replacement,
+                boundaryBar.SequenceIndex,
+                boundaryBar.StartSeconds,
+                replacementBoundary.StartSeconds);
+            _positionSeconds = currentPosition;
             HeadOutQueued = true;
             StatusText = "Head out queued";
         }

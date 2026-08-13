@@ -140,10 +140,19 @@ if (slashRoute.join(",") !== "C7,C7/G7,C7,C7/G7") {
 
 console.log(`Timing/form tests passed (${cases.length} timing + 6 form cases).`);
 
-const headOutCoda = [{}, { codaEnd: true }, { codaStart: true }, {}];
+const headOutCoda = [
+  { marker: "Fm7" },
+  { marker: "Fm7", codaEnd: true },
+  { marker: "C-7" },
+  { marker: "C-7" },
+  { marker: "B7#9" },
+  { marker: "B7#9" },
+  { marker: "Coda", codaStart: true },
+  { marker: "Coda" }
+];
 const headOutRoute = buildHeadOutSequenceWithExpander(headOutCoda, 40, identityExpander).map(x => x.sourceIndex);
-if (headOutRoute.join(",") !== "40,41,42,43") throw new Error(`standalone Coda head-out route wrong: ${headOutRoute}`);
-console.log("Standalone Coda head-out test passed.");
+if (headOutRoute.join(",") !== "40,41,46,47") throw new Error(`standalone Coda head-out route wrong: ${headOutRoute}`);
+console.log("Standalone Coda head-out test passed (To Coda skips the written tail).");
 
 const irealTempo180 = extractIRealTempoFromRecord({
   protocol: "irealb://",

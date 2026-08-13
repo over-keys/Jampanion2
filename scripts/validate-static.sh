@@ -50,8 +50,8 @@ grep -q 'APP_VERSION = "31"' "$ROOT/scripts/customize-shell.mjs"
 grep -q 'help.html?v=31' "$ROOT/scripts/customize-viewer.mjs"
 grep -q 'help.en.html?v=31' "$ROOT/scripts/customize-viewer.mjs"
 grep -q 'help.css?v=31' "$ROOT/scripts/customize-help.mjs"
-grep -q 'jazz-chart-host.js?v=34' "$ROOT/scripts/customize-viewer.mjs"
-grep -q 'jazz-chart-host.js?v=46' "$ROOT/integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs"
+grep -q 'jazz-chart-host.js?v=37' "$ROOT/scripts/customize-viewer.mjs"
+grep -q 'jazz-chart-host.js?v=49' "$ROOT/integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs"
 
 # Native IndexedDB loading is part of embedded startup readiness so saved
 # chart/settings state is applied before the first visible chart render.
@@ -111,6 +111,17 @@ grep -q 'stageNative(song)' "$HOST"
 grep -q 'saveMixerPreferences' "$LOGIC"
 grep -q 'getMixerPreferences' "$LOGIC"
 grep -q 'replaceContinuation' "$LOGIC"
+grep -q 'generatedSegments: 2' "$LOGIC"
+grep -q 'initializeSettingsDialog' "$HOST"
+grep -q 'disposeSettingsDialog' "$HOST"
+grep -q 'longestStyleLabel = "Ballad"' "$HOST"
+grep -q 'aria-labelledby="settings-dialog-title"' "$HOME"
+grep -q 'min-height:100svh' "$ROOT/integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css"
+! grep -q '100svh + 96px' "$ROOT/integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css"
+! grep -q '100dvh + 1px' "$ROOT/integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css"
+grep -q 'jazz-integration.css?v=27' "$HOME"
+grep -q 'padding:6px 8px 8px' "$ROOT/integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css"
+grep -q 'padding-top:0' "$ROOT/integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css"
 grep -q 'TruncateHarmonyAtTick' "$ROOT/integration/overlay/src/Jampanion.Web/Audio/IntegratedSessionPlanner.cs"
 
 # Interactive Space controls and exact first-bar deletion semantics.

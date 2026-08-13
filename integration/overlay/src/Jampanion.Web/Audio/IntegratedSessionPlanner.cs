@@ -21,7 +21,8 @@ public static class IntegratedSessionPlanner
         int seed,
         int? headOutChorus = null,
         int? generatedChoruses = null,
-        bool endWithHeadOut = true)
+        bool endWithHeadOut = true,
+        int? generatedSegments = null)
     {
         return BuildSessionCoreAsync(
             chart,
@@ -31,6 +32,7 @@ public static class IntegratedSessionPlanner
             headOutChorus,
             generatedChoruses,
             endWithHeadOut,
+            generatedSegments,
             yieldToBrowser: null).GetAwaiter().GetResult();
     }
 
@@ -42,7 +44,8 @@ public static class IntegratedSessionPlanner
         Func<ValueTask> yieldToBrowser,
         int? headOutChorus = null,
         int? generatedChoruses = null,
-        bool endWithHeadOut = true)
+        bool endWithHeadOut = true,
+        int? generatedSegments = null)
     {
         ArgumentNullException.ThrowIfNull(yieldToBrowser);
         return BuildSessionCoreAsync(
@@ -53,6 +56,7 @@ public static class IntegratedSessionPlanner
             headOutChorus,
             generatedChoruses,
             endWithHeadOut,
+            generatedSegments,
             yieldToBrowser);
     }
 
@@ -62,6 +66,23 @@ public static class IntegratedSessionPlanner
         if (positionSeconds < plan.CountInSeconds)
         {
             return 1;
+        }
+
+        // Match Jampanion's native Head Out timing: a request in the first
+        // two bars can finish the current chorus, while a later request waits
+        // for the next chorus so the theme is not repeated immediately.
+        var currentBar = plan.PlaybackBars
+            .Where(bar => bar.StartSeconds <= positionSeconds && positionSeconds < bar.EndSeconds)
+            .OrderByDescending(bar => bar.StartSeconds)
+            .FirstOrDefault();
+        if (currentBar is not null)
+        {
+            var barsInCurrentChorus = plan.PlaybackBars.Count(bar =>
+                bar.Chorus == currentBar.Chorus &&
+                bar.SequenceIndex <= currentBar.SequenceIndex);
+            return barsInCurrentChorus <= 2
+                ? Math.Clamp(currentBar.Chorus, 1, MaximumOpenEndedChoruses)
+                : Math.Clamp(currentBar.Chorus + 1, 1, MaximumOpenEndedChoruses);
         }
 
         var current = plan.Stages.LastOrDefault(stage => positionSeconds >= stage.StartSeconds);
@@ -77,6 +98,7 @@ public static class IntegratedSessionPlanner
         int? headOutChorus,
         int? generatedChoruses,
         bool endWithHeadOut,
+        int? generatedSegments,
         Func<ValueTask>? yieldToBrowser)
     {
         ArgumentNullException.ThrowIfNull(chart);
@@ -126,6 +148,10 @@ public static class IntegratedSessionPlanner
         long sessionTicks = countInTicks;
         var sequenceIndex = 0;
         var headOutRendered = false;
+        var segmentLimit = generatedSegments is int requestedSegments
+            ? Math.Max(1, requestedSegments)
+            : int.MaxValue;
+        var generatedSegmentCount = 0;
 
         for (var chorus = 1; chorus <= finalChorus; chorus++)
         {
@@ -139,9 +165,11 @@ public static class IntegratedSessionPlanner
             var tune = isHeadOut ? headOutTune : chorus == 1 ? openingTune : soloTune;
             var exactTune = isHeadOut ? headOutExactTune : chorus == 1 ? openingExactTune : soloExactTune;
             var stageStartTicks = sessionTicks;
+            var segmentsToBuild = Math.Min(tune.SegmentCount, segmentLimit - generatedSegmentCount);
+            var barsToAdd = Math.Min(sourceBars.Count, segmentsToBuild * SessionConstants.BarsPerSegment);
 
             var sourceOccurrences = new Dictionary<int, int>();
-            for (var barIndex = 0; barIndex < sourceBars.Count; barIndex++)
+            for (var barIndex = 0; barIndex < barsToAdd; barIndex++)
             {
                 var sourceIndex = sourceBars[barIndex].SourceIndex;
                 var occurrence = sourceOccurrences.TryGetValue(sourceIndex, out var seen) ? seen : 0;
@@ -157,7 +185,7 @@ public static class IntegratedSessionPlanner
                     start + barTicks * secondsPerTick));
             }
 
-            for (var segmentIndex = 0; segmentIndex < tune.SegmentCount; segmentIndex++)
+            for (var segmentIndex = 0; segmentIndex < segmentsToBuild; segmentIndex++)
             {
                 if (yieldToBrowser is not null)
                 {
@@ -190,6 +218,7 @@ public static class IntegratedSessionPlanner
 
                 context = segment.OutputContext;
                 sessionTicks += segment.Segment.LengthTicks;
+                generatedSegmentCount++;
             }
 
             stages.Add(new IntegratedStageBoundary(
@@ -201,6 +230,11 @@ public static class IntegratedSessionPlanner
             if (isHeadOut)
             {
                 headOutRendered = true;
+                break;
+            }
+
+            if (generatedSegmentCount >= segmentLimit)
+            {
                 break;
             }
         }

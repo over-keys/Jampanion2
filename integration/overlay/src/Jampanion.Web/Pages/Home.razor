@@ -3,7 +3,7 @@
 @implements IAsyncDisposable
 
 <PageTitle>Jampanion2</PageTitle>
-<link rel="stylesheet" href="css/jazz-integration.css?v=24" />
+<link rel="stylesheet" href="css/jazz-integration.css?v=27" />
 
 <div class="jamp-shell @(IsPlaying ? "is-playing" : string.Empty)">
     <aside class="jamp-sidebar">
@@ -75,8 +75,8 @@
 @if (SettingsOpen)
 {
     <div class="integration-backdrop" @onclick="ToggleSettingsAsync"></div>
-    <section class="integration-dialog" role="dialog" aria-modal="true" aria-label="Settings">
-        <header><div><h2>Settings</h2><p>Audio output, MIDI input, and local song controls</p></div><button @onclick="ToggleSettingsAsync">×</button></header>
+    <section class="integration-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-dialog-title">
+        <header><div><h2 id="settings-dialog-title">Settings</h2><p>Audio output, MIDI input, and local song controls</p></div><button type="button" data-dialog-close="settings" aria-label="Close Settings" @onclick="ToggleSettingsAsync">×</button></header>
         <section>
             <div class="jamp-heading-row"><h3>Audio &amp; MIDI</h3><button class="tiny" @onclick="RefreshMidiAsync">Refresh</button></div>
             <label class="dialog-field"><span>MIDI input</span>

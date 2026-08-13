@@ -20,6 +20,7 @@ let observer;
 let mobileControlsScrollCleanup;
 let embeddedLayoutObserver;
 let embeddedLayoutMutationObserver;
+let embeddedLayoutResizeHandler;
 let embeddedLayoutTimer;
 let embeddedFrameContentHeight = 0;
 let libraryTimer;
@@ -36,7 +37,12 @@ let embeddedMode = false;
 let frameOrigin = null;
 let parentBridgeListenerInstalled = false;
 let embeddedBridgeListenerInstalled = false;
+let parentBridgeHandler;
+let embeddedBridgeHandler;
 let libraryActionsInstalled = false;
+let libraryClearedHandler;
+let libraryDeleteHandler;
+let libraryDeleteButton;
 let bridgeReady = false;
 let bridgeStartupError = null;
 let bridgeRequestId = 0;
@@ -46,6 +52,9 @@ let standaloneSaveButton;
 let standaloneRevertButton;
 let toolbarHasUnsavedChanges = false;
 let toolbarRevertVisible = false;
+let settingsDialog;
+let settingsDialogKeydownHandler;
+let settingsDialogPreviousFocus;
 const bridgePending = new Map();
 const bridgeReadyWaiters = new Set();
 const BRIDGE_CHANNEL = "jampanion-jcv-v12";
@@ -64,7 +73,7 @@ function postToParent(message) {
 function installParentBridgeListener() {
     if (parentBridgeListenerInstalled) return;
     parentBridgeListenerInstalled = true;
-    window.addEventListener("message", event => {
+    parentBridgeHandler = event => {
         if (!frame || event.source !== frame.contentWindow) return;
         const data = event.data;
         if (!data || data.channel !== BRIDGE_CHANNEL) return;
@@ -91,7 +100,7 @@ function installParentBridgeListener() {
             return;
         }
         if (data.type === "event") {
-        if (data.name === "bootstrapChanged") {
+            if (data.name === "bootstrapChanged") {
                 void dotNet?.invokeMethodAsync("ChartBootstrapChanged", data.value);
             } else if (data.name === "edited") {
                 void dotNet?.invokeMethodAsync("ChartEdited", String(data.message || "Chart updated"));
@@ -107,7 +116,8 @@ function installParentBridgeListener() {
                 applyEmbeddedFrameHeight(data.value?.height);
             }
         }
-    });
+    };
+    window.addEventListener("message", parentBridgeHandler);
 }
 
 function invokeToolbarAction(methodName, action) {
@@ -165,7 +175,7 @@ function requestEmbedded(action, args = {}, timeoutMs = 60000) {
 function installEmbeddedBridgeListener() {
     if (embeddedBridgeListenerInstalled) return;
     embeddedBridgeListenerInstalled = true;
-    window.addEventListener("message", async event => {
+    embeddedBridgeHandler = async event => {
         if (event.source !== window.parent) return;
         const data = event.data;
         if (!data || data.channel !== BRIDGE_CHANNEL) return;
@@ -206,7 +216,8 @@ function installEmbeddedBridgeListener() {
                 error: error instanceof Error ? error.message : String(error)
             });
         }
-    });
+    };
+    window.addEventListener("message", embeddedBridgeHandler);
 }
 
 async function waitForLocalViewer(timeoutMs = 15000) {
@@ -275,6 +286,63 @@ export function initializeMobileControlsScrollHint() {
     update();
 }
 
+function settingsDialogFocusableElements() {
+    if (!settingsDialog) return [];
+    return [...settingsDialog.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+    )].filter(element => {
+        const style = getComputedStyle(element);
+        return style.display !== "none" && style.visibility !== "hidden";
+    });
+}
+
+export function initializeSettingsDialog() {
+    const dialog = document.querySelector('.integration-dialog[role="dialog"][aria-labelledby="settings-dialog-title"]');
+    if (!dialog) return;
+    if (settingsDialog === dialog) return;
+    disposeSettingsDialog();
+    settingsDialog = dialog;
+    settingsDialogPreviousFocus = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    settingsDialogKeydownHandler = event => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            settingsDialog.querySelector('[data-dialog-close="settings"]')?.click();
+            return;
+        }
+        if (event.key !== "Tab") return;
+        const focusable = settingsDialogFocusableElements();
+        if (!focusable.length) {
+            event.preventDefault();
+            settingsDialog.focus();
+            return;
+        }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    };
+    settingsDialog.addEventListener("keydown", settingsDialogKeydownHandler);
+    settingsDialogFocusableElements()[0]?.focus();
+}
+
+export function disposeSettingsDialog() {
+    if (settingsDialog && settingsDialogKeydownHandler) {
+        settingsDialog.removeEventListener("keydown", settingsDialogKeydownHandler);
+    }
+    const previousFocus = settingsDialogPreviousFocus;
+    settingsDialog = null;
+    settingsDialogKeydownHandler = null;
+    settingsDialogPreviousFocus = null;
+    if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+}
+
 function applyEmbeddedFrameHeight(height) {
     const numericHeight = Math.ceil(Number(height) || 0);
     if (numericHeight > 0) embeddedFrameContentHeight = numericHeight;
@@ -326,7 +394,8 @@ function installEmbeddedLayoutObserver() {
             attributeFilter: ["class", "style"]
         });
     }
-    window.addEventListener("resize", notify, { passive: true });
+    embeddedLayoutResizeHandler = notify;
+    window.addEventListener("resize", embeddedLayoutResizeHandler, { passive: true });
     notify();
 }
 
@@ -453,6 +522,18 @@ function installIntegrationCss() {
       body.jampanion-embedded .chart-viewport {
         min-width:0 !important;
       }
+      /* The desktop toolbar has a fixed-width control cluster. Below this
+         breakpoint, let the search field yield its excess minimum width so
+         the utility buttons remain visible instead of being clipped. */
+      @media (min-width: 701px) and (max-width: 1180px) {
+        body.jampanion-embedded .toolbar {
+          min-width:0 !important;
+        }
+        body.jampanion-embedded .toolbar-main {
+          min-width:0 !important;
+          flex-basis:220px !important;
+        }
+      }
       @media (max-width: 700px) {
         body.jampanion-embedded .app-shell {
           height:auto !important;
@@ -563,6 +644,10 @@ function installChartListeners() {
     }, true);
 
     observer = new MutationObserver(() => {
+        // The Viewer rebuilds the settings dialog when its library changes.
+        // Rebind the customized-song action if that replacement created a
+        // new button node.
+        installLibraryActions();
         annotateRenderedBars();
         queueBootstrapNotification();
     });
@@ -578,14 +663,33 @@ function installChartListeners() {
 }
 
 function installLibraryActions() {
-    if (libraryActionsInstalled || !doc) return;
-    libraryActionsInstalled = true;
-    window.addEventListener("jampanion-library-cleared", event => {
-        void handleLibraryCleared(event?.detail?.songs);
-    });
+    if (!doc) return;
+    if (!libraryActionsInstalled) {
+        libraryActionsInstalled = true;
+        libraryClearedHandler = event => {
+            void handleLibraryCleared(event?.detail?.songs);
+        };
+        window.addEventListener("jampanion-library-cleared", libraryClearedHandler);
+    }
     const button = doc.getElementById("deleteCustomized");
-    if (button) {
-        button.addEventListener("click", () => { void deleteCustomizedSongs(); });
+    if (button !== libraryDeleteButton) {
+        if (libraryDeleteButton && libraryDeleteHandler) {
+            libraryDeleteButton.removeEventListener("click", libraryDeleteHandler);
+        }
+        libraryDeleteButton = button || null;
+        if (libraryDeleteButton) {
+            libraryDeleteHandler = () => {
+                void deleteCustomizedSongs().catch(error => {
+                    console.error("Customized-song restoration failed", error);
+                    const message = error instanceof Error ? error.message : String(error);
+                    window.alert?.(message);
+                    updateCustomizedSongsButton();
+                });
+            };
+            libraryDeleteButton.addEventListener("click", libraryDeleteHandler);
+        } else {
+            libraryDeleteHandler = null;
+        }
     }
     updateCustomizedSongsButton();
 }
@@ -628,8 +732,8 @@ async function deleteCustomizedSongs() {
     const targets = customizedSongs();
     if (!targets.length) return getBootstrap();
     const message = targets.length === 1
-        ? "Remove saved changes from this song? The original imported chart will be kept."
-        : `Remove saved changes from these ${targets.length} songs? Their original imported charts will be kept.`;
+        ? "Remove saved changes from 1 song? The original imported chart will be kept."
+        : `Remove saved changes from ${targets.length} songs? Their original imported charts will be kept.`;
     if (!window.confirm(message)) return getBootstrap();
 
     const ids = targets.map(song => song.id);
@@ -1396,15 +1500,19 @@ function sectionStyleAbbreviation(style) {
 
 function commonSectionStyleBadgeFontSize(entries) {
     const maximumFontSize = 22;
+    const longestStyleLabel = "Ballad";
+    const canvas = doc.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (context) context.font = `700 ${maximumFontSize}px Arial,Helvetica,sans-serif`;
+    const naturalWidth = Math.max(
+        1,
+        context?.measureText(longestStyleLabel).width
+            || longestStyleLabel.length * maximumFontSize * 0.6
+    );
+
     let fittedFontSize = maximumFontSize;
-    for (const { badge, lead } of entries) {
+    for (const { lead } of entries) {
         const availableWidth = Math.max(1, lead.clientWidth || lead.offsetWidth);
-        badge.style.width = "max-content";
-        badge.style.maxWidth = "none";
-        badge.style.fontSize = `${maximumFontSize}px`;
-        badge.style.lineHeight = `${maximumFontSize}px`;
-        badge.style.height = `${maximumFontSize}px`;
-        const naturalWidth = Math.max(1, badge.offsetWidth);
         fittedFontSize = Math.min(
             fittedFontSize,
             maximumFontSize * Math.max(1, availableWidth - 1) / naturalWidth
@@ -1581,7 +1689,23 @@ export function buildHeadOutSequenceWithExpander(loopSource, sourceOffset, expan
     // Head Out follows the same complete, written-form expansion as Viewer.
     // The ending/root hold is added by IntegratedSessionPlanner after this
     // route; it must not cause the chart navigator to be interpreted again.
-    return buildCanonicalPlaybackSequence(loopSource, sourceOffset, expandChartBars);
+    const expanded = buildCanonicalPlaybackSequence(loopSource, sourceOffset, expandChartBars);
+    if (!loopSource.length || hasJumpDirective(loopSource)) return expanded;
+
+    // A standalone To Coda/Coda pair is intentionally left in written order
+    // by the Viewer because it is notation, not a navigation directive. For
+    // Head Out, however, it is the ending route: leave the written form at
+    // To Coda and continue at the Coda destination. This is the same
+    // practical behavior as Jampanion's separate ending form and prevents a
+    // main-form tail (for example C-7/B7#9) from playing before the Coda.
+    const codaEnd = findStandaloneCodaEnd(loopSource);
+    const codaStart = findStandaloneCodaStart(loopSource);
+    if (codaEnd < 0 || codaStart <= codaEnd) return expanded;
+
+    const codaEndSourceIndex = sourceOffset + codaEnd;
+    const codaStartSourceIndex = sourceOffset + codaStart;
+    return expanded.filter(item =>
+        item.sourceIndex <= codaEndSourceIndex || item.sourceIndex >= codaStartSourceIndex);
 }
 
 export function buildSoloSequenceWithExpander(loopSource, sourceOffset, expandChartBars) {
@@ -1612,6 +1736,10 @@ function hasJumpDirective(bars) {
 
 function findStandaloneCodaStart(bars) {
     return (bars || []).findIndex((bar, index) => index > 0 && Boolean(bar.codaStart));
+}
+
+function findStandaloneCodaEnd(bars) {
+    return (bars || []).findIndex((bar, index) => index > 0 && Boolean(bar.codaEnd));
 }
 
 function offsetExpanded(bars, offset) {
@@ -2513,12 +2641,36 @@ export function saveMixerPreferences(value) {
 }
 
 export function dispose() {
+    const activeDocument = doc;
+    const activeWindow = win || window;
     observer?.disconnect();
+    embeddedLayoutObserver?.disconnect();
+    embeddedLayoutMutationObserver?.disconnect();
     mobileControlsScrollCleanup?.();
+    disposeSettingsDialog();
+    if (embeddedLayoutResizeHandler) activeWindow.removeEventListener("resize", embeddedLayoutResizeHandler);
+    if (embeddedLayoutTimer) clearTimeout(embeddedLayoutTimer);
+    if (notifyTimer) clearTimeout(notifyTimer);
     if (globalKeyHandler) document.removeEventListener("keydown", globalKeyHandler);
-    if (embeddedKeyHandler) document.removeEventListener("keydown", embeddedKeyHandler);
+    if (embeddedKeyHandler) activeDocument?.removeEventListener("keydown", embeddedKeyHandler);
+    if (parentBridgeHandler) window.removeEventListener("message", parentBridgeHandler);
+    if (embeddedBridgeHandler) activeWindow.removeEventListener("message", embeddedBridgeHandler);
+    if (libraryClearedHandler) window.removeEventListener("jampanion-library-cleared", libraryClearedHandler);
+    if (libraryDeleteButton && libraryDeleteHandler) libraryDeleteButton.removeEventListener("click", libraryDeleteHandler);
+    for (const pending of bridgePending.values()) {
+        clearTimeout(pending.timer);
+        pending.reject(new Error("Jazz Chart Viewer bridge was disposed."));
+    }
+    bridgePending.clear();
+    for (const resolve of bridgeReadyWaiters) resolve();
+    bridgeReadyWaiters.clear();
     globalKeyHandler = null;
+    embeddedKeyHandler = null;
     observer = null;
+    embeddedLayoutObserver = null;
+    embeddedLayoutMutationObserver = null;
+    embeddedLayoutResizeHandler = null;
+    embeddedLayoutTimer = null;
     if (libraryTimer) clearInterval(libraryTimer);
     libraryTimer = null;
     closeEditor(false);
@@ -2528,4 +2680,20 @@ export function dispose() {
     doc = null;
     win = null;
     frame = null;
+    parentBridgeHandler = null;
+    embeddedBridgeHandler = null;
+    libraryClearedHandler = null;
+    libraryDeleteHandler = null;
+    libraryDeleteButton = null;
+    parentBridgeListenerInstalled = false;
+    embeddedBridgeListenerInstalled = false;
+    libraryActionsInstalled = false;
+    initialized = false;
+    bridgeReady = false;
+    bridgeStartupError = null;
+    standaloneNewButton = null;
+    standaloneSaveButton = null;
+    standaloneRevertButton = null;
+    toolbarHasUnsavedChanges = false;
+    toolbarRevertVisible = false;
 }
