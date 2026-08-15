@@ -187,7 +187,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         try
         {
             _self ??= DotNetObjectReference.Create(this);
-            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=51");
+            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=52");
             try { await _chartModule.InvokeVoidAsync("initializeMobileControlsScrollHint"); } catch { }
             var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("initialize", "jcv-frame", _self);
             ApplyBootstrap(bootstrap);
@@ -330,7 +330,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
 
     protected async Task ChangeTempoAsync(ChangeEventArgs args)
     {
-        if (IsLoading) return;
+        if (IsLoading || _endingInProgress) return;
         if (!int.TryParse(args.Value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var requested)) return;
         requested = Math.Clamp(requested, 40, 300);
         if (requested == TempoBpm)
@@ -356,7 +356,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
 
     protected async Task ChangeStyleAsync(ChangeEventArgs args)
     {
-        if (IsLoading) return;
+        if (IsLoading || _endingInProgress) return;
         if (!AccompanimentStyleNames.TryParseExplicit(args.Value?.ToString(), out var requested)) return;
         if (CurrentMeter == "3/4") requested = AccompanimentStyle.JazzWaltz;
         if (requested == SelectedStyle) return;
@@ -578,8 +578,9 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         {
             var oldPlan = _sessionPlan;
             var currentPosition = await _audioModule.InvokeAsync<double>("getPosition");
-            var headOutChorus = IntegratedSessionPlanner.ResolveNextHeadOutChorus(oldPlan, currentPosition);
-            var boundaryBar = NextFourBarBoundary(oldPlan, currentPosition, schedulingGuardSeconds)
+            var schedulingPosition = await GetProtectedThroughAsync(currentPosition);
+            var headOutChorus = IntegratedSessionPlanner.ResolveNextHeadOutChorus(oldPlan, schedulingPosition);
+            var boundaryBar = NextFourBarBoundary(oldPlan, schedulingPosition, schedulingGuardSeconds)
                 ?? throw new InvalidOperationException("No later four-bar boundary is available for Head Out.");
             StatusText = "Preparing head out";
             await InvokeAsync(StateHasChanged);
@@ -603,9 +604,10 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             if (!IsPlaying || generationVersion != _generationVersion || _audioModule is null) return;
 
             currentPosition = await _audioModule.InvokeAsync<double>("getPosition");
-            if (boundaryBar.StartSeconds - currentPosition <= schedulingGuardSeconds)
+            schedulingPosition = await GetProtectedThroughAsync(currentPosition);
+            if (boundaryBar.StartSeconds - schedulingPosition <= schedulingGuardSeconds)
             {
-                boundaryBar = NextFourBarBoundary(oldPlan, currentPosition, schedulingGuardSeconds)
+                boundaryBar = NextFourBarBoundary(oldPlan, schedulingPosition, schedulingGuardSeconds)
                     ?? throw new InvalidOperationException("The requested Head Out reached the next four-bar boundary.");
             }
 
@@ -660,6 +662,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         if (!IsPlaying || _compiledChart is null || _sessionPlan is null || _audioModule is null) return;
         var oldPlan = _sessionPlan;
         var generationVersion = ++_generationVersion;
+        var gateEntered = false;
         const double schedulingGuardSeconds = 0.30d;
         try
         {
@@ -670,7 +673,12 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             }
 
             var currentPosition = await _audioModule.InvokeAsync<double>("getPosition");
-            var boundaryBar = NextBarBoundary(oldPlan, currentPosition, schedulingGuardSeconds)
+            var schedulingPosition = await GetProtectedThroughAsync(currentPosition);
+            var boundaryBar = NextBarBoundary(
+                oldPlan,
+                schedulingPosition,
+                schedulingGuardSeconds,
+                allowProjection: oldPlan.HeadOutChorus is null)
                 ?? throw new InvalidOperationException("No later bar boundary is available in the prepared session.");
             var replacement = await IntegratedSessionPlanner.BuildSessionIncrementallyAsync(
                 _compiledChart,
@@ -682,10 +690,19 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                 endWithHeadOut: oldPlan.HeadOutChorus is not null);
             if (!IsPlaying || generationVersion != _generationVersion || _audioModule is null) return;
 
+            await _planMutationGate.WaitAsync();
+            gateEntered = true;
+            if (!IsPlaying || generationVersion != _generationVersion || _audioModule is null) return;
+
             currentPosition = await _audioModule.InvokeAsync<double>("getPosition");
-            if (boundaryBar.StartSeconds - currentPosition <= schedulingGuardSeconds)
+            schedulingPosition = await GetProtectedThroughAsync(currentPosition);
+            if (boundaryBar.StartSeconds - schedulingPosition <= schedulingGuardSeconds)
             {
-                boundaryBar = NextBarBoundary(oldPlan, currentPosition, schedulingGuardSeconds)
+                boundaryBar = NextBarBoundary(
+                    oldPlan,
+                    schedulingPosition,
+                    schedulingGuardSeconds,
+                    allowProjection: oldPlan.HeadOutChorus is null)
                     ?? throw new InvalidOperationException("The requested tempo change reached the end of the prepared session.");
             }
 
@@ -719,25 +736,37 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             StatusText = $"Tempo change failed: {exception.Message}";
             SetPlaybackError($"Tempo change failed: {exception.Message}");
         }
+        finally
+        {
+            if (gateEntered) _planMutationGate.Release();
+        }
     }
 
     private async Task QueueStyleChangeAsync(AccompanimentStyle previousStyle)
     {
-        if (!IsPlaying || _compiledChart is null || _sessionPlan is null || _audioModule is null || HeadOutQueued)
+        if (!IsPlaying || _compiledChart is null || _sessionPlan is null || _audioModule is null)
         {
             return;
         }
 
         var oldPlan = _sessionPlan;
         var generationVersion = ++_generationVersion;
+        var gateEntered = false;
         const double schedulingGuardSeconds = 0.30d;
         try
         {
             var currentPosition = await _audioModule.InvokeAsync<double>("getPosition");
-            var boundaryBar = NextFourBarBoundary(oldPlan, currentPosition, schedulingGuardSeconds);
+            var schedulingPosition = await GetProtectedThroughAsync(currentPosition);
+            var boundaryBar = NextFourBarBoundary(
+                oldPlan,
+                schedulingPosition,
+                schedulingGuardSeconds,
+                allowProjection: oldPlan.HeadOutChorus is null);
             if (boundaryBar is null)
             {
-                throw new InvalidOperationException("No later four-bar boundary is available in the prepared session.");
+                SelectedStyle = previousStyle;
+                StatusText = "Style unchanged · no later 4-bar boundary is available";
+                return;
             }
 
             StatusText = $"Preparing {AccompanimentStyleNames.DisplayName(SelectedStyle)} for the next 4-bar boundary";
@@ -746,7 +775,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             async ValueTask YieldAsync()
             {
                 await Task.Delay(1);
-                if (!IsPlaying || generationVersion != _generationVersion || HeadOutQueued)
+                if (!IsPlaying || generationVersion != _generationVersion)
                     throw new OperationCanceledException();
             }
 
@@ -760,12 +789,25 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                 endWithHeadOut: oldPlan.HeadOutChorus is not null);
             if (!IsPlaying || generationVersion != _generationVersion || _audioModule is null) return;
 
+            await _planMutationGate.WaitAsync();
+            gateEntered = true;
+            if (!IsPlaying || generationVersion != _generationVersion || _audioModule is null) return;
+
             currentPosition = await _audioModule.InvokeAsync<double>("getPosition");
-            if (boundaryBar.StartSeconds - currentPosition <= schedulingGuardSeconds)
+            schedulingPosition = await GetProtectedThroughAsync(currentPosition);
+            if (boundaryBar.StartSeconds - schedulingPosition <= schedulingGuardSeconds)
             {
-                boundaryBar = NextFourBarBoundary(oldPlan, currentPosition, schedulingGuardSeconds);
+                boundaryBar = NextFourBarBoundary(
+                    oldPlan,
+                    schedulingPosition,
+                    schedulingGuardSeconds,
+                    allowProjection: oldPlan.HeadOutChorus is null);
                 if (boundaryBar is null)
-                    throw new InvalidOperationException("The requested style change reached the end of the prepared session.");
+                {
+                    SelectedStyle = previousStyle;
+                    StatusText = "Style unchanged · no later 4-bar boundary is available";
+                    return;
+                }
             }
 
             var replacementBoundary = replacement.PlaybackBars.FirstOrDefault(bar => bar.SequenceIndex == boundaryBar.SequenceIndex)
@@ -783,6 +825,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                 duration,
                 boundaryBar.StartSeconds);
             _sessionPlan = SplicePlanAtBoundary(oldPlan, replacement, boundaryBar.SequenceIndex, boundaryBar.StartSeconds, replacementBoundary.StartSeconds);
+            _positionSeconds = currentPosition;
             StatusText = $"{AccompanimentStyleNames.DisplayName(SelectedStyle)} queued for the next 4-bar boundary";
         }
         catch (OperationCanceledException) { }
@@ -792,18 +835,40 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             StatusText = $"Style change failed: {exception.Message}";
             SetPlaybackError($"Style change failed: {exception.Message}");
         }
+        finally
+        {
+            if (gateEntered) _planMutationGate.Release();
+        }
+    }
+
+    private async Task<double> GetProtectedThroughAsync(double currentPosition)
+    {
+        if (_audioModule is null) return currentPosition;
+        try
+        {
+            var protectedThrough = await _audioModule.InvokeAsync<double>("getProtectedThrough");
+            return Math.Max(currentPosition, protectedThrough);
+        }
+        catch
+        {
+            // Older cached audio modules do not expose the protected horizon.
+            // The normal scheduling guard remains safe for foreground playback.
+            return currentPosition;
+        }
     }
 
     private static IntegratedPlaybackBar? NextBarBoundary(
         IntegratedSessionPlan plan,
         double currentPosition,
-        double guardSeconds)
+        double guardSeconds,
+        bool allowProjection = true)
     {
         var known = plan.PlaybackBars
             .Where(bar => bar.StartSeconds - currentPosition > guardSeconds)
             .OrderBy(bar => bar.StartSeconds)
             .FirstOrDefault();
         if (known is not null) return known;
+        if (!allowProjection) return null;
 
         var currentBar = plan.PlaybackBars
             .Where(bar => bar.StartSeconds <= currentPosition)
@@ -827,7 +892,8 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     private static IntegratedPlaybackBar? NextFourBarBoundary(
         IntegratedSessionPlan plan,
         double currentPosition,
-        double guardSeconds)
+        double guardSeconds,
+        bool allowProjection = true)
     {
         var known = plan.PlaybackBars
             .Where(bar => bar.SequenceIndex > 0 && bar.SequenceIndex % SessionConstants.BarsPerSegment == 0)
@@ -842,6 +908,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                 SequenceIndex: 0, SourceIndex: -1, SourceOccurrence: 0, Chorus: 1, Stage: "Opening",
                 StartSeconds: plan.CountInSeconds, EndSeconds: plan.CountInSeconds + plan.BarDurationSeconds);
         }
+        if (!allowProjection) return null;
 
         // During the first chorus the long plan may still be generating. The
         // current prepared plan has a uniform tempo, so the next four-bar grid
@@ -930,18 +997,29 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         _generationVersion++;
         _progressCancellation?.Cancel();
         // stopSession sends all-notes-off/all-sound-off before clearing the queue.
-        if (_audioModule is not null) await _audioModule.InvokeVoidAsync("stopSession");
+        // Stopping is best-effort: an interop failure must never leave the UI
+        // or plan state looking as if playback is still active.
+        if (_audioModule is not null)
+        {
+            try { await _audioModule.InvokeVoidAsync("stopSession"); } catch { }
+        }
+
         IsPlaying = false;
         IsLoading = false;
         HeadOutQueued = false;
         HeadOutActive = false;
+        _endingInProgress = false;
         _positionSeconds = 0;
         _sessionPlan = null;
         _compiledChart = null;
         _launchPlanDurationSeconds = 0;
         _lastHighlightedSource = -2;
         _lastHighlightedOccurrence = -2;
-        if (_chartModule is not null) await _chartModule.InvokeVoidAsync("setPlaybackState", false, -1);
+
+        if (_chartModule is not null)
+        {
+            try { await _chartModule.InvokeVoidAsync("setPlaybackState", false, -1); } catch { }
+        }
         StatusText = "Stopped";
     }
 
@@ -1374,7 +1452,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     }
 
     private async Task<IJSObjectReference> EnsureAudioModuleAsync() =>
-        _audioModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-audio.js?v=30");
+        _audioModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-audio.js?v=31");
 
     private static string FormatTime(double seconds)
     {
