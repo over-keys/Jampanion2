@@ -60,15 +60,30 @@ const bridgePending = new Map();
 const bridgeReadyWaiters = new Set();
 const BRIDGE_CHANNEL = "jampanion-jcv-v12";
 
+function normalizeBridgeOrigin(origin) {
+    return origin && origin !== "null" ? origin : null;
+}
+
+function bridgeTargetOrigin(origin) {
+    return normalizeBridgeOrigin(origin) || "*";
+}
+
+function bridgeOriginMatches(eventOrigin, expectedOrigin) {
+    const normalized = normalizeBridgeOrigin(expectedOrigin);
+    return normalized ? eventOrigin === normalized : eventOrigin === "null";
+}
+
 function postToFrame(message) {
     const target = frame?.contentWindow;
     if (!target) throw new Error("Jazz Chart Viewer frame is not available.");
-    target.postMessage({ channel: BRIDGE_CHANNEL, ...message }, frameOrigin || "*");
+    target.postMessage({ channel: BRIDGE_CHANNEL, ...message }, bridgeTargetOrigin(frameOrigin));
 }
 
 function postToParent(message) {
     if (window.parent === window) return;
-    window.parent.postMessage({ channel: BRIDGE_CHANNEL, ...message }, "*");
+    window.parent.postMessage(
+        { channel: BRIDGE_CHANNEL, ...message },
+        bridgeTargetOrigin(window.location.origin));
 }
 
 function installParentBridgeListener() {
@@ -76,6 +91,7 @@ function installParentBridgeListener() {
     parentBridgeListenerInstalled = true;
     parentBridgeHandler = event => {
         if (!frame || event.source !== frame.contentWindow) return;
+        if (!bridgeOriginMatches(event.origin, frameOrigin)) return;
         const data = event.data;
         if (!data || data.channel !== BRIDGE_CHANNEL) return;
         if (data.type === "bridge-error") {
@@ -180,6 +196,7 @@ function installEmbeddedBridgeListener() {
     embeddedBridgeListenerInstalled = true;
     embeddedBridgeHandler = async event => {
         if (event.source !== window.parent) return;
+        if (!bridgeOriginMatches(event.origin, window.location.origin)) return;
         const data = event.data;
         if (!data || data.channel !== BRIDGE_CHANNEL) return;
         if (data.type === "ping") {
@@ -258,10 +275,9 @@ export async function initialize(frameId, dotNetReference) {
         }
     }
     try {
-        frameOrigin = new URL(frame.src, window.location.href).origin;
-        if (frameOrigin === "null") frameOrigin = "*";
+        frameOrigin = normalizeBridgeOrigin(new URL(frame.src, window.location.href).origin);
     } catch {
-        frameOrigin = "*";
+        frameOrigin = null;
     }
     installParentBridgeListener();
     installParentShortcuts();

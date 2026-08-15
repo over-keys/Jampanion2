@@ -7,14 +7,19 @@ planner = (root / "integration/overlay/src/Jampanion.Web/Audio/IntegratedSession
 home = (root / "integration/overlay/src/Jampanion.Web/Pages/Home.razor").read_text()
 css = (root / "integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text()
 customize_viewer = (root / "scripts/customize-viewer.mjs").read_text()
+background_playback = (root / "scripts/customize-background-playback.mjs").read_text()
 style_change_method = logic[logic.find('protected async Task ChangeStyleAsync'):logic.find('private static int DefaultTempoForStyle')]
 tempo_change_method = logic[logic.find('private async Task RebuildLiveTempoAsync'):logic.find('private async Task QueueStyleChangeAsync')]
+style_queue_method = logic[logic.find('private async Task QueueStyleChangeAsync'):logic.find('private async Task<double> GetProtectedThroughAsync')]
+stop_method = logic[logic.find('protected async Task StopSessionAsync'):logic.find('private void BeginProgressUpdates')]
 
 checks = {
     "playback disables original search": 'search.disabled = playing' in host,
     "stopping clears search loading state": 'search.removeAttribute("aria-busy")' in host and 'if (playing)' in host,
     "playback locks selected song": 'playbackLockedSongId' in host,
     "embedded Space forwards to parent": 'name: "spaceShortcut"' in host,
+    "bridge messages require the expected origin": 'bridgeOriginMatches(event.origin, frameOrigin)' in host and 'bridgeOriginMatches(event.origin, window.location.origin)' in host and 'bridgeTargetOrigin(window.location.origin)' in host,
+    "bridge startup errors target the same origin": 'const bridgeTargetOrigin = window.location.origin === "null" ? "*" : window.location.origin' in customize_viewer,
     "Space shortcut ignores interactive controls": 'shortcutBelongsToInteractiveControl' in host and 'tag === "button"' in host and '.search-options' in host,
     "native iReal can restore original": 'viewer.parseIRealCollection' in host and 'originalSourceRecord' in host,
     "3/4 style menu is constrained": 'resolvedMeterAt(song.bars || [], sourceIndex) === "3/4"' in host,
@@ -32,7 +37,12 @@ checks = {
     "style changes use four-bar boundary": 'SequenceIndex % SessionConstants.BarsPerSegment == 0' in logic,
     "style continuation is replaced, not rebased immediately": '"replaceContinuation"' in logic,
     "style changes preserve the current tempo": 'TempoBpm = DefaultTempoForStyle(SelectedStyle)' not in style_change_method,
+    "queued Head Out accepts later style changes": 'HeadOutQueued' not in style_queue_method and 'headOutChorus: oldPlan.HeadOutChorus' in style_queue_method and 'allowProjection: oldPlan.HeadOutChorus is null' in style_queue_method,
+    "tempo/style do not cancel Head Out preparation": 'if (IsLoading || _endingInProgress) return;' in logic,
     "tempo changes wait for a bar boundary": 'NextBarBoundary' in tempo_change_method and 'next bar boundary' in tempo_change_method,
+    "plan replacements share the mutation gate": '_planMutationGate.WaitAsync()' in tempo_change_method and '_planMutationGate.WaitAsync()' in style_queue_method,
+    "background playback protects prequeued audio": 'BACKGROUND_LOOK_AHEAD_SECONDS = 4.0' in background_playback and 'getProtectedThrough' in background_playback and 'GetProtectedThroughAsync' in logic,
+    "stop cleanup survives interop failure": 'try { await _audioModule.InvokeVoidAsync("stopSession"); } catch { }' in stop_method and 'try { await _chartModule.InvokeVoidAsync("setPlaybackState", false, -1); } catch { }' in stop_method,
     "same tempo does not create a dirty state": 'if (requested == TempoBpm)' in logic and 'do not turn an Auto/default' in logic,
     "tempo continuation is replaced without rebasing": '"replaceContinuation"' in tempo_change_method and '"replaceSession"' not in tempo_change_method,
     "Ending appends the native final tonic hold": 'EndingPlanBuilder.Build' in planner and 'headOutRendered = true' in planner and 'Ending / final tonic' in planner,
@@ -44,7 +54,7 @@ checks = {
     "integrated brand row has icon and text only": '<img src="icons/jampanion-32.png' in home and '<strong>Jampanion2</strong>' in home and 'jamp-brand-actions' not in home,
     "desktop brand row is above session": '.jamp-brand-row { order:-1; align-self:center; margin-top:0;' in (root / "integration/overlay/src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text(),
     "startup brand is customized": 'customize-shell.mjs' in (root / "scripts/build-integrated.sh").read_text() and 'Jampanion2' in (root / "scripts/customize-shell.mjs").read_text(),
-    "cache-busted page versions": 'APP_VERSION = "31"' in (root / "scripts/customize-shell.mjs").read_text() and 'help.html?v=31' in (root / "scripts/customize-viewer.mjs").read_text() and 'help.en.html?v=31' in (root / "scripts/customize-viewer.mjs").read_text() and 'jazz-chart-host.js?v=51' in (root / "scripts/customize-viewer.mjs").read_text() and 'help.css?v=31' in (root / "scripts/customize-help.mjs").read_text() and 'jazz-chart-host.js?v=51' in logic and 'viewer/index.html?integrated=14' in home,
+    "cache-busted page versions": 'APP_VERSION = "31"' in (root / "scripts/customize-shell.mjs").read_text() and 'help.html?v=31' in (root / "scripts/customize-viewer.mjs").read_text() and 'help.en.html?v=31' in (root / "scripts/customize-viewer.mjs").read_text() and 'jazz-chart-host.js?v=52' in (root / "scripts/customize-viewer.mjs").read_text() and 'help.css?v=31' in (root / "scripts/customize-help.mjs").read_text() and 'jazz-chart-host.js?v=52' in logic and 'viewer/index.html?integrated=14' in home,
     "English Jampanion help is built": 'customize-help-en.mjs' in (root / "scripts/build-integrated.sh").read_text() and 'test-help-en-contract.mjs' in (root / "scripts/build-integrated.sh").read_text(),
     "transpose is saved with accompaniment settings": 'CurrentSemitoneShift' in logic and 'SemitoneShift' in (root / "integration/overlay/src/Jampanion.Web/Models/JazzChartModels.cs").read_text() and 'semitoneShift' in host and 'saveSongSettings' in logic,
     "standalone viewer Save includes settings": 'installStandaloneSaveButton' in host and 'jampanionStandaloneSave' in host and 'window.parent !== window' in host and 'hasUnsavedStandaloneSettings' in host and 'Save chart, key, tempo, and style' in host and 'Number(viewer.state.semitones) || 0' in host and 'toolbarHasUnsavedChanges' in host,
@@ -63,7 +73,7 @@ checks = {
     "rehearsal context menu only sets styles": 'bar.section = label || null' in host and 'Add rehearsal mark' not in host and 'Edit rehearsal mark' not in host and 'Remove rehearsal mark' not in host and 'Section style:' in host,
     "head out leaves queued state when active": 'HeadOutActive' in logic and 'HeadOutQueued = false;' in logic and 'stage.Name, "HeadOut"' in logic,
     "head out completion rerenders after automatic stop": 'position >= _sessionPlan.DurationSeconds + 0.3d' in logic and 'await StopSessionAsync();\n                    await InvokeAsync(StateHasChanged);' in logic,
-    "head out queues a four-bar continuation": 'var boundaryBar = NextFourBarBoundary(oldPlan, currentPosition, schedulingGuardSeconds)' in logic and '"replaceContinuation"' in logic[logic.find('protected async Task CueHeadOutAsync'):logic.find('private async Task RebuildLiveTempoAsync')] and 'SplicePlanAtBoundary' in logic[logic.find('protected async Task CueHeadOutAsync'):logic.find('private async Task RebuildLiveTempoAsync')] and '"replaceSession"' not in logic[logic.find('protected async Task CueHeadOutAsync'):logic.find('private async Task RebuildLiveTempoAsync')],
+    "head out queues a four-bar continuation": 'var boundaryBar = NextFourBarBoundary(oldPlan, schedulingPosition, schedulingGuardSeconds)' in logic and '"replaceContinuation"' in logic[logic.find('protected async Task CueHeadOutAsync'):logic.find('private async Task RebuildLiveTempoAsync')] and 'SplicePlanAtBoundary' in logic[logic.find('protected async Task CueHeadOutAsync'):logic.find('private async Task RebuildLiveTempoAsync')] and '"replaceSession"' not in logic[logic.find('protected async Task CueHeadOutAsync'):logic.find('private async Task RebuildLiveTempoAsync')],
     "head out follows native first-two-bars timing": 'barsInCurrentChorus <= 2' in planner and 'Math.Clamp(currentBar.Chorus, 1, MaximumOpenEndedChoruses)' in planner and 'currentBar.Chorus + 1' in planner,
     "startup builds native-sized preparation window": 'generatedSegments: 2' in logic and 'int? generatedSegments = null' in planner and 'segmentLimit' in planner,
     "settings dialog manages keyboard focus": 'initializeSettingsDialog' in host and 'disposeSettingsDialog' in host and 'aria-labelledby="settings-dialog-title"' in home,
@@ -113,7 +123,8 @@ checks = {
     "empty library actions explain that there is nothing to do": 'No customized songs to revert.' in host and 'No imported songs to delete.' in (root / "scripts/customize-viewer.mjs").read_text(),
     "customized-song confirmation counts songs directly": 'Remove saved changes from 1 song?' in host and 'Remove saved changes from ${targets.length} songs?' in host,
     "customized-song action survives dialog replacement": 'installLibraryActions();' in host and 'button !== libraryDeleteButton' in host and 'Customized-song restoration failed' in host,
-    "background playback does not stop on page visibility": 'visibilityHandler' not in host and 'StopSessionFromVisibility' not in host and 'customize-background-playback.mjs' in (root / "scripts/build-integrated.sh").read_text() and 'jampanion-audio.js?v=30' in logic,
+    "background playback does not stop on page visibility": 'visibilityHandler' not in host and 'StopSessionFromVisibility' not in host and 'customize-background-playback.mjs' in (root / "scripts/build-integrated.sh").read_text() and 'jampanion-audio.js?v=31' in logic,
+    "continuation keeps the protected audio cursor": 'findCursorAt(scheduledThroughSeconds + 0.0001, true)' in background_playback,
     "blank chord cells add at the clicked beat": 'A rendered chord slot can span several empty beat cells' in host and 'first?.classList.contains("cell-positioned-slot")' in host and 'const maxInputCells = meter === "3/4" ? 3 : 4' in host and 'Math.min(maxInputCells, Math.max(1, renderedTotal || maxInputCells))' in host and 'openEditorAtPoint(inputLeft' in host and 'const sourceCell = hasVisibleSlot ? insertCell : startCell' in host and 'hidden: true' in host,
     "existing chord double-click opens its value": 'const clickedChord = event.target.closest?.(".chord")' in host and 'editChord(sourceIndex, clickedSlotIndex, clickedChordSlot)' in host,
     "new chord input divisions are capped at bar beats": 'const maxInputCells = meter === "3/4" ? 3 : 4' in host and 'Math.min(maxInputCells, Math.max(1, renderedTotal || maxInputCells))' in host,
