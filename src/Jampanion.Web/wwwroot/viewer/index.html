@@ -1,0 +1,6266 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f2ec">
+  <meta name="description" content="A locally runnable, self-contained viewer for iReal-format jazz chord charts.">
+  <title>Jampanion2 Viewer</title>
+  <style>
+/*
+  Base rules come first. Chart-specific feature overrides follow them, and the
+  responsive toolbar rules are kept together near the end of this stylesheet so
+  their breakpoint order is explicit.
+*/
+@font-face {
+  font-family: "MuseJazz Text";
+  src: local("MuseJazz Text"), local("MuseJazzText"),
+       url("assets/MuseJazzText.otf") format("opentype");
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --paper: #ffffff;
+  --ink: #151515;
+  --line: #242424;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+.app-shell {
+  height: 100dvh;
+  display: grid;
+}
+
+.toolbar {
+  z-index: 20;
+}
+
+.search-wrap {
+  position: relative;
+}
+
+#search {
+  width: 100%;
+  outline: none;
+}
+
+.search-options {
+  position: absolute;
+  left: 0;
+  overflow: auto;
+  background: white;
+  z-index: 50;
+}
+
+.search-options button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  display: grid;
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-options button:hover, .search-options button:focus {
+  background: #edf4f6;
+}
+
+.search-options strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty-option {
+  color: var(--muted);
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+}
+
+.compact-label {
+  text-transform: uppercase;
+}
+
+.icon-button, .text-button, .segmented button {
+  border: 1px solid #aaa69d;
+  cursor: pointer;
+}
+
+.icon-button {
+  font-weight: 700;
+}
+
+.key-value {
+  display: grid;
+  place-items: center;
+  border-block: 1px solid #aaa69d;
+  background: white;
+  font-family: "MuseJazz Text", "Comic Sans MS", cursive;
+  font-weight: 700;
+}
+
+.segmented {
+  display: flex;
+}
+
+.segmented button {
+  border-right: 0;
+}
+
+.segmented button:last-child {
+  border-right: 1px solid #aaa69d;
+}
+
+.segmented button.selected {
+  font-weight: 700;
+}
+
+#scale {
+  accent-color: var(--accent);
+}
+
+.text-button {
+  padding: 0 8px;
+}
+
+.utility {
+  font-size: 17px;
+}
+
+.chart-viewport {
+  position: relative;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.chart-scale-frame {
+  position: relative;
+  flex: 0 0 auto;
+  margin: 0 auto;
+}
+
+.chart-page {
+  width: 1120px;
+  min-height: 720px;
+  padding: 6px 18px 16px;
+  transform-origin: top left;
+  background: var(--paper);
+  font-family: "MuseJazz Text", "Comic Sans MS", "Segoe Print", cursive;
+}
+
+.score-header {
+  height: 42px;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 5px;
+  padding: 0 2px 3px;
+}
+
+.score-header h1 {
+  margin: 0;
+  text-align: center;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: .01em;
+}
+
+.score-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 18px;
+  line-height: 1.05;
+  padding-top: 4px;
+}
+
+.score-meta strong {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.score-meta span {
+  color: #343434;
+  font-size: 15px;
+}
+
+.score-meta-right {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.systems {
+  display: grid;
+  gap: 10px;
+}
+
+.system-row {
+  display: grid;
+  grid-template-columns: 43px minmax(0, 1fr);
+}
+
+.system-lead {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.rehearsal-mark {
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.time-signature {
+  position: absolute;
+  text-align: center;
+  font-family: "MuseJazz Text", cursive;
+}
+
+.bar-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--columns, 4), minmax(0, 1fr));
+  min-width: 0;
+}
+
+.bar {
+  position: relative;
+  min-width: 0;
+  min-height: 86px;
+  border-right: 2px solid var(--line);
+  display: grid;
+  grid-template-rows: 18px 1fr 14px;
+  align-items: center;
+  padding: 5px 10px 2px;
+}
+
+.bar:first-child:not(.spacer) {
+  border-left: 2px solid var(--line);
+}
+
+.bar.spacer {
+  border: 0;
+  background: transparent;
+}
+
+.bar.ending-spacer {
+  min-height: 86px;
+}
+
+.chords {
+  display: grid;
+  grid-template-columns: repeat(var(--chord-count, 1), minmax(0, 1fr));
+  width: 100%;
+  min-width: 0;
+}
+
+.chords-1 {
+  --chord-count: 1;
+}
+
+.chords-2 {
+  --chord-count: 2;
+}
+
+.chords-3 {
+  --chord-count: 3;
+}
+
+.chords-4 {
+  --chord-count: 4;
+}
+
+.chord {
+  min-width: 0;
+  padding-left: 1px;
+  font-size: 44px;
+  white-space: nowrap;
+  letter-spacing: -.025em;
+}
+
+/* Root, accidental and quality stay large. Per-slot JavaScript reduces the whole chord only when its measured width actually overflows. */
+
+.chord-root {
+  grid-row: 1;
+  font-size: 1em;
+}
+
+.chord-accidental {
+  grid-row: 1;
+  align-self: start;
+  margin: .005em 0 0 .02em;
+  font-size: 1em;
+  line-height: .82;
+}
+
+.chord-quality {
+  grid-row: 1;
+  align-self: baseline;
+  margin-left: .005em;
+  font-size: .68em;
+}
+
+.alternate-chords {
+  position: absolute;
+  z-index: 2;
+  top: -17px;
+  left: 10px;
+  right: 10px;
+  display: grid;
+  grid-template-columns: repeat(var(--alternate-count, 1), minmax(0, 1fr));
+  justify-items: start;
+  color: #777;
+  font-family: "MuseJazz Text", "Comic Sans MS", "Segoe Print", cursive;
+}
+
+.alternate-chords-1 {
+  --alternate-count: 1;
+}
+
+.alternate-chords-2 {
+  --alternate-count: 2;
+}
+
+.alternate-chords-3 {
+  --alternate-count: 3;
+}
+
+.alternate-chords-4 {
+  --alternate-count: 4;
+}
+
+.alternate-chord {
+  white-space: nowrap;
+}
+
+.repeat-glyph {
+  width: 100%;
+  justify-content: center;
+  padding-left: 0;
+  font-size: 34px;
+}
+
+.coda-marker {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.coda-glyph::before,
+.coda-glyph::after {
+  content: "";
+  position: absolute;
+  background: var(--line);
+}
+
+.bar-symbols {
+  position: relative;
+  height: 18px;
+  font-family: "MuseJazz Text", cursive;
+}
+
+.bar-symbols-left,
+.bar-symbols-right {
+  position: absolute;
+  top: 0;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.bar-symbols-right {
+  left: 6px;
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.bar.has-left-symbol .bar-symbols-right {
+  left: 40px;
+}
+
+.bar.repeat-end.has-right-symbol .bar-symbols-right,
+.bar.final-bar.has-right-symbol .bar-symbols-right {
+  right: 14px;
+}
+
+.directive {
+  display: inline-block;
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.0;
+  letter-spacing: -0.03em;
+  transform-origin: right top;
+}
+
+.music-symbol {
+  font-family: "Noto Music", "Bravura Text", serif;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.segno-symbol {
+  width: 28px;
+  height: 28px;
+}
+
+.segno-glyph {
+  width: 28px;
+  height: 28px;
+}
+
+.segno-glyph path {
+  fill: currentColor;
+  stroke: none;
+}
+
+.repeat-start {
+  border-left: 6px double var(--line) !important;
+}
+
+.repeat-end {
+  border-right: 6px double var(--line);
+}
+
+.repeat-dots {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.repeat-dots i {
+  display: block;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.double-start {
+  border-left: 4px double var(--line) !important;
+}
+
+.double-end {
+  border-right: 4px double var(--line);
+}
+
+.final-bar {
+  border-right: 6px double var(--line);
+}
+
+.ending-number {
+  position: absolute;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.ending-end::before {
+  position: absolute;
+  right: -2px;
+  top: -2px;
+  width: 2px;
+  height: 12px;
+  background: var(--line);
+}
+
+.font-notice {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 30;
+  padding: 8px 11px;
+  font: 12px/1.4 ui-sans-serif, system-ui, sans-serif;
+}
+
+.modal {
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+}
+
+.modal-card {
+  padding: 0;
+}
+
+.modal-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px;
+  border-bottom: 1px solid #ddd8cf;
+}
+
+.modal-card h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.modal-card h3 {
+  margin: 0 0 10px;
+}
+
+.modal-card section {
+  border-bottom: 1px solid #e5e1d9;
+}
+
+.modal-card footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.close-button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.settings-grid label {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-grid select {
+  border: 1px solid #aaa69d;
+  background: white;
+}
+
+.action-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.modal button, .file-label {
+  border: 1px solid #aaa69d;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.modal button.primary {
+  color: white;
+}
+
+.import-card p {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.import-card textarea {
+  width: calc(100% - 32px);
+  resize: vertical;
+  border: 1px solid #aaa69d;
+  padding: 9px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+
+.file-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.file-label input {
+  max-width: 240px;
+}
+
+.error-message {
+  min-height: 18px;
+}
+
+.chart-warning {
+  margin: 6px 0 10px;
+  padding: 7px 10px;
+  border: 1px solid #b79b42;
+  border-radius: 5px;
+  background: #fff7d8;
+  color: #5f4b0f;
+  font: 12px/1.4 ui-sans-serif, system-ui, sans-serif;
+}
+
+.system-lead {
+  z-index: 6;
+}
+
+.rehearsal-mark {
+  position: relative;
+  z-index: 7;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  background: var(--paper);
+  line-height: 1;
+}
+
+.chords {
+  position: relative;
+  height: 100%;
+  align-items: stretch;
+  justify-items: stretch;
+}
+
+.chord-slot {
+  position: relative;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 1px;
+}
+
+.alternate-stack {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: baseline;
+  color: #666;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.alternate-chord {
+  display: inline-flex;
+  align-items: baseline;
+  letter-spacing: -.02em;
+}
+
+.alternate-chords {
+  display: none !important;
+}
+
+.chord {
+  position: relative;
+}
+
+.chord.has-slash {
+  position: relative;
+}
+
+.slash-bass {
+  left: .68em;
+  top: .96em;
+}
+
+.bass-note {
+  font-size: 1em;
+}
+
+.bass-root {
+  font-size: 1em;
+}
+
+.bass-accidental {
+  align-self: flex-start;
+}
+
+/* Draw repeat barlines explicitly so ||: and :|| always contain both dots. */
+
+.bar.repeat-start {
+  border-left: 0 !important;
+  padding-left: 18px;
+}
+
+.bar.repeat-end {
+  border-right: 0 !important;
+  padding-right: 18px;
+}
+
+.repeat-barline {
+  position: absolute;
+  z-index: 5;
+  top: 5px;
+  bottom: 5px;
+  width: 10px;
+  pointer-events: none;
+}
+
+.repeat-barline-start {
+  left: 0;
+}
+
+.repeat-barline-end {
+  right: 0;
+}
+
+.repeat-barline i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: block;
+  background: var(--line);
+}
+
+.repeat-barline-start .repeat-thick {
+  left: 0;
+  width: 4px;
+}
+
+.repeat-barline-start .repeat-thin {
+  left: 7px;
+  width: 2px;
+}
+
+.repeat-barline-end .repeat-thin {
+  right: 7px;
+  width: 2px;
+}
+
+.repeat-barline-end .repeat-thick {
+  right: 0;
+  width: 4px;
+}
+
+.repeat-dots-start {
+  left: 12px;
+}
+
+.repeat-dots-end {
+  right: 12px;
+}
+
+.repeat-dots {
+  gap: 8px;
+}
+
+.repeat-dots i {
+  width: 5px;
+  height: 5px;
+}
+
+/* Volta brackets are open hooks: vertical at the start, horizontal on top. */
+
+.ending {
+  border-top: 2px solid var(--line);
+}
+
+.ending-start::before {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  width: 2px;
+  background: var(--line);
+}
+
+.ending-end::before {
+  content: none;
+}
+
+@media print {
+  .toolbar, .font-notice {
+    display: none !important;
+  }
+
+  html, body, .app-shell, .chart-viewport {
+    height: auto;
+    overflow: visible;
+  }
+
+  .app-shell {
+    display: block;
+  }
+
+  .chart-page {
+    transform: none !important;
+    width: 100%;
+    min-height: 0;
+  }
+
+  .chart-scale-frame {
+    width: auto !important;
+    height: auto !important;
+  }
+}
+
+/* Substitute chords float above their primary chord. They never move the primary chord down or change its size/baseline. */
+
+.view-mode-wrap {
+  flex: 0 0 auto;
+}
+
+.view-mode-group button.selected {
+  box-shadow: inset 0 0 0 1px rgb(31 95 116 / 18%);
+}
+
+.system-lead {
+  overflow: visible;
+}
+
+.time-signature {
+  display: inline-grid;
+  justify-items: center;
+  align-items: center;
+}
+
+.time-signature-number {
+  display: block;
+  min-width: 100%;
+  text-align: center;
+}
+
+.time-signature-rule {
+  display: block;
+  height: 2px;
+  background: var(--ink);
+}
+
+.bar,
+.chords,
+.chord-slot {
+  overflow: visible;
+}
+
+.chord {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  grid-template-rows: none;
+  grid-auto-flow: initial;
+  grid-auto-columns: initial;
+  line-height: .84;
+}
+
+.chord-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.chord-main {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.chord-quality {
+  line-height: .92;
+}
+
+.slash-bass {
+  position: static;
+  display: inline-flex;
+  align-items: flex-start;
+  margin-top: -.04em;
+  margin-left: .58em;
+  font-size: .64em;
+  line-height: .78;
+  letter-spacing: -.025em;
+  white-space: nowrap;
+}
+
+.slash-mark {
+  font-size: 1em;
+  line-height: .9;
+}
+
+.bass-note {
+  display: inline-flex;
+  align-items: flex-start;
+  line-height: .8;
+}
+
+.bass-accidental {
+  margin: -.04em 0 0 .015em;
+  font-size: 1em;
+  line-height: .82;
+}
+
+/* Keep the slash and bass root visually distinct without opening a large gap. */
+
+.slash-mark {
+  margin-right: .045em;
+}
+
+.bass-note {
+  margin-left: 0;
+}
+
+.chord-slot.has-alternate > .chord {
+  transform: none;
+}
+
+.alternate-stack {
+  font-size: 20px;
+  line-height: .82;
+}
+
+.alternate-chord {
+  font-size: 1em;
+}
+
+.ending {
+  padding-top: 10px;
+}
+
+.ending-start::before {
+  left: 8px;
+  top: 1px;
+  height: 14px;
+}
+
+.ending-spacer {
+  min-height: 92px;
+}
+
+.chord.repeat-glyph {
+  display: block;
+  width: 100%;
+  padding-left: 0;
+  text-align: center;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.bar.ending {
+  border-top: 0;
+}
+
+.bar.ending-start::after {
+  left: 0;
+}
+
+.bar.ending-end::before {
+  content: none;
+}
+
+.bar-grid {
+  overflow: visible;
+}
+
+@media (max-width: 620px) {
+  .chart-viewport {
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 3px 2px 8px;
+  }
+
+  .chart-page {
+    width: 760px;
+    min-height: 0;
+    padding: 4px 12px 14px;
+  }
+
+  .score-header {
+    height: 39px;
+    margin-bottom: 2px;
+    padding-bottom: 1px;
+    gap: 10px;
+  }
+
+  .score-header h1 {
+    font-size: 27px;
+  }
+
+  .score-meta {
+    font-size: 17px;
+    padding-top: 3px;
+  }
+
+  .score-meta strong {
+    font-size: 17px;
+  }
+
+  .systems {
+    gap: 8px;
+  }
+
+  .system-row {
+    grid-template-columns: 39px minmax(0, 1fr);
+    min-height: 88px;
+  }
+
+  .bar {
+    min-height: 88px;
+    padding-inline: 7px;
+  }
+
+  .bar.ending-spacer {
+    min-height: 88px;
+  }
+
+  .rehearsal-mark {
+    width: 23px;
+    height: 23px;
+    font-size: 15px;
+  }
+
+  .time-signature {
+    left: 0;
+    top: 29px;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.measure-repeat-sign {
+  position: relative;
+  display: inline-block;
+  width: 0.92em;
+  height: 1em;
+}
+
+.mrs-dot {
+  position: absolute;
+  width: 0.16em;
+  height: 0.16em;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.mrs-dot-top {
+  left: 0.14em;
+  top: 0.13em;
+}
+
+.mrs-dot-bottom {
+  right: 0.12em;
+  bottom: 0.13em;
+}
+
+.coda-glyph {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.coda-glyph::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 26px;
+  border: 2.5px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+}
+
+.coda-glyph::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(var(--line), var(--line)) center / 2.5px 34px no-repeat,
+    linear-gradient(var(--line), var(--line)) center / 28px 2.5px no-repeat;
+}
+
+:root {
+  --chrome: #f5f6f7;
+  --surface: #ffffff;
+  --surface-subtle: #f7f8f9;
+  --border: #d6d9dd;
+  --border-strong: #b9bec4;
+  --muted: #687078;
+  --accent: #1f6176;
+  --accent-soft: #e7f1f4;
+  --danger: #a22d34;
+  --control-height: 34px;
+}
+
+html, body {
+  background: #eef0f2;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 72%, white);
+  outline-offset: 2px;
+}
+
+.app-shell {
+  background: #eef0f2;
+}
+
+.toolbar {
+  grid-template-columns: minmax(300px, 1fr) auto;
+  backdrop-filter: blur(14px);
+}
+
+.toolbar-main,
+.toolbar-controls,
+.utility-group {
+  display: flex;
+  align-items: center;
+}
+
+.toolbar-main {
+  gap: 12px;
+}
+
+.app-identity {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #20262b;
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: -.01em;
+}
+
+.app-mark {
+  width: 25px;
+  height: 25px;
+  padding: 4px;
+  border-radius: 7px;
+  background: #20262b;
+  fill: none;
+  stroke: white;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.search-wrap {
+  flex: 1 1 360px;
+}
+
+.search-icon {
+  position: absolute;
+  z-index: 2;
+  left: 11px;
+  top: 50%;
+  width: 17px;
+  height: 17px;
+  transform: translateY(-50%);
+  fill: none;
+  stroke: #747b82;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+#search {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: #171b1f;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+#search::placeholder {
+  color: #858b91;
+}
+
+#search:hover {
+  border-color: #969da4;
+}
+
+#search:focus {
+  border-color: var(--accent);
+  background: white;
+  box-shadow: 0 0 0 3px rgb(31 97 118 / 14%);
+}
+
+.search-options {
+  max-height: min(520px, 64dvh);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  box-shadow: 0 18px 48px rgb(20 27 34 / 20%);
+  overscroll-behavior: contain;
+}
+
+.search-options button {
+  min-height: 50px;
+  grid-template-columns: minmax(0, 1fr) minmax(100px, auto);
+  align-items: center;
+  gap: 20px;
+  padding: 9px 12px;
+  border-bottom: 1px solid #eceef0;
+}
+
+.search-options button:first-child {
+  border-radius: 10px 10px 0 0;
+}
+
+.search-options button:last-child {
+  border-bottom: 0;
+  border-radius: 0 0 10px 10px;
+}
+
+.search-options button:hover,
+.search-options button:focus-visible {
+  background: var(--accent-soft);
+  outline: 0;
+}
+
+.search-options strong {
+  color: #15191d;
+  font-size: 14px;
+  font-weight: 680;
+  line-height: 1.25;
+}
+
+.search-options span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty-option {
+  padding: 18px 14px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.compact-label {
+  color: #6d747a;
+  font-weight: 750;
+}
+
+.icon-button,
+.text-button,
+.segmented button {
+  height: var(--control-height);
+  border-color: var(--border-strong);
+  background: var(--surface);
+  transition: background 110ms ease, border-color 110ms ease, color 110ms ease, transform 80ms ease;
+}
+
+.icon-button:hover,
+.text-button:hover,
+.segmented button:hover {
+  border-color: #8d949b;
+  background: var(--surface-subtle);
+}
+
+.icon-button:active,
+.text-button:active,
+.segmented button:active {
+  transform: translateY(1px);
+}
+
+.key-value {
+  height: var(--control-height);
+  border-color: var(--border-strong);
+}
+
+.key-group .icon-button:first-of-type {
+  border-radius: 7px 0 0 7px;
+}
+
+.key-group .icon-button:last-of-type {
+  border-radius: 0 7px 7px 0;
+}
+
+.segmented button {
+  color: #373d42;
+}
+
+.segmented button:first-child {
+  border-radius: 7px 0 0 7px;
+}
+
+.segmented button:last-child {
+  border-radius: 0 7px 7px 0;
+  border-right-color: var(--border-strong);
+}
+
+.segmented button.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: #184c5d;
+  box-shadow: none;
+}
+
+.text-button {
+  font-weight: 650;
+}
+
+.utility {
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.utility svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart-viewport {
+  background: #eef0f2;
+  padding: 12px;
+}
+
+.chart-page {
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgb(20 27 34 / 10%), 0 12px 34px rgb(20 27 34 / 8%);
+}
+
+.font-notice {
+  border: 1px solid #d7b75a;
+  border-radius: 8px;
+  background: #fff7dc;
+  box-shadow: 0 8px 24px rgb(20 27 34 / 12%);
+}
+
+.modal {
+  width: min(600px, calc(100vw - 28px));
+  border: 1px solid rgb(255 255 255 / 55%);
+  border-radius: 15px;
+  color: #1c2125;
+  background: white;
+  box-shadow: 0 28px 90px rgb(8 13 18 / 34%);
+}
+
+.modal::backdrop {
+  background: rgb(18 24 29 / 40%);
+  backdrop-filter: blur(5px);
+}
+
+.modal-card > .modal-header {
+  align-items: flex-start;
+  padding: 18px 20px 16px;
+  border-bottom-color: #e6e8ea;
+}
+
+.modal-header h2 {
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -.015em;
+}
+
+.modal-header p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.modal-card h3 {
+  margin-bottom: 12px;
+  color: #3e454b;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.modal-card section {
+  padding: 18px 0;
+  border-bottom-color: #e8eaec;
+}
+
+.modal-card section,
+.import-card > p,
+.import-card > textarea,
+.file-label,
+.error-message {
+  margin-inline: 20px;
+}
+
+.modal-card footer {
+  padding: 15px 20px 17px;
+}
+
+.close-button {
+  width: 34px;
+  height: 34px;
+  min-height: 34px !important;
+  display: grid;
+  place-items: center;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  color: #626970;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.close-button:hover {
+  background: #f0f2f3 !important;
+  color: #1f252a;
+}
+
+.settings-grid {
+  gap: 11px 16px;
+}
+
+.settings-grid label {
+  grid-template-columns: minmax(110px, 1fr) 128px;
+  color: #3c4349;
+  font-size: 13px;
+}
+
+.settings-grid select {
+  height: 36px;
+  padding-inline: 8px;
+  border-color: var(--border-strong);
+  border-radius: 8px;
+  color: #20262b;
+}
+
+.modal button,
+.file-label {
+  min-height: 36px;
+  border-color: var(--border-strong);
+  border-radius: 8px;
+  background: white;
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.modal button:hover,
+.file-label:hover {
+  border-color: #8d949b;
+  background: #f7f8f9;
+}
+
+.modal button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.modal button.primary:hover {
+  border-color: #184f61;
+  background: #184f61;
+}
+
+.modal button.danger {
+  border-color: #ddc1c4;
+  color: var(--danger);
+}
+
+.modal button.danger:hover {
+  border-color: #c98f95;
+  background: #fff6f6;
+}
+
+.import-card > p {
+  margin-top: 18px;
+  margin-bottom: 12px;
+  color: #4e565d;
+}
+
+.import-card textarea {
+  min-height: 164px;
+  border-color: var(--border-strong);
+  border-radius: 9px;
+  background: #fbfcfc;
+  line-height: 1.5;
+}
+
+.file-label {
+  margin-top: 12px;
+}
+
+.error-message {
+  margin-top: 9px;
+  margin-bottom: 0;
+  color: var(--danger);
+}
+
+@media (max-width: 620px) {
+  .app-identity {
+    display: none;
+  }
+
+  .search-options {
+    left: 0;
+    width: calc(100vw - 16px);
+    max-height: 55dvh;
+  }
+
+  .search-options button {
+    min-height: 48px;
+    grid-template-columns: minmax(0, 1fr) minmax(90px, 42%);
+    gap: 10px;
+  }
+
+  .view-mode-group button {
+    min-width: 58px;
+    padding-inline: 8px;
+  }
+
+  .chart-page {
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+@media print {
+  html,
+  body,
+  .app-shell,
+  .chart-viewport {
+    background: white;
+  }
+
+  .chart-page {
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+.bar.ending,
+.bar.ending-spacer {
+  margin-top: 10px;
+}
+
+.bar.ending {
+  padding-top: 6px;
+}
+
+.bar.ending::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  right: 0;
+  top: -12px;
+  height: 2px;
+  background: var(--line);
+}
+
+.bar.ending-start::before {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  left: 4px;
+  top: -12px;
+  width: 2px;
+  height: 12px;
+  background: var(--line);
+}
+
+.ending-number {
+  z-index: 6;
+  top: -13px;
+  left: 9px;
+  transform: none;
+  padding: 0 4px 0 2px;
+  background: var(--paper);
+}
+
+@media (max-width: 620px) {
+  .bar.ending,
+  .bar.ending-spacer {
+    margin-top: 12px;
+  }
+}
+
+.bar.ending-spacer + .bar:not(.spacer) {
+  border-left: 2px solid var(--line);
+}
+
+:root {
+  --compact-toolbar-height: 44px;
+  --compact-control-height: 30px;
+}
+
+.app-shell {
+  grid-template-rows: var(--compact-toolbar-height) minmax(0, 1fr);
+}
+
+.toolbar {
+  height: var(--compact-toolbar-height);
+  min-height: var(--compact-toolbar-height);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 7px;
+  border-bottom: 1px solid #cfd3d6;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 1px 5px rgb(20 27 34 / 7%);
+  white-space: nowrap;
+}
+
+.toolbar-main {
+  flex: 1 1 250px;
+  min-width: 130px;
+  max-width: 430px;
+}
+
+.toolbar-controls {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  overflow: visible;
+}
+
+.search-wrap {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+#search {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.search-options {
+  top: 36px;
+  width: min(480px, calc(100vw - 16px));
+}
+
+.toolbar-group {
+  min-height: var(--compact-control-height);
+  gap: 3px;
+}
+
+.compact-label {
+  display: inline;
+  font-size: 9px;
+  letter-spacing: .055em;
+}
+
+.icon-button,
+.text-button,
+.segmented button,
+.key-value {
+  height: var(--compact-control-height);
+}
+
+.icon-button {
+  min-width: 30px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-size: 15px;
+}
+
+.key-value {
+  min-width: 38px;
+  font-size: 17px;
+}
+
+.segmented button {
+  min-width: 29px;
+  padding: 0 6px;
+  border-radius: 0;
+  font-size: 12px;
+}
+
+.view-mode-group button {
+  min-width: 57px;
+  padding-inline: 7px;
+  font-size: 11px;
+}
+
+.scale-group {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+#scale {
+  width: 88px;
+}
+
+.text-button {
+  min-width: 43px;
+  padding-inline: 7px;
+  border-radius: 5px;
+  font-size: 11px;
+}
+
+.text-button.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: #184c5d;
+  font-weight: 750;
+  box-shadow: inset 0 0 0 1px rgb(31 97 118 / 16%);
+}
+
+.scale-group .text-button.selected::before {
+  content: "✓";
+  margin-right: 3px;
+  font-size: 10px;
+}
+
+.utility-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding-left: 0;
+}
+
+.chart-viewport {
+  padding-top: 6px;
+}
+
+.mobile-label {
+  display: none;
+}
+
+.bar.final-bar {
+  border-right: 0;
+}
+
+.final-barline {
+  position: absolute;
+  z-index: 5;
+  top: 5px;
+  right: 0;
+  bottom: 5px;
+  width: 11px;
+  pointer-events: none;
+}
+
+.final-barline i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: block;
+  background: var(--line);
+}
+
+.final-barline .final-thin {
+  right: 8px;
+  width: 2px;
+}
+
+.final-barline .final-thick {
+  right: 0;
+  width: 5px;
+}
+
+.bar-time-signature {
+  left: 6px;
+  top: 29px;
+  z-index: 4;
+  width: 20px;
+  font-size: 25px;
+}
+
+.bar-time-signature .time-signature-rule {
+  width: 17px;
+}
+
+.bar.has-time-signature .chords {
+  padding-left: 27px;
+}
+
+.search-options button.active,
+.search-options button[aria-selected="true"] {
+  background: var(--accent-soft, #edf4f6);
+}
+
+.font-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(420px, calc(100vw - 24px));
+}
+
+.font-notice[hidden] {
+  display: none !important;
+}
+
+.font-notice button {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  font: 18px/1 ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-notice button:hover,
+.font-notice button:focus-visible {
+  background: rgb(0 0 0 / 8%);
+}
+
+.field-label {
+  display: block;
+  margin: 0 20px 6px;
+  color: #3e454b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.about-section p {
+  margin: 7px 20px 0;
+  color: #4e565d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.about-section a {
+  color: var(--accent);
+}
+
+.help-button {
+  display: grid;
+  place-items: center;
+  color: inherit;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.time-signature {
+  left: 0;
+  grid-template-rows: auto 2px auto;
+  row-gap: 0;
+}
+
+.staff-directive {
+  transform-origin: left top;
+}
+
+.beat-repeat-sign {
+  display: inline-block;
+  font-weight: 700;
+}
+
+.bar.two-measure-repeat-start {
+  overflow: visible;
+}
+
+.two-measure-repeat-marker {
+  position: absolute;
+  z-index: 8;
+  top: 50%;
+  right: -27px;
+  width: 52px;
+  height: 44px;
+  display: inline-flex;
+  font-size: 42px;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.two-measure-repeat-marker .measure-repeat-sign {
+  transform: scale(.86);
+}
+
+.two-measure-repeat-count {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: "MuseJazz Text", cursive;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+@media (max-width: 620px) {
+  .time-signature {
+    top: 32px;
+    width: 24px;
+    font-size: 34px;
+  }
+}
+
+.key-group {
+  gap: 0;
+}
+
+.key-group .compact-label {
+  margin-right: 4px;
+}
+
+.key-group .key-value {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  border: 1px solid var(--border-strong, #aaa69d);
+  margin-inline: -1px;
+}
+
+.scale-group .text-button.selected::before {
+  content: none !important;
+  margin: 0 !important;
+}
+
+.system-row {
+  min-height: 92px;
+}
+
+.system-lead {
+  padding-top: 0;
+}
+
+.time-signature {
+  top: 34px;
+  width: 26px;
+  font-size: 38px;
+  line-height: .60;
+}
+
+.time-signature-rule {
+  width: 22px;
+}
+
+@media (max-width: 620px) {
+  .time-signature {
+    top: 34px;
+    width: 25px;
+    font-size: 35px;
+  }
+
+  .time-signature-rule {
+    width: 20px;
+  }
+}
+
+.chord-slot.has-alternate {
+  padding-top: 14px;
+}
+
+.chord-slot.has-multi-alternate {
+  padding-top: 18px;
+}
+
+.chord-slot.has-alternate-bass {
+  padding-top: 22px;
+}
+
+.alternate-stack {
+  top: -9px;
+  left: 3px;
+  right: 2px;
+  max-width: none;
+  gap: .22em;
+}
+
+.alternate-stack-inline {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.alternate-stack-beat-grid {
+  display: grid;
+  width: calc(100% - 5px);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  justify-items: start;
+  gap: 0;
+}
+
+.alternate-stack-beat-grid.alternate-stack-2 .alternate-at-1 {
+  grid-column: 1;
+}
+
+.alternate-stack-beat-grid.alternate-stack-2 .alternate-at-2 {
+  grid-column: 3;
+}
+
+.alternate-stack-beat-grid.alternate-stack-3 .alternate-at-1 {
+  grid-column: 1;
+}
+
+.alternate-stack-beat-grid.alternate-stack-3 .alternate-at-2 {
+  grid-column: 2;
+}
+
+.alternate-stack-beat-grid.alternate-stack-3 .alternate-at-3 {
+  grid-column: 3;
+}
+
+.alternate-stack-beat-grid.alternate-stack-4 .alternate-at-1 {
+  grid-column: 1;
+}
+
+.alternate-stack-beat-grid.alternate-stack-4 .alternate-at-2 {
+  grid-column: 2;
+}
+
+.alternate-stack-beat-grid.alternate-stack-4 .alternate-at-3 {
+  grid-column: 3;
+}
+
+.alternate-stack-beat-grid.alternate-stack-4 .alternate-at-4 {
+  grid-column: 4;
+}
+
+.alternate-stack-beat-grid .alternate-chord {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.alternate-chord {
+  line-height: .86;
+}
+
+.alternate-chord .slash-bass {
+  top: 1.00em;
+}
+
+.alternate-stack-with-bass .alternate-chord .slash-bass {
+  top: 1.04em;
+}
+
+.bar-symbols-center {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.fermata-symbol {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 17px;
+  color: var(--line);
+}
+
+.fermata-arc {
+  position: absolute;
+  left: 2px;
+  top: 0;
+  width: 24px;
+  height: 11px;
+  border: 3px solid currentColor;
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  box-sizing: border-box;
+}
+
+.fermata-dot {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translateX(-50%);
+}
+
+.chord-fermata {
+  position: absolute;
+  z-index: 8;
+  top: -23px;
+  left: 50%;
+  display: block;
+  width: 28px;
+  height: 17px;
+  font-size: 0;
+  line-height: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.chord-fermata > .fermata-symbol {
+  display: block;
+}
+
+.system-row.section-break {
+  margin-top: 18px;
+}
+
+.measure-repeat-sign,
+.beat-repeat-sign {
+  position: relative;
+  display: inline-block;
+  width: .92em;
+  height: 1em;
+  color: var(--line);
+}
+
+.repeat-slash {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: .12em;
+  height: 1.15em;
+  border-radius: .08em;
+  background: currentColor;
+  transform: translate(-50%, -50%) rotate(45deg);
+  transform-origin: center;
+}
+
+.beat-repeat-sign {
+  font-size: 1em;
+  line-height: 1;
+}
+
+.chords-beat-grid {
+  --chord-count: 4;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.chords-beat-grid .beat-slot-1 {
+  grid-column: 1;
+}
+
+.chords-beat-grid .beat-slot-2 {
+  grid-column: 2;
+}
+
+.chords-beat-grid .beat-slot-3 {
+  grid-column: 3 / span 2;
+}
+
+.chords-beat-grid .beat-slot-4 {
+  grid-column: 4;
+}
+
+.segno-glyph {
+  overflow: visible;
+}
+
+.segno-glyph .segno-s,
+.segno-glyph .segno-cut {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#accidentalGroup button[data-value="flat"],
+#accidentalGroup button[data-value="sharp"] {
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 500;
+  padding: 0;
+}
+
+.chord.repeat-glyph .beat-repeat-sign,
+.chord.repeat-glyph .measure-repeat-sign {
+  width: .92em;
+  height: 1em;
+  font-size: 1em;
+  line-height: 1;
+}
+
+.system-row.section-break-2 {
+  margin-top: 23px;
+}
+
+.system-row.section-break-3 {
+  margin-top: 31px;
+}
+
+.chords-cell-grid {
+  display: grid;
+}
+
+.chords-cell-grid .cell-positioned-slot {
+  min-width: 0;
+}
+
+.small-chord-slot > .chord {
+  font-size: 36px;
+}
+
+.small-chord-slot .alternate-chord {
+  font-size: 19px;
+}
+
+.invisible-root {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.invisible-root .slash-bass {
+  position: static;
+  display: inline-flex;
+  align-items: flex-start;
+  margin: 0;
+  font-size: 1em;
+  line-height: .84;
+}
+
+.invisible-root .slash-mark {
+  margin-right: .04em;
+}
+
+.bar-grid {
+  grid-template-columns: repeat(var(--columns, 4), minmax(0, 1fr)) !important;
+}
+
+.bar-symbols-left {
+  left: var(--left-symbol-offset, 1px);
+  top: -5px;
+  justify-content: flex-start;
+  gap: 7px;
+}
+
+.coda-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 30px;
+  color: var(--line);
+}
+
+.coda-glyph {
+  width: 26px;
+  height: 30px;
+  overflow: visible;
+}
+
+.coda-glyph ellipse,
+.coda-glyph path,
+.segno-glyph path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 6px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.segno-glyph circle {
+  fill: currentColor;
+  stroke: none;
+}
+
+.coda-inline {
+  width: 24px;
+  height: 28px;
+  vertical-align: top;
+}
+
+.coda-marker-start {
+  left: 5px;
+  top: -16px;
+}
+
+.coda-marker-end {
+  right: 6px;
+  top: -1px;
+}
+
+.segno-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--line);
+}
+
+#accidentalGroup button[data-value="flat"],
+#accidentalGroup button[data-value="sharp"] {
+  font-size: 24px;
+  line-height: .92;
+}
+
+.chords-cell-grid {
+  grid-template-columns: repeat(var(--cell-count, 32), minmax(0, 1fr));
+}
+
+.chords-cell-grid .measure-repeat-slot {
+  justify-content: center;
+  padding-left: 0;
+}
+
+.chords-cell-grid .measure-repeat-slot > .chord {
+  justify-self: center;
+}
+
+.ending-number {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.chords.has-alternate-layer .chord-slot {
+  padding-top: 18px;
+}
+
+.chords.has-alternate-bass .chord-slot {
+  padding-top: 30px;
+}
+
+.alternate-layer {
+  position: absolute;
+  z-index: 7;
+  top: -12px;
+  left: 1px;
+  right: 1px;
+  display: grid;
+  grid-template-columns: repeat(var(--cell-count, 32), minmax(0, 1fr));
+  align-items: start;
+  pointer-events: none;
+}
+
+.bar.ending.has-alternate-layer .alternate-layer {
+  top: 2px;
+}
+
+.bar.ending.has-alternate-layer .chord-slot {
+  padding-top: 29px;
+}
+
+.bar.ending.has-alternate-bass .chord-slot {
+  padding-top: 39px;
+}
+
+.alternate-cell {
+  min-width: 0;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: .14em;
+  overflow: visible;
+  white-space: nowrap;
+  color: #666;
+  font-family: "MuseJazz Text", "Comic Sans MS", "Segoe Print", cursive;
+  font-size: 25px;
+  line-height: .84;
+  letter-spacing: -.02em;
+}
+
+.alternate-cell .alternate-chord {
+  flex: 0 0 auto;
+  font-size: 1em;
+  line-height: .84;
+}
+
+.alternate-cell .chord-stack {
+  line-height: .84;
+}
+
+.alternate-cell .slash-bass {
+  margin-top: -.02em;
+  margin-left: .48em;
+  font-size: .68em;
+  line-height: .76;
+}
+
+.alternate-cell .bass-accidental {
+  margin-top: -.03em;
+}
+
+@media (max-width: 620px) {
+  .ending-number {
+    font-size: 17px;
+  }
+
+  .alternate-cell {
+    font-size: 23px;
+  }
+
+  .chords.has-alternate-layer .chord-slot {
+    padding-top: 17px;
+  }
+
+  .chords.has-alternate-bass .chord-slot {
+    padding-top: 28px;
+  }
+
+  .bar.ending.has-alternate-layer .chord-slot {
+    padding-top: 27px;
+  }
+
+  .bar.ending.has-alternate-bass .chord-slot {
+    padding-top: 37px;
+  }
+}
+
+/* Keep navigation/staff directives and alternate chords in separate vertical lanes. */
+
+.bar.has-alternate-layer.has-left-symbol,
+.bar.has-alternate-layer.has-right-symbol {
+  min-height: 128px;
+  grid-template-rows: 28px 1fr 14px;
+}
+
+.bar.has-alternate-layer.has-left-symbol .alternate-layer,
+.bar.has-alternate-layer.has-right-symbol .alternate-layer {
+  top: 5px;
+}
+
+.bar.has-alternate-layer.has-left-symbol .chord-slot,
+.bar.has-alternate-layer.has-right-symbol .chord-slot {
+  padding-top: 30px;
+}
+
+.bar.has-alternate-bass.has-left-symbol,
+.bar.has-alternate-bass.has-right-symbol {
+  min-height: 146px;
+}
+
+.bar.has-alternate-bass.has-left-symbol .chord-slot,
+.bar.has-alternate-bass.has-right-symbol .chord-slot {
+  padding-top: 43px;
+}
+
+.chart-page,
+.score-header,
+.score-header h1,
+.score-meta,
+.systems,
+.rehearsal-mark,
+.time-signature,
+.bar-symbols,
+.directive,
+.staff-directive,
+.ending-number,
+.two-measure-repeat-count,
+.chart-warning {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.chord,
+.alternate-cell,
+.alternate-chord {
+  font-family: "MuseJazz Text", "Comic Sans MS", "Segoe Print", cursive;
+}
+
+.bar-symbols-right {
+  right: var(--right-symbol-offset, 6px);
+  gap: 8px;
+}
+
+.bar.has-coda-end .bar-symbols-right {
+  right: var(--right-symbol-offset, 38px);
+}
+
+.segno-symbol,
+.segno-glyph {
+  width: 28px;
+  height: 30px;
+}
+
+.score-header h1 {
+  font-weight: 700;
+}
+
+.score-meta,
+.score-meta strong,
+.score-meta span,
+.rehearsal-mark,
+.time-signature,
+.bar-symbols,
+.directive,
+.staff-directive,
+.ending-number,
+.two-measure-repeat-count,
+.chart-warning {
+  font-weight: 400;
+}
+
+/* Keep the compact control row swipeable without taking space for a scrollbar. */
+.utility {
+  font-size: 21px;
+  line-height: 1;
+}
+
+.key-value {
+  line-height: 1;
+  padding-top: 2px;
+}
+
+.toolbar-controls-shell {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.toolbar-controls-shell::before,
+.toolbar-controls-shell::after {
+  content: "";
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.toolbar-controls-shell::before {
+  left: 0;
+  background: linear-gradient(90deg, rgb(255 255 255 / 96%), rgb(255 255 255 / 0%));
+}
+
+.toolbar-controls-shell::after {
+  right: 0;
+  background: linear-gradient(270deg, rgb(255 255 255 / 96%), rgb(255 255 255 / 0%));
+}
+
+.toolbar-controls-shell.can-scroll-left::before,
+.toolbar-controls-shell.can-scroll-right::after {
+  opacity: 1;
+}
+
+/* Responsive toolbar rules are kept together so the active value for each
+   breakpoint is easy to audit. These declarations preserve the existing
+   computed layout; obsolete intermediate grid overrides were removed. */
+
+@media (min-width: 821px) {
+  .toolbar-main {
+    flex: 1 1 260px;
+    min-width: 260px;
+  }
+
+  .toolbar-controls-shell {
+    flex: 0 0 auto;
+    min-width: max-content;
+  }
+
+  .toolbar-controls {
+    min-width: max-content;
+  }
+}
+
+@media (max-width: 1040px) {
+  :root {
+    --compact-toolbar-height: 76px;
+  }
+
+  .toolbar {
+    overflow: visible;
+    height: var(--compact-toolbar-height);
+    min-height: var(--compact-toolbar-height);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 32px 30px;
+    align-content: center;
+    gap: 4px;
+    padding: 5px 6px;
+  }
+
+  .app-identity span {
+    display: none;
+  }
+
+  .toolbar-main {
+    width: 100%;
+    max-width: none;
+    gap: 8px;
+  }
+
+  .toolbar-controls-shell {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .toolbar-controls {
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .toolbar-controls > * {
+    flex: 0 0 auto;
+  }
+
+  .toolbar-controls::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (min-width: 821px) and (max-width: 1040px) {
+  .toolbar-main,
+  .toolbar-controls-shell {
+    flex: none;
+  }
+
+  .toolbar-main {
+    min-width: 0;
+  }
+
+  .toolbar-controls-shell {
+    min-width: 0;
+  }
+
+  .toolbar-controls {
+    gap: 6px;
+  }
+
+  .scale-group {
+    flex: 0 0 auto;
+    min-width: max-content;
+  }
+
+  #scaleAuto {
+    flex: 0 0 auto;
+    display: inline-flex;
+    position: relative;
+    z-index: 5;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 820px) {
+  .toolbar-controls {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+
+  .toolbar-controls-shell {
+    flex: 0 1 auto;
+  }
+
+  .compact-label {
+    display: none;
+  }
+
+  .utility,
+  #settingsButton {
+    width: 36px;
+    min-width: 36px;
+    line-height: 1;
+  }
+
+  #scale {
+    width: 76px;
+  }
+}
+
+@media (max-width: 790px) {
+  .chart-viewport {
+    padding: 6px 4px 10px;
+  }
+}
+
+@media (max-width: 620px) {
+  #scale {
+    flex: 0 0 76px;
+    min-width: 76px;
+  }
+}
+
+@media (max-width: 520px) {
+  .toolbar {
+    gap: 4px;
+    padding-inline: 6px;
+  }
+
+  .search-wrap {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+  }
+
+  #search {
+    font-size: 16px;
+    width: 114.2857%;
+    transform: scale(.875);
+    transform-origin: left center;
+  }
+
+  .toolbar-controls {
+    gap: 5px;
+  }
+
+  .key-group .icon-button {
+    width: 32px;
+    min-width: 32px;
+    padding: 0;
+  }
+
+  .key-value {
+    width: 38px;
+    min-width: 38px;
+    padding-inline: 3px;
+    font-size: 14px;
+  }
+
+  #accidentalGroup button {
+    width: 32px;
+    min-width: 32px;
+    padding-inline: 0;
+  }
+
+  #accidentalGroup button:first-child {
+    position: relative;
+    width: 38px;
+    min-width: 38px;
+    overflow: hidden;
+    color: transparent;
+    font-size: 0;
+  }
+
+  #accidentalGroup button:first-child::after {
+    content: "A";
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #373d42;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .desktop-label {
+    display: none;
+  }
+
+  .mobile-label {
+    display: inline;
+  }
+
+  .view-mode-group button {
+    width: 50px;
+    min-width: 50px;
+    padding-inline: 5px;
+    font-size: 11px;
+  }
+
+  #scale {
+    width: 76px;
+    min-width: 76px;
+  }
+
+  .scale-group .text-button {
+    display: inline-block;
+    width: 40px;
+    min-width: 40px;
+    padding-inline: 4px;
+    font-size: 11px;
+  }
+
+  .utility,
+  #settingsButton {
+    width: 36px;
+    min-width: 36px;
+  }
+
+  .utility-group {
+    width: 27px;
+    min-width: 27px;
+  }
+
+  #accidentalGroup button[data-value="flat"],
+  #accidentalGroup button[data-value="sharp"] {
+    font-size: 22px;
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-grid label {
+    grid-template-columns: minmax(0, 1fr) 128px;
+  }
+
+  .action-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .file-label {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  #fullscreen {
+    display: none !important;
+  }
+}
+
+@media (max-width: 350px) {
+  .toolbar {
+    grid-template-rows: 32px 30px;
+  }
+
+  .scale-group {
+    width: 100%;
+  }
+}
+
+/* Let mobile Safari collapse its browser chrome when the chart is scrolled. */
+@media (max-width: 520px) {
+  html,
+  body {
+    height: auto;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-shell {
+    height: auto;
+    min-height: 100svh;
+    display: block;
+    padding-top: var(--compact-toolbar-height);
+  }
+
+  .toolbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+  }
+
+  .chart-viewport {
+    height: auto;
+    min-height: calc(100svh - var(--compact-toolbar-height) + 48px);
+    overflow: visible;
+    padding-bottom: calc(48px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Landscape phones/tablets have very little vertical space below Safari's chrome. */
+@media (orientation: landscape) and (max-height: 600px) and (hover: none) and (pointer: coarse) {
+  :root {
+    --compact-toolbar-height: 44px;
+  }
+
+  html,
+  body {
+    height: auto;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-shell {
+    height: auto;
+    min-height: 100svh;
+    display: block;
+    padding-top: var(--compact-toolbar-height);
+  }
+
+  .toolbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    overflow: visible;
+    scrollbar-width: none;
+    height: var(--compact-toolbar-height);
+    min-height: var(--compact-toolbar-height);
+    display: flex;
+    grid-template-columns: none;
+    grid-template-rows: none;
+    align-items: center;
+    gap: 5px;
+    padding: 4px calc(6px + env(safe-area-inset-right)) 4px calc(6px + env(safe-area-inset-left));
+  }
+
+  .toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .toolbar-main {
+    flex: 0 0 min(240px, 34vw);
+    width: auto;
+    min-width: 140px;
+    max-width: none;
+  }
+
+  #search {
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .toolbar-controls-shell {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* The shell supplies the viewport; the non-shrinking controls overflow inside it. */
+  .toolbar-controls {
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .toolbar-controls > * {
+    flex: 0 0 auto;
+  }
+
+  .toolbar-controls::-webkit-scrollbar {
+    display: none;
+  }
+
+  .chart-viewport {
+    min-height: calc(100svh - var(--compact-toolbar-height) + 48px);
+    height: auto;
+    overflow: visible;
+    padding-bottom: calc(48px + env(safe-area-inset-bottom));
+  }
+
+  #fullscreen {
+    display: none !important;
+  }
+}
+</style>
+  <link rel="icon" type="image/png" href="../icons/jampanion-viewer.png?v=33" />
+  <style data-jampanion-startup-guard="v1">html.jampanion-startup-pending .app-shell { visibility:hidden; }</style>
+  <script data-jampanion-startup-guard="v1">
+    document.documentElement.classList.add('jampanion-startup-pending');
+  </script>
+  <style data-jampanion-customized-songs-style="v1">
+    .action-row + .action-row { margin-top: 8px; }
+    .settings-hint { margin: 10px 0 0; color: #69767b; font-size: 12px; line-height: 1.4; }
+  </style>
+  <style data-jampanion-library-loading="v1">
+    body.jampanion-library-loading .toolbar-main { pointer-events: none; opacity: .72; }
+    .library-loading { display: grid; place-items: center; min-height: 220px; color: #53636a; font: 16px/1.4 system-ui, sans-serif; }
+    @media (max-width: 620px) { .library-loading { min-height: 180px; font-size: 14px; } }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="toolbar" aria-label="Chart controls">
+      <div class="toolbar-main">
+        <div class="search-wrap">
+          <input id="search" type="search" role="combobox" autocomplete="off" aria-label="Search songs" aria-autocomplete="list" aria-controls="searchOptions" aria-expanded="false" placeholder="Search songs">
+          <div id="searchOptions" class="search-options" role="listbox" hidden></div>
+        </div>
+      </div>
+
+      <div id="toolbarControlsShell" class="toolbar-controls-shell">
+        <div id="toolbarControls" class="toolbar-controls">
+        <div class="toolbar-group key-group" aria-label="Transpose">
+          <span class="compact-label">Key</span>
+          <button id="keyDown" class="icon-button" type="button" aria-label="Transpose down one semitone">−</button>
+          <output id="keyValue" class="key-value">Gm</output>
+          <button id="keyUp" class="icon-button" type="button" aria-label="Transpose up one semitone">+</button>
+        </div>
+
+        <div id="accidentalGroup" class="segmented notation-group" aria-label="Enharmonic spelling">
+          <button type="button" data-value="auto" class="selected">Auto</button>
+          <button type="button" data-value="flat" aria-label="Prefer flats">♭</button>
+          <button type="button" data-value="sharp" aria-label="Prefer sharps">♯</button>
+        </div>
+
+        <div class="toolbar-group view-mode-wrap">
+          <span class="compact-label">View</span>
+          <div id="viewModeGroup" class="segmented view-mode-group" aria-label="Repeat display mode">
+            <button type="button" data-value="original" class="selected" aria-pressed="true" title="Show repeats, endings, D.C., and D.S. as written"><span class="desktop-label">Original</span><span class="mobile-label">Orig.</span></button>
+            <button type="button" data-value="expanded" aria-pressed="false" title="Expand repeats and jumps into playback order"><span class="desktop-label">Expanded</span><span class="mobile-label">Exp.</span></button>
+          </div>
+        </div>
+
+        <div class="toolbar-group scale-group">
+          <span class="compact-label">Scale</span>
+          <input id="scale" type="range" min="70" max="140" step="5" value="100" aria-label="Chart scale">
+          <button id="scaleAuto" class="text-button" type="button" aria-pressed="true">Fit</button>
+        </div>
+
+        <div class="utility-group">
+          <button id="fullscreen" class="icon-button utility" type="button" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+          <a id="helpButton" class="icon-button utility help-button" href="./help.html?v=33" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
+          <button id="settingsButton" class="icon-button utility" type="button" title="Settings" aria-label="Settings">⚙︎</button>
+        </div>
+        </div>
+      </div>
+    </header>
+
+    <main id="chartViewport" class="chart-viewport">
+      <div id="fontNotice" class="font-notice" role="status" hidden><span>MuseJazz Text could not be loaded. The standard △ symbol is being used.</span><button id="fontNoticeClose" type="button" aria-label="Dismiss font notice">×</button></div>
+      <div id="chartScaleFrame" class="chart-scale-frame">
+        <article id="chartPage" class="chart-page" aria-live="polite"></article>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="settingsDialog" class="modal" aria-labelledby="settingsTitle">
+    <form method="dialog" class="modal-card">
+      <header class="modal-header">
+        <div>
+          <h2 id="settingsTitle">Settings</h2>
+          <p>Notation and song-library options</p>
+        </div>
+        <button id="settingsClose" class="close-button" value="cancel" aria-label="Close">×</button>
+      </header>
+      <section>
+        <h3>Chord notation</h3>
+        <div class="settings-grid">
+          <label>Major 7<select id="majorStyle"><option value="&#xE18A;">△7</option><option value="M">M7</option><option value="Maj">Maj7</option></select></label>
+          <label>Minor<select id="minorStyle"><option value="m">m</option><option value="−">−</option><option value="min">min</option></select></label>
+          <label>Half diminished<select id="halfDimStyle"><option value="&#xE18F;7">ø7</option><option value="m7♭5">m7♭5</option></select></label>
+          <label>Diminished 7<select id="dimStyle"><option value="&#xE18E;7">○7</option><option value="dim7">dim7</option></select></label>
+        </div>
+      </section>
+      <section>
+        <h3>Song library</h3>
+        <div class="action-row">
+          <button id="openImport" type="button" class="primary">Import iReal data</button>
+          <button id="deleteAll" type="button" class="danger">Delete all imported songs</button>
+        </div>
+        <div class="action-row">
+          <button id="deleteCustomized" type="button" class="danger">Revert all customized songs</button>
+        </div>
+        <p class="settings-hint" data-jampanion-customized-songs-layout="v2">Revert all customized songs restores their original imported state. Delete all imported songs removes the entire imported library.</p>
+      </section>
+      <section class="about-section">
+        <h3>About</h3>
+        <p>Jazz Chart Viewer is licensed under the MIT License. MuseJazz Text is loaded from a pinned MuseScore source under the SIL Open Font License 1.1, with a Unicode fallback when unavailable.</p>
+        <p><a href="./help.html?v=33" target="_blank" rel="noopener" lang="en">Help</a> · <a href="./help.en.html?v=33" target="_blank" rel="noopener" lang="en">English help</a></p>
+        <p><a href="./LICENSE" target="_blank" rel="noopener">Application license</a> · <a href="./THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Third-party notices</a></p>
+      </section>
+    </form>
+  </dialog>
+
+  <dialog id="importDialog" class="modal" aria-labelledby="importTitle">
+    <form method="dialog" class="modal-card import-card">
+      <header class="modal-header">
+        <div>
+          <h2 id="importTitle">Import iReal data</h2>
+          <p>Paste a shared link or choose a saved text or HTML file.</p>
+        </div>
+        <button id="importClose" class="close-button" value="cancel" aria-label="Close">×</button>
+      </header>
+      <p id="importHelp">Paste an <code>irealb://</code> or <code>irealbook://</code> string shared from iReal Pro, or select a saved text or HTML file.</p>
+      <label class="field-label" for="importText">iReal data</label>
+      <textarea id="importText" rows="8" spellcheck="false" aria-describedby="importHelp importError" placeholder="irealb://..."></textarea>
+      <label class="file-label">Choose a file<input id="importFile" type="file" accept=".txt,.html,.htm,text/plain,text/html"></label>
+      <p id="importError" class="error-message" role="alert"></p>
+      <footer><button value="cancel">Cancel</button><button id="importConfirm" type="button" class="primary">Import</button></footer>
+    </form>
+  </dialog>
+
+  <script>
+/* Jazz Chart Viewer v0.1.82 static bundle */
+
+const __names = (() => {
+'use strict';
+function displayComposer(value) {
+  const name = String(value || '').trim().replace(/\s+/g, ' ');
+  if (!name) return '';
+
+  const comma = name.indexOf(',');
+  if (comma >= 0) {
+    const family = name.slice(0, comma).trim();
+    const given = name.slice(comma + 1).trim();
+    return given ? `${given} ${family}` : family;
+  }
+
+  const parts = name.split(' ');
+  if (parts.length < 2) return name;
+  return `${parts.slice(1).join(' ')} ${parts[0]}`;
+}
+return { displayComposer };
+})();
+const { displayComposer } = __names;
+
+const __music = (() => {
+'use strict';
+const PITCHES = { Cb: 11, C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, 'E#': 5, Fb: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11, 'B#': 0 };
+const SHARP_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+const FLAT_NAMES = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
+const FLAT_KEYS = new Set(['F', 'B♭', 'E♭', 'A♭', 'D♭', 'G♭', 'C♭', 'Dm', 'Gm', 'Cm', 'Fm', 'B♭m', 'E♭m', 'A♭m']);
+
+function transposeKey(key, semitones, preference = 'auto', minorStyle = 'm') {
+  const parsed = parseKey(key);
+  if (!parsed) return key;
+  const index = mod(parsed.pitch + semitones, 12);
+  const useFlats = chooseFlats(preference, key, semitones, index);
+  const modeLabel = parsed.mode === 'm'
+    ? (minorStyle === '−' ? '−' : minorStyle === 'min' ? 'min' : 'm')
+    : '';
+  return (useFlats ? FLAT_NAMES[index] : SHARP_NAMES[index]) + modeLabel;
+}
+
+function formatChord(raw, semitones, preference, notation, songKey) {
+  if (raw === '%' || raw === '%%' || raw === 'N.C.' || raw === '/') return raw;
+  const invisible = String(raw).match(/^[Ww]\/([A-G])([#b]?)$/);
+  if (invisible) {
+    const bass = transposeNote(invisible[1] + invisible[2], semitones, preference, songKey);
+    return `/${bass}`;
+  }
+  const match = String(raw).match(/^([A-G])([#b]?)(.*?)(?:\/([A-G])([#b]?))?$/);
+  if (!match) return symboliseAccidentals(raw);
+  const [, rootLetter, rootAccidental, qualityRaw, bassLetter, bassAccidental] = match;
+  const root = transposeNote(rootLetter + rootAccidental, semitones, preference, songKey);
+  const bass = bassLetter ? transposeNote(bassLetter + bassAccidental, semitones, preference, songKey) : null;
+  const quality = formatQuality(qualityRaw, notation);
+  return `${root}${quality}${bass ? `/${bass}` : ''}`;
+}
+
+function formatQuality(raw, notation) {
+  if (!raw) return '';
+  let q = raw;
+  if (q.startsWith('^')) q = notation.major + q.slice(1);
+  else if (q.startsWith('-')) q = notation.minor + q.slice(1);
+  else if (q.startsWith('h')) {
+    const tail = q.slice(1);
+    q = tail === '7' || tail === '' ? notation.halfDim : `${notation.halfDim.replace(/7$/, '')}${tail}`;
+  } else if (q.startsWith('o')) {
+    const tail = q.slice(1);
+    const dimBase = notation.dim.replace(/7$/, '');
+    q = tail === '' ? dimBase : (tail === '7' ? notation.dim : `${dimBase}${tail}`);
+  }
+  // A caret denotes a major quality in iReal-style chord names. It can also
+  // occur after a minor marker, as in m^7 or -^7, so replace every remaining
+  // caret according to the selected Major 7 notation.
+  q = q.replace(/\^/g, notation.major);
+  return symboliseAccidentals(q);
+}
+
+function symboliseAccidentals(value) {
+  return String(value).replace(/b/g, '♭').replace(/#/g, '♯');
+}
+
+function transposeNote(note, semitones, preference, songKey) {
+  const ascii = note.replace('♭', 'b').replace('♯', '#');
+  // With Auto spelling and no transposition, preserve the chart author's
+  // exact enharmonic choice, including theoretical roots such as Cb, Fb,
+  // E#, and B#. This must happen before pitch lookup so the accidental is
+  // rendered as part of the root rather than misread as a chord alteration.
+  if (preference === 'auto' && mod(semitones, 12) === 0) return symboliseAccidentals(ascii);
+  const pitch = PITCHES[ascii];
+  if (pitch == null) return symboliseAccidentals(ascii);
+  const index = mod(pitch + semitones, 12);
+  const useFlats = chooseFlats(preference, songKey, semitones, index);
+  return (useFlats ? FLAT_NAMES : SHARP_NAMES)[index];
+}
+
+function chooseFlats(preference, key, semitones, targetPitch) {
+  if (preference === 'flat') return true;
+  if (preference === 'sharp') return false;
+
+  const parsed = parseKey(key);
+  if (parsed) {
+    const originalUsesFlats = FLAT_KEYS.has(normaliseKeyForChoice(key)) || String(key).includes('♭');
+    if (mod(semitones, 12) === 0) return originalUsesFlats;
+
+    if (parsed.mode === 'm') {
+      if ([3, 10].includes(targetPitch)) return true;
+      if ([1, 6].includes(targetPitch)) return false;
+      if (targetPitch === 8) return originalUsesFlats;
+    } else {
+      if ([1, 3, 8, 10].includes(targetPitch)) return true;
+      if (targetPitch === 6) return originalUsesFlats;
+    }
+  }
+  return [1, 3, 8, 10].includes(targetPitch);
+}
+
+function normaliseKeyForChoice(key) {
+  const parsed = parseKey(key);
+  if (!parsed) return String(key);
+  const name = (String(key).includes('♭') || /b/.test(String(key))) ? FLAT_NAMES[parsed.pitch] : SHARP_NAMES[parsed.pitch];
+  return name + parsed.mode;
+}
+
+function parseKey(key) {
+  const match = String(key).trim().replace('♭', 'b').replace('♯', '#').match(/^([A-G])([#b]?)(m|min|-|−)?$/i);
+  if (!match) return null;
+  const pitch = PITCHES[match[1].toUpperCase() + match[2]];
+  return pitch == null ? null : { pitch, mode: match[3] ? 'm' : '' };
+}
+
+function mod(value, base) { return ((value % base) + base) % base; }
+return { transposeKey, formatChord };
+})();
+const { transposeKey, formatChord } = __music;
+
+const __expand = (() => {
+'use strict';
+/**
+ * Convert a notated iReal chart into a linear, top-to-bottom play order.
+ *
+ * Explicit repeat barlines and numbered endings are expanded as they are
+ * encountered. D.C./D.S. directives are then executed in written source order;
+ * ordinary repeats are taken normally after each jump, To Coda is consumed on
+ * the final applicable repeat pass, and reading continues from the Coda so a
+ * later navigation directive can also be executed. The returned bars are fresh
+ * objects without repeat or volta navigation marks for straight-through display.
+ */
+function expandChartBars(sourceBars) {
+  const source = Array.isArray(sourceBars) ? sourceBars : [];
+  if (!source.length) return [];
+
+  const directives = findJumpDirectives(source);
+  // A To Coda/Coda pair without D.C. or D.S. is notation only. It must not be
+  // treated as a navigation jump in Expanded view: every written measure stays
+  // in place, while any ordinary repeat inside the Coda is still expanded.
+  if (!directives.length) return finishLinearBars(expandWrittenRepeats(source, 0));
+
+  const output = [];
+  let cursor = 0;
+  let consumedCodaNavigation = false;
+
+  for (const jump of directives) {
+    if (jump.index < cursor) continue;
+
+    const terminalIndex = findJumpTerminal(source, jump.index, jump.symbol);
+    if (terminalIndex >= cursor) {
+      output.push(...expandWrittenRepeats(source.slice(cursor, terminalIndex + 1), cursor));
+    }
+
+    const lower = jump.symbol.toLowerCase();
+    const jumpStart = lower.startsWith('d.s.') ? findSegno(source, jump.index) : 0;
+    const endingTarget = lower.match(/al\s+(\d+)(?:st|nd|rd|th)\s+end(?:ing|\.)?/i);
+
+    if (endingTarget) {
+      const targetEnding = Number(endingTarget[1]);
+      const independentCodaStart = findIndependentCodaAfterEndingDirective(
+        source, jumpStart, jump.index, terminalIndex
+      );
+      if (independentCodaStart >= 0) {
+        // Some charts direct the return to a numbered ending, omit To Coda,
+        // and place an independent Coda section after the printed directive.
+        // In that structure, complete the requested ending (Fine is not a stop
+        // unless the directive says al Fine), then continue at the Coda.
+        output.push(...pathToEnding(source, jumpStart, targetEnding));
+        cursor = independentCodaStart;
+      } else {
+        const endingPath = pathToEndingAndFine(source, jumpStart, targetEnding);
+        output.push(...endingPath);
+        // When the numbered ending is printed after the D.C./D.S. instruction,
+        // the ordinary tail pass would append that same ending a second time.
+        // Resume after the furthest source bar already emitted by the return
+        // path, while still respecting the instruction's written terminal.
+        const lastReturnedSource = endingPath.reduce((last, bar) =>
+          Math.max(last, Number.isInteger(bar._sourceIndex) ? bar._sourceIndex : -1), -1);
+        cursor = Math.max(terminalIndex + 1, lastReturnedSource + 1);
+      }
+      continue;
+    }
+
+    if (lower.includes('al coda')) {
+      const toCoda = findToCoda(source, jumpStart, jump.index);
+      // A Coda destination belongs after the instruction that sends the player
+      // there. Requiring that ordering prevents an earlier standalone Q marker
+      // from being mistaken for the destination.
+      const codaStart = source.findIndex((bar, index) => index > jump.index && bar.codaStart);
+      if (toCoda >= jumpStart) {
+        const preCodaEnd = codaStart > jump.index ? codaStart - 1 : jump.index;
+        output.push(...pathToCodaAfterRepeats(source, jumpStart, toCoda, preCodaEnd));
+      }
+      consumedCodaNavigation = true;
+      // Continue normal reading from the Coda destination. This permits a
+      // later D.C./D.S. instruction inside the Coda to be processed in order.
+      cursor = codaStart >= 0 ? codaStart : terminalIndex + 1;
+      continue;
+    }
+
+    if (lower.includes('al fine')) {
+      const fine = source.findIndex((bar, index) => index >= jumpStart && hasSymbol(bar, 'Fine'));
+      output.push(...(fine >= jumpStart
+        ? pathToIndex(source, jumpStart, fine)
+        : copyRange(source, jumpStart, source.length - 1)));
+      cursor = terminalIndex + 1;
+      continue;
+    }
+
+    const fine = source.findIndex((bar, index) => index >= jumpStart && hasSymbol(bar, 'Fine'));
+    const codaStart = source.findIndex((bar, index) => index > jump.index && bar.codaStart);
+    const stop = fine >= jumpStart ? fine : (codaStart > jumpStart ? codaStart - 1 : source.length - 1);
+    output.push(...pathToIndex(source, jumpStart, stop));
+    cursor = terminalIndex + 1;
+  }
+
+  if (cursor < source.length) {
+    output.push(...expandWrittenRepeats(source.slice(cursor), cursor));
+  }
+
+  return finishLinearBars(output, {
+    removeConsumedNavigation: true,
+    suppressCodaNavigation: consumedCodaNavigation
+  });
+}
+
+/**
+ * Derive the full span of each numbered ending. In iReal data N1/N2 marks only
+ * the first measure; the ending continues until the repeat close, double bar,
+ * final bar, or next structural section.
+ */
+function deriveEndingNumbers(bars) {
+  const result = new Array(bars.length).fill(null);
+  let active = null;
+
+  for (let i = 0; i < bars.length; i += 1) {
+    const bar = bars[i];
+    if (Number.isFinite(bar.ending)) active = Number(bar.ending);
+    if (active != null) result[i] = active;
+
+    const next = bars[i + 1];
+    const closesFirst = active === 1 && bar.endRepeat;
+    const closesLater = active > 1 && (
+      bar.endRepeat || bar.doubleEnd || bar.final ||
+      !next || Number.isFinite(next.ending) || next.section || next.doubleStart || next.systemBreak
+    );
+    const closesUnnumbered = active === 0 && (
+      bar.endRepeat || bar.doubleEnd || bar.final ||
+      !next || Number.isFinite(next.ending) || next.section || next.doubleStart || next.systemBreak
+    );
+    if (closesFirst || closesLater || closesUnnumbered) active = null;
+  }
+  return result;
+}
+
+function expandWrittenRepeats(bars, sourceOffset = 0) {
+  const analysis = analyseRepeatStructure(bars);
+  const endings = deriveEndingNumbers(bars);
+  const pairByStart = new Map(analysis.pairs.map((pair) => [pair.start, pair]));
+  return expandRepeatRange(bars, 0, bars.length - 1, sourceOffset, endings, pairByStart);
+}
+
+function analyseRepeatStructure(bars) {
+  const stack = [];
+  const pairs = [];
+  const unmatchedStarts = [];
+  const endings = deriveEndingNumbers(bars);
+  let implicitCursor = 0;
+
+  for (let index = 0; index < bars.length; index += 1) {
+    const bar = bars[index];
+    if (bar.startRepeat) stack.push(index);
+    if (!bar.endRepeat) continue;
+
+    if (stack.length) {
+      const start = stack.pop();
+      pairs.push({ start, end: index, implicit: false });
+      if (!stack.length) implicitCursor = index + 1;
+    } else if (endings[index] != null && endings[index] > 1) {
+      // A repeat close at the end of a second or later ending belongs to the
+      // preceding numbered-ending structure. It is not a new implicit repeat.
+      continue;
+    } else {
+      // A closing repeat without an opening sign conventionally repeats from
+      // the beginning of the current top-level segment.
+      pairs.push({ start: implicitCursor, end: index, implicit: true });
+      implicitCursor = index + 1;
+    }
+  }
+
+  unmatchedStarts.push(...stack);
+  pairs.sort((left, right) => left.start - right.start || right.end - left.end);
+
+  const warnings = [];
+  if (unmatchedStarts.length) {
+    warnings.push(`Unmatched opening repeat at bar${unmatchedStarts.length > 1 ? 's' : ''} ${unmatchedStarts.map((value) => value + 1).join(', ')}. Expanded view leaves the unresolved outer repeat unexpanded.`);
+  }
+
+  return { pairs, unmatchedStarts, warnings };
+}
+
+function expandRepeatRange(bars, start, end, sourceOffset, endings, pairByStart, ignoredStart = -1) {
+  const output = [];
+  let cursor = Math.max(0, start);
+
+  while (cursor <= end && cursor < bars.length) {
+    const pair = cursor === ignoredStart ? null : pairByStart.get(cursor);
+    if (pair && pair.end <= end) {
+      const expanded = expandRepeatPair(bars, pair, sourceOffset, endings, pairByStart);
+      output.push(...expanded.bars);
+      cursor = expanded.nextIndex;
+      continue;
+    }
+
+    output.push(cloneForLinear(bars[cursor], cursor + sourceOffset));
+    cursor += 1;
+  }
+  return output;
+}
+
+function expandRepeatPair(bars, pair, sourceOffset, endings, pairByStart) {
+  const { start, end } = pair;
+  const firstEndingStart = findEndingStart(endings, 1, start, end);
+
+  if (firstEndingStart < 0) {
+    const passCount = repeatPassCount(bars, start, end);
+    const output = [];
+    for (let pass = 0; pass < passCount; pass += 1) {
+      const passBars = expandRepeatRange(
+        bars, start, end, sourceOffset, endings, pairByStart, start
+      );
+      if (pass > 0) suppressRepeatedCodaMarkers(passBars);
+      output.push(...passBars);
+    }
+    return { bars: output, nextIndex: end + 1 };
+  }
+
+  const commonEnd = firstEndingStart - 1;
+  const common = () => expandRepeatRange(
+    bars, start, commonEnd, sourceOffset, endings, pairByStart, start
+  );
+  const firstEnding = expandRepeatRange(
+    bars, firstEndingStart, end, sourceOffset, endings, pairByStart
+  );
+  const output = [...common(), ...firstEnding];
+
+  let look = end + 1;
+  const laterEndings = [];
+  while (look < bars.length && endings[look] != null && endings[look] > 1) {
+    const number = endings[look];
+    const rangeStart = look;
+    while (look + 1 < bars.length && endings[look + 1] === number) look += 1;
+    laterEndings.push({ number, start: rangeStart, end: look });
+    look += 1;
+  }
+
+  if (laterEndings.length) {
+    laterEndings.forEach((range) => {
+      const passBars = [
+        ...common(),
+        ...expandRepeatRange(bars, range.start, range.end, sourceOffset, endings, pairByStart)
+      ];
+      suppressRepeatedCodaMarkers(passBars);
+      output.push(...passBars);
+    });
+    return { bars: output, nextIndex: look };
+  }
+
+  // Preserve the previous defensive behavior for malformed N1-only charts.
+  const fallback = expandRepeatRange(
+    bars, start, end, sourceOffset, endings, pairByStart, start
+  );
+  suppressRepeatedCodaMarkers(fallback);
+  output.push(...fallback);
+  return { bars: output, nextIndex: end + 1 };
+}
+
+function repeatPassCount(bars, start, end) {
+  for (let index = Math.min(end, bars.length - 1); index >= Math.max(0, start); index -= 1) {
+    const count = Number(bars[index]?.repeatCount);
+    if (Number.isFinite(count) && count >= 2) return count;
+  }
+  return 2;
+}
+
+function suppressRepeatedCodaMarkers(bars) {
+  for (const bar of bars) {
+    if (!bar.codaStart) continue;
+    // The repeated pass remains part of the same Coda section. Keep the first
+    // pass's Coda heading only, and remove layout metadata that would create a
+    // second section gap before the repeated copy.
+    bar.codaStart = false;
+    bar.symbols = (bar.symbols || []).filter((symbol) => symbol !== 'coda');
+    bar.section = null;
+    bar.systemBreak = false;
+    bar.verticalSpace = 0;
+  }
+}
+
+function pathToCodaAfterRepeats(source, start, target, preCodaEnd) {
+  const routeEnd = Math.max(target, Math.min(preCodaEnd, source.length - 1));
+  const route = expandWrittenRepeats(source.slice(start, routeEnd + 1), start);
+  let finalTargetPosition = -1;
+  for (let index = 0; index < route.length; index += 1) {
+    if (route[index]._sourceIndex === target) finalTargetPosition = index;
+  }
+  if (finalTargetPosition >= 0) return route.slice(0, finalTargetPosition + 1);
+  return pathToIndex(source, start, target);
+}
+
+function pathToEnding(source, start, targetEnding) {
+  const endings = deriveEndingNumbers(source);
+  const targetStart = findEndingStart(endings, targetEnding, start, source.length - 1);
+  if (targetStart < 0) return copyRange(source, start, source.length - 1);
+
+  let targetEnd = targetStart;
+  while (targetEnd + 1 < source.length && endings[targetEnd + 1] === targetEnding) targetEnd += 1;
+
+  let firstEndingStart = targetStart;
+  for (let i = targetStart - 1; i >= start; i -= 1) {
+    if (endings[i] === 1) firstEndingStart = i;
+    if (source[i].startRepeat) break;
+  }
+  if (firstEndingStart === targetStart) {
+    const priorFirst = findEndingStart(endings, 1, start, targetStart - 1);
+    if (priorFirst >= 0) firstEndingStart = priorFirst;
+  }
+
+  return [
+    ...copyRange(source, start, firstEndingStart - 1),
+    ...copyRange(source, targetStart, targetEnd)
+  ];
+}
+
+function pathToEndingAndFine(source, start, targetEnding) {
+  const endings = deriveEndingNumbers(source);
+  const targetStart = findEndingStart(endings, targetEnding, start, source.length - 1);
+  if (targetStart < 0) return copyRange(source, start, source.length - 1);
+
+  let targetEnd = targetStart;
+  while (targetEnd + 1 < source.length && endings[targetEnd + 1] === targetEnding) targetEnd += 1;
+
+  let firstEndingStart = targetStart;
+  for (let index = targetStart - 1; index >= start; index -= 1) {
+    if (endings[index] === 1) firstEndingStart = index;
+    if (source[index].startRepeat) break;
+  }
+  if (firstEndingStart === targetStart) {
+    const priorFirst = findEndingStart(endings, 1, start, targetStart - 1);
+    if (priorFirst >= 0) firstEndingStart = priorFirst;
+  }
+
+  const fine = source.findIndex((bar, index) => index >= targetStart && hasSymbol(bar, 'Fine'));
+  const targetStop = fine >= targetStart && fine <= targetEnd ? fine : targetEnd;
+  const output = [
+    ...copyRange(source, start, firstEndingStart - 1),
+    ...copyRange(source, targetStart, targetStop)
+  ];
+  if (fine < 0 || fine <= targetEnd) return output;
+
+  // After taking the requested ending, continue forward to Fine while skipping
+  // any mutually exclusive numbered endings encountered along the way.
+  for (let index = targetEnd + 1; index <= fine; index += 1) {
+    const ending = endings[index];
+    if (ending != null && ending > 0 && ending !== targetEnding) continue;
+    output.push(cloneForLinear(source[index], index));
+  }
+  return output;
+}
+
+function pathToIndex(source, start, target) {
+  const endings = deriveEndingNumbers(source);
+  const targetEnding = endings[target];
+  if (targetEnding && targetEnding > 1) {
+    const endingPath = pathToEnding(source, start, targetEnding);
+    return endingPath.filter((bar) => bar._sourceIndex <= target);
+  }
+
+  const output = [];
+  for (let i = start; i <= target && i < source.length; i += 1) {
+    // On a D.C./D.S. return, do not take a first ending when a later ending is
+    // available before the target. This matches standard navigation practice.
+    if (endings[i] === 1 && endings.slice(i + 1, target + 1).some((value) => value > 1)) continue;
+    output.push(cloneForLinear(source[i], i));
+  }
+  return output;
+}
+
+function findEndingStart(endings, number, start, end) {
+  for (let i = Math.max(0, start); i <= end && i < endings.length; i += 1) {
+    if (endings[i] === number) return i;
+  }
+  return -1;
+}
+
+function findJumpDirectives(bars) {
+  const found = [];
+  bars.forEach((bar, index) => {
+    const symbols = [
+      ...(bar.navigationSymbols || []),
+      ...(bar.symbols || [])
+    ].filter((value) => /^D\.[CS]\./i.test(value));
+    for (const symbol of symbols) found.push({ index, symbol });
+  });
+  return found;
+}
+
+function analyseNavigationStructure(bars) {
+  const directives = findJumpDirectives(bars);
+  const warnings = [];
+  for (const jump of directives) {
+    const lower = String(jump.symbol || '').toLowerCase();
+    const jumpStart = lower.startsWith('d.s.') ? findSegno(bars, jump.index) : 0;
+    if (!lower.includes('al coda')) continue;
+    const toCoda = findToCoda(bars, jumpStart, jump.index);
+    const codaStart = bars.findIndex((bar, index) => index > jump.index && bar.codaStart);
+    if (toCoda < jumpStart) {
+      warnings.push(`${jump.symbol} at bar ${jump.index + 1} has no To Coda between the jump start and the instruction.`);
+    }
+    if (codaStart < 0) {
+      warnings.push(`${jump.symbol} at bar ${jump.index + 1} has no Coda destination after the instruction.`);
+    }
+  }
+  return { directives, warnings };
+}
+
+function findJumpTerminal(bars, jumpIndex, jumpSymbol) {
+  const target = String(jumpSymbol || '').toLowerCase();
+  for (let i = Math.max(0, jumpIndex); i < bars.length; i += 1) {
+    if ((bars[i].displayDirectives || []).some((value) => String(value).toLowerCase() === target)) {
+      return i;
+    }
+  }
+  for (let i = jumpIndex; i < bars.length; i += 1) {
+    if (bars[i].final || bars[i].doubleEnd) return i;
+  }
+  return bars.length - 1;
+}
+
+function findSegno(bars, before) {
+  for (let i = Math.min(before, bars.length - 1); i >= 0; i -= 1) {
+    if (hasSymbol(bars[i], 'segno')) return i;
+  }
+  return 0;
+}
+
+function findToCoda(bars, start, before) {
+  for (let i = start; i <= Math.min(before, bars.length - 1); i += 1) {
+    if (bars[i].codaEnd || hasSymbol(bars[i], 'To Coda')) return i;
+  }
+  return -1;
+}
+
+function findIndependentCodaAfterEndingDirective(bars, start, jumpIndex, terminalIndex) {
+  if (findToCoda(bars, start, jumpIndex) >= start) return -1;
+  const after = Math.max(jumpIndex, terminalIndex);
+  return bars.findIndex((bar, index) => index > after && bar.codaStart);
+}
+
+function hasSymbol(bar, value) {
+  return (bar.symbols || []).some((symbol) => symbol.toLowerCase() === value.toLowerCase());
+}
+
+function copyRange(bars, start, end, sourceOffset = 0) {
+  if (end < start) return [];
+  const output = [];
+  for (let i = Math.max(0, start); i <= end && i < bars.length; i += 1) {
+    output.push(cloneForLinear(bars[i], i + sourceOffset));
+  }
+  return output;
+}
+
+function cloneForLinear(bar, sourceIndex) {
+  return {
+    ...bar,
+    chords: [...(bar.chords || [])],
+    chordSlots: (bar.chordSlots || []).map((slot) => ({
+      ...slot,
+      alternates: (slot.alternates || []).map((alternate) => typeof alternate === 'string' ? alternate : { ...alternate })
+    })),
+    alternateChords: [...(bar.alternateChords || [])],
+    // D.C./D.S. directives are consumed by linearisation. To Coda is kept
+    // here and removed later only when an actual "al Coda" jump is expanded.
+    symbols: (bar.symbols || []).filter((symbol) => !/^D\.[CS]\./i.test(symbol)),
+    navigationSymbols: [],
+    displayDirectives: [],
+    texts: [...(bar.texts || [])],
+    // Expanded notation removes repeat dots, but the former repeat
+    // boundaries still mark structural divisions and must remain double bars.
+    doubleStart: Boolean(bar.doubleStart || bar.startRepeat),
+    doubleEnd: Boolean(bar.doubleEnd || bar.endRepeat),
+    startRepeat: false,
+    endRepeat: false,
+    ending: null,
+    endingStart: false,
+    endingEnd: false,
+    endMarkerSource: Boolean(bar.endMarker || bar.endMarkerSource),
+    _sourceIndex: sourceIndex
+  };
+}
+
+
+function finishLinearBars(
+  bars,
+  {
+    removeConsumedNavigation = false,
+    suppressCodaNavigation = false
+  } = {}
+) {
+  const result = bars.map((bar) => ({
+    ...bar,
+    symbols: [...(bar.symbols || [])],
+    chords: [...(bar.chords || [])],
+    chordSlots: (bar.chordSlots || []).map((slot) => ({
+      ...slot,
+      alternates: (slot.alternates || []).map((alternate) => typeof alternate === 'string' ? alternate : { ...alternate })
+    })),
+    alternateChords: [...(bar.alternateChords || [])]
+  }));
+
+  for (let i = 0; i < result.length; i += 1) {
+    const bar = result[i];
+    const fineSharesEnd = Boolean(
+      removeConsumedNavigation &&
+      bar.endMarker &&
+      (bar.symbols || []).some((symbol) => /^fine$/i.test(symbol))
+    );
+    if (fineSharesEnd) bar.suppressEndMarker = true;
+
+    // Repeat-count staff text has already been consumed by linearisation.
+    bar.symbols = bar.symbols.filter((symbol) => !/^\d+x$/i.test(symbol));
+    bar.repeatCount = null;
+
+    // Fine and Segno are removed only when a D.C./D.S. route has actually
+    // been converted into linear order. Standalone To Coda/Coda marks remain
+    // visible because no navigation route consumes them.
+    if (removeConsumedNavigation) {
+      bar.symbols = bar.symbols.filter((symbol) =>
+        !/^fine$/i.test(symbol) &&
+        !/^segno$/i.test(symbol) &&
+        !(suppressCodaNavigation && /^to coda$/i.test(symbol))
+      );
+    }
+
+    // The departure mark has been consumed by the linear jump, but the Coda
+    // destination remains meaningful as a visible section heading in Expanded
+    // view. This applies whether or not the route to To Coda contained repeats.
+    if (suppressCodaNavigation && bar.codaEnd) {
+      bar.codaEnd = false;
+      bar.symbols = bar.symbols.filter((symbol) => symbol !== 'coda');
+    }
+
+    bar.final = false;
+  }
+  // An END marker inside an ordinary repeat is a last-chorus instruction.
+  // Keep its source bar in every expanded pass, but display End only on the
+  // final occurrence reached by the linear route.
+  retainFinalEndMarkerOccurrences(result);
+  // A standalone Fine inside an ordinary repeat is a visual ending marker,
+  // not a navigation destination. Keep it only on the final occurrence.
+  // Fine consumed by D.C./D.S. remains hidden; when that bar also has End,
+  // the functional stop is consumed as well, so neither marker is shown.
+  if (!removeConsumedNavigation) retainFinalFineOccurrences(result);
+  else result.forEach((bar) => {
+    if (bar.suppressEndMarker) bar.endMarker = false;
+  });
+  if (result.length) result[result.length - 1].final = true;
+
+  return result;
+}
+
+function retainFinalFineOccurrences(bars) {
+  const lastBySource = new Map();
+  bars.forEach((bar, index) => {
+    if (!(bar.symbols || []).some((symbol) => /^fine$/i.test(symbol))) return;
+    const sourceIndex = Number.isInteger(bar._sourceIndex) ? bar._sourceIndex : index;
+    lastBySource.set(sourceIndex, index);
+  });
+
+  bars.forEach((bar, index) => {
+    if (!(bar.symbols || []).some((symbol) => /^fine$/i.test(symbol))) return;
+    const sourceIndex = Number.isInteger(bar._sourceIndex) ? bar._sourceIndex : index;
+    if (lastBySource.get(sourceIndex) !== index) {
+      bar.symbols = bar.symbols.filter((symbol) => !/^fine$/i.test(symbol));
+    }
+  });
+}
+
+function retainFinalEndMarkerOccurrences(bars) {
+  const lastBySource = new Map();
+  bars.forEach((bar, index) => {
+    if (!bar.endMarker && !bar.endMarkerSource) return;
+    bar.endMarkerSource = true;
+    if (!bar.endMarker) return;
+    const sourceIndex = Number.isInteger(bar._sourceIndex) ? bar._sourceIndex : index;
+    lastBySource.set(sourceIndex, index);
+  });
+
+  bars.forEach((bar, index) => {
+    if (!bar.endMarker) return;
+    const sourceIndex = Number.isInteger(bar._sourceIndex) ? bar._sourceIndex : index;
+    if (lastBySource.get(sourceIndex) !== index) bar.endMarker = false;
+  });
+}
+return { expandChartBars, deriveEndingNumbers, analyseRepeatStructure, analyseNavigationStructure };
+})();
+const { expandChartBars, deriveEndingNumbers, analyseRepeatStructure, analyseNavigationStructure } = __expand;
+
+const __ireal = (() => {
+'use strict';
+const MUSIC_PREFIX = '1r34LbKcu7';
+const MAX_INPUT_BYTES = 4 * 1024 * 1024;
+
+function extractIRealUrl(input) {
+  const text = String(input ?? '').trim();
+  // A directly pasted iReal string may legally contain unescaped spaces in
+  // titles and composer names. Keep the complete value instead of truncating
+  // it at the first space. When reading HTML, continue to extract the compact
+  // URL from the surrounding markup.
+  if (/^(?:irealb|irealbook):\/\//i.test(text)) return text.split(/\r?\n/, 1)[0].trim();
+  const match = text.match(/(?:irealb|irealbook):\/\/[^"'<>\r\n]+/i);
+  return match ? match[0].trim() : text;
+}
+
+function parseIRealCollection(input) {
+  const url = extractIRealUrl(input);
+  if (url.length > MAX_INPUT_BYTES) throw new Error('The imported data is too large.');
+  const prefix = url.startsWith('irealb://')
+    ? 'irealb://'
+    : url.startsWith('irealbook://')
+      ? 'irealbook://'
+      : null;
+  if (!prefix) throw new Error('Paste data beginning with irealb:// or irealbook://.');
+
+  let decoded;
+  try {
+    decoded = decodeURIComponent(url.slice(prefix.length));
+  } catch {
+    throw new Error('The URL encoding is invalid.');
+  }
+
+  let playlistName = null;
+  let songBodies = [];
+
+  if (prefix === 'irealbook://' && !decoded.includes('===')) {
+    // The documented legacy format is six '='-separated fields per song.
+    // Preserve empty metadata fields; dropping them shifts the progression into
+    // the wrong field. A trailing field after a whole number of six-field songs
+    // is treated as the playlist name.
+    const fields = decoded.split('=');
+    const usable = fields.length % 6 === 1 ? fields.length - 1 : fields.length;
+    if (usable >= 6 && usable % 6 === 0) {
+      for (let index = 0; index < usable; index += 6) {
+        songBodies.push(fields.slice(index, index + 6).join('='));
+      }
+      if (fields.length > usable) playlistName = fields.at(-1)?.trim() || null;
+    } else {
+      songBodies = [decoded];
+    }
+  } else {
+    const parts = decoded.split('===');
+    if (parts.length > 1) playlistName = parts.pop()?.trim() || null;
+    songBodies = parts.map((part) => part.trim()).filter(Boolean);
+  }
+
+  const songs = songBodies.map((body) => parseSongBody(body, prefix));
+  if (!songs.length) throw new Error('No songs were found.');
+  return { name: playlistName, songs };
+}
+
+function createSongId() {
+  const webCrypto = globalThis.crypto;
+  if (typeof webCrypto?.randomUUID === 'function') return webCrypto.randomUUID();
+
+  if (typeof webCrypto?.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    webCrypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
+  // Song IDs are local record keys, not security tokens. This final fallback
+  // keeps imports working in older or unusually restricted browser contexts.
+  return `jcv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function parseSongBody(body, protocol = 'irealb://') {
+  const fields = body.split('=');
+  let title = fields[0] || '';
+  let composer = fields[1] || '';
+  let style = fields[2] || '';
+  let key = fields[3] || 'C';
+  let music = '';
+  let timeSignature = '4/4';
+
+  const modernMusicIndex = fields.findIndex((field) => field.startsWith(MUSIC_PREFIX));
+  if (modernMusicIndex >= 0) {
+    // Current irealb:// exports place an empty metadata field after composer,
+    // then style, key, another unused field, and finally the encoded music.
+    // Resolve metadata relative to the music field instead of assuming the
+    // legacy six-field irealbook:// positions.
+    if (modernMusicIndex >= 3) {
+      style = fields[modernMusicIndex - 3] || style;
+      key = fields[modernMusicIndex - 2] || key;
+    }
+    music = unscramble(fields[modernMusicIndex].slice(MUSIC_PREFIX.length));
+  } else if (fields.length >= 6) {
+    // Official irealbook:// format: title, composer, style, key, unused 'n', progression.
+    music = fields[5] || '';
+  } else {
+    throw new Error(`The number of fields in the iReal data could not be interpreted (${fields.length}).`);
+  }
+
+  if (!music) throw new Error('The chart data could not be recognized.');
+  const chart = parseChart(music, timeSignature);
+  return {
+    id: createSongId(),
+    title: title.trim() || 'Untitled',
+    composer: composer.trim(),
+    style: style.trim(),
+    key: normaliseKey(key),
+    timeSignature: chart.timeSignature,
+    bars: chart.bars,
+    warnings: chart.warnings,
+    importedAt: Date.now(),
+    source: 'ireal',
+    sourceRecord: { protocol, body },
+    parserVersion: 18
+  };
+}
+
+function unscramble(input) {
+  let source = Array.from(String(input));
+  let output = [];
+  while (source.length > 50) {
+    const chunk = source.slice(0, 50);
+    source = source.slice(50);
+    output = output.concat(source.length < 2 ? chunk : obfusc50(chunk));
+  }
+  return output.concat(source).join('');
+}
+
+function obfusc50(chars) {
+  const out = chars.slice();
+  for (let i = 0; i < 5; i += 1) {
+    out[49 - i] = chars[i];
+    out[i] = chars[49 - i];
+  }
+  for (let i = 10; i < 24; i += 1) {
+    out[49 - i] = chars[i];
+    out[i] = chars[49 - i];
+  }
+  return out;
+}
+
+const PROTOCOL_QUALITIES = [
+  '7susb9b13','7susadd3','7(add13)','maj13#11','7b9b13','7b9#11','7#9#11','7#9#5','7#9b5',
+  '7b9b5','7b9#5','7b9#9','13#11','7b13sus','7b9sus','min(add4)','maj(add4)','min9b6','min7b6',
+  'min^13','min^11','7susb13','7susb9','7b9sus','7b13sus','7b9b13','7b9#11','7#9#11','7alt',
+  '^13#11','^9#11','^7#11','^7#5','^7b5','^7#9','-^13','-^11','-^9','-^7','-add11','-add9','-add4','-add2',
+  'min13','maj13','maj9','maj7#9','maj7b5','maj7','min11','min9','min7','min6','min',
+  'madd11','madd9','madd4','madd2','m7b5','m11','m9','m7','m6','m#5','m+5','m^','m',
+  'dim7','dim','aug','sus7','sus4','sus2','add11','add9','add6','add4','add2','13sus','9sus','7sus4','7sus',
+  '13b9','13#9','13','11','9#11','9b5','9#5','9+','+9','9','7b13','7#11','7b5','7#5','7+','+7',
+  '7b9','7#9','7','h9','h7','h','o^7','o^','o7','o','-69','-11','-9','-7b5','-7b6','-b6','-#5','-+5','-7','-6','-',
+  '^13','^9','^7','-^','^+','^#5','^b5','^#11','^','69','6','5','2','+','sus','alt',''
+].filter((value, index, list) => list.indexOf(value) === index)
+  .sort((a, b) => b.length - a.length);
+
+function normaliseChordQuality(quality) {
+  const exact = {
+    m: '-', min: '-', m6: '-6', min6: '-6', m7: '-7', min7: '-7', m9: '-9', min9: '-9',
+    m11: '-11', min11: '-11', m13: '-13', min13: '-13', 'm#5': '-#5', 'm+5': '-#5',
+    'm^': '-^7', '-^': '-^7', madd2: '-add2', madd4: '-add4', madd11: '-add11', madd9: '-add9',
+    '-add2': '-add2', '-add4': '-add4', '-add9': '-add9', '-add11': '-add11',
+    'm7b5': 'h7', '-7b5': 'h7', h: 'h7', dim: 'o', dim7: 'o7', 'o^': 'o^7',
+    aug: '+', alt: '7alt', add6: 'add6', add9: 'add9',
+    maj7: '^7', maj9: '^9', maj13: '^13', '^+': '^7#5', '^#5': '^7#5', '^b5': '^7b5', '^#11': '^7#11',
+    sus4: 'sus', sus7: '7sus', '7sus4': '7sus', '+7': '7#5', '7+': '7#5', '+9': '9#5', '9+': '9#5'
+  };
+  if (Object.prototype.hasOwnProperty.call(exact, quality)) return exact[quality];
+  if (quality.startsWith('min^')) return `-^${quality.slice(4)}`;
+  if (quality.startsWith('min') && quality !== 'min(add4)') return `-${quality.slice(3)}`;
+  if (quality.startsWith('maj13')) return `^13${quality.slice(5)}`;
+  if (quality.startsWith('maj9')) return `^9${quality.slice(4)}`;
+  if (quality.startsWith('maj7')) return `^7${quality.slice(4)}`;
+  if (quality === 'min(add4)') return '-(add4)';
+  return quality;
+}
+
+function isChordBoundaryAt(input, index) {
+  const rest = String(input).slice(index);
+  if (!rest) return true;
+  if (/^[\s,()|\[\]{}Z*<>TYNSQfUxrpnslK]/.test(rest)) return true;
+  return rest.startsWith('XyQ') || rest.startsWith('QyX') ||
+    rest.startsWith('LZ') || rest.startsWith('Kcl');
+}
+
+function scanChordToken(input) {
+  const rootMatch = String(input).match(/^([A-G](?:[#b])?|[Ww])/);
+  if (!rootMatch) return null;
+  const root = rootMatch[1];
+  let offset = root.length;
+
+  if (/^[Ww]$/.test(root)) {
+    const bass = input.slice(offset).match(/^\/([A-G](?:[#b])?)/);
+    if (!bass || !isChordBoundaryAt(input, offset + bass[0].length)) return null;
+    return { value: `W/${bass[1]}`, length: offset + bass[0].length };
+  }
+
+  for (const quality of PROTOCOL_QUALITIES) {
+    if (!input.startsWith(quality, offset)) continue;
+    let cursor = offset + quality.length;
+    let inversion = '';
+    const bass = input.slice(cursor).match(/^\/([A-G](?:[#b])?)/);
+    if (bass) {
+      inversion = `/${bass[1]}`;
+      cursor += bass[0].length;
+    }
+    if (!isChordBoundaryAt(input, cursor)) continue;
+    return {
+      value: `${root}${normaliseChordQuality(quality)}${inversion}`,
+      length: cursor
+    };
+  }
+  return null;
+}
+
+function scanLegacyStarChord(input) {
+  const match = String(input).match(/^([A-G](?:[#b])?)\*([^*]+)\*/);
+  if (!match) return null;
+  const aliases = {
+    '-^': '-^7',
+    '7us': '7sus'
+  };
+  const quality = aliases[match[2]];
+  if (!quality) return null;
+  return {
+    value: `${match[1]}${quality}`,
+    length: match[0].length,
+    original: match[0]
+  };
+}
+
+function scanAlternateChord(input) {
+  if (!input.startsWith('(')) return null;
+  let depth = 0;
+  for (let index = 0; index < input.length; index += 1) {
+    if (input[index] === '(') depth += 1;
+    else if (input[index] === ')') {
+      depth -= 1;
+      if (depth === 0) {
+        const inside = input.slice(1, index);
+        const chord = scanLegacyStarChord(inside) || scanChordToken(inside);
+        if (chord && chord.length === inside.length) {
+          return { value: chord.value, length: index + 1, legacy: chord.original || null };
+        }
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+function decodeMeterToken(packed) {
+  if (packed === '12') return '12/8';
+  return packed.length === 2
+    ? `${packed[0]}/${packed[1]}`
+    : `${packed.slice(0, -1)}/${packed.at(-1)}`;
+}
+
+function hasHarmonyBeforeBarBoundary(raw, startIndex) {
+  let cursor = Math.max(0, startIndex);
+  while (cursor < raw.length) {
+    const rest = raw.slice(cursor);
+    const whitespace = rest.match(/^\s+/);
+    if (whitespace) { cursor += whitespace[0].length; continue; }
+    if (rest.startsWith('XyQ')) { cursor += 3; continue; }
+    if (rest.startsWith('Kcl')) return true;
+    if (/^[,slfU]/.test(rest)) { cursor += 1; continue; }
+    const comment = rest.match(/^<[^>]*>/);
+    if (comment) { cursor += comment[0].length; continue; }
+    const section = rest.match(/^\*[A-Za-z0-9]/);
+    if (section) { cursor += section[0].length; continue; }
+    const meter = rest.match(/^T\d{2,3}/);
+    if (meter) { cursor += meter[0].length; continue; }
+    if (/^[|\]\[{}ZY]/.test(rest)) return false;
+    if (/^[xrpn]/.test(rest)) return true;
+    if (scanAlternateChord(rest) || scanLegacyStarChord(rest) || scanChordToken(rest)) return true;
+    return false;
+  }
+  return false;
+}
+
+function parseChart(raw, initialTimeSignature = '4/4') {
+  const bars = [];
+  let current = newBar();
+  let i = 0;
+  let timeSignature = initialTimeSignature || '4/4';
+  let pendingTimeSignature = null;
+  let lastChordSlot = null;
+  let cellCursor = 0;
+  let smallChordMode = false;
+  let pendingFermataCount = 0;
+  let pendingAlternates = [];
+  const parserWarnings = [];
+  const groupingByTop = { 5: null, 7: null };
+
+  const addParserWarning = (message) => {
+    if (!parserWarnings.includes(message)) parserWarnings.push(message);
+  };
+
+  const groupingForMeter = (meterValue) => {
+    const top = Number.parseInt(String(meterValue || '').split('/')[0], 10);
+    return groupingByTop[top] || null;
+  };
+
+  current.meterGrouping = groupingForMeter(timeSignature);
+
+  const hasContent = () => (
+    current.chords.length || current.section || Number.isFinite(current.ending) || current.symbols.length ||
+    current.texts.length || current.startRepeat || current.endRepeat || current.doubleStart ||
+    current.doubleEnd || current.final || current.systemBreak || current.repeatTwoBars ||
+    current.repeatTwoBarsContinuation || current.codaStart || current.codaEnd
+  );
+
+  const hasWrittenContent = () => (
+    current.chords.length || current.endRepeat || current.doubleEnd || current.final ||
+    current.repeatTwoBars || current.repeatTwoBarsContinuation
+  );
+
+  const push = (force = false) => {
+    // Alternate chords can precede the harmony they annotate. If a boundary
+    // arrives before any primary harmony, the source is incomplete; do not
+    // leak those alternates into the following measure.
+    if (pendingAlternates.length > 0) {
+      addParserWarning(`Unattached alternate chord${pendingAlternates.length === 1 ? '' : 's'} ${pendingAlternates.map((item) => item.value).join(', ')} were ignored at a measure boundary.`);
+      pendingAlternates = [];
+    }
+    // A fermata is normally a prefix for the following chord. Preserve an
+    // unattached marker as a legacy centered symbol rather than discarding it.
+    if (pendingFermataCount > 0) {
+      current.symbols.push(...Array(pendingFermataCount).fill('pause'));
+      pendingFermataCount = 0;
+    }
+    if (hasContent() || force) {
+      current.timeSignature ||= timeSignature;
+      const lastCell = current.chordSlots.reduce((max, slot) => Math.max(max, Number(slot.cell) + 1 || 0), 0);
+      current.cellCount = Math.max(1, cellCursor, lastCell);
+      bars.push(current);
+    }
+    current = newBar();
+    lastChordSlot = null;
+    pendingAlternates = [];
+    cellCursor = 0;
+    if (pendingTimeSignature) {
+      timeSignature = pendingTimeSignature;
+      current.timeSignature = pendingTimeSignature;
+      pendingTimeSignature = null;
+    }
+    current.meterGrouping = groupingForMeter(current.timeSignature || timeSignature);
+  };
+
+  const startStructuralBar = () => {
+    if (hasWrittenContent()) push();
+  };
+
+  const attachAlternate = (slot, alternate, cell) => {
+    const alternateEntry = {
+      chord: alternate.value,
+      cell: Math.max(0, Number(cell) || 0)
+    };
+    slot.alternates.push(alternateEntry);
+    current.alternateChords.push({ ...alternateEntry });
+    if (alternate.legacy) {
+      addParserWarning(`Legacy non-standard chord token "${alternate.legacy}" was normalized as ${alternate.value}.`);
+    }
+  };
+
+  const ensureAlternateHost = (cell = cellCursor) => {
+    if (lastChordSlot) return lastChordSlot;
+    const slot = {
+      chord: '',
+      alternates: [],
+      cell: Math.max(0, Number(cell) || 0),
+      small: false,
+      fermata: false,
+      hidden: true
+    };
+    current.chordSlots.push(slot);
+    lastChordSlot = slot;
+    return slot;
+  };
+
+  const attachPendingAlternatesTo = (slot) => {
+    for (const alternate of pendingAlternates) {
+      attachAlternate(slot, alternate, alternate.cell);
+    }
+    pendingAlternates = [];
+  };
+
+  const addPrimaryChord = (value) => {
+    current.chords.push(value);
+    const slot = {
+      chord: value,
+      alternates: [],
+      cell: cellCursor,
+      small: smallChordMode,
+      fermata: pendingFermataCount > 0
+    };
+    pendingFermataCount = 0;
+    current.chordSlots.push(slot);
+    attachPendingAlternatesTo(slot);
+    lastChordSlot = slot;
+    cellCursor += 1;
+  };
+
+  while (i < raw.length) {
+    const rest = raw.slice(i);
+    const whitespace = rest.match(/^\s+/);
+    if (whitespace) {
+      cellCursor += whitespace[0].length;
+      i += whitespace[0].length;
+      continue;
+    }
+
+    const comment = rest.match(/^<([^>]*)>/);
+    if (comment) {
+      const staffText = normaliseStaffText(comment[1]);
+      const repeatCount = staffText.match(/^(\d+)x$/i);
+      if (repeatCount) {
+        current.repeatCount = Math.max(2, Number(repeatCount[1]));
+        current.symbols.push(`${current.repeatCount}x`);
+      } else {
+        const grouping = staffText.match(/^(2\+3|3\+2|3\+4|4\+3)$/);
+        if (grouping) {
+          const parts = grouping[1].split('+').map(Number);
+          const top = parts[0] + parts[1];
+          groupingByTop[top] = grouping[1];
+          current.meterGrouping = grouping[1];
+          current.texts.push(grouping[1]);
+        } else {
+          const macro = normaliseMacro(staffText);
+          if (macro === 'Break') current.texts.push(macro);
+          else if (macro) current.symbols.push(macro);
+          else if (staffText) current.texts.push(staffText);
+        }
+      }
+      i += comment[0].length;
+      continue;
+    }
+
+    const section = rest.match(/^\*([A-Za-z0-9])/);
+    if (section) {
+      startStructuralBar();
+      current.section = section[1] === 'i' ? 'i' : section[1].toUpperCase();
+      i += section[0].length;
+      continue;
+    }
+
+    const meter = rest.match(/^T(\d{2,3})/);
+    if (meter) {
+      const decodedMeter = decodeMeterToken(meter[1]);
+      // The protocol places a meter before the barline that begins the new
+      // meter. If harmony already exists in the current bar, defer it until
+      // that bar is closed; otherwise it applies to the current opening bar.
+      if (hasWrittenContent()) pendingTimeSignature = decodedMeter;
+      else {
+        timeSignature = decodedMeter;
+        current.timeSignature = decodedMeter;
+        current.meterGrouping = groupingForMeter(decodedMeter);
+      }
+      i += meter[0].length;
+      continue;
+    }
+
+    const ending = rest.match(/^N([0-3])/);
+    if (ending) {
+      startStructuralBar();
+      current.ending = Number(ending[1]);
+      i += ending[0].length;
+      continue;
+    }
+
+    if (rest.startsWith('Kcl')) {
+      if (hasContent()) push();
+      current.repeatBar = true;
+      addPrimaryChord('%');
+      i += 3;
+      continue;
+    }
+    if (rest.startsWith('XyQ')) { i += 3; continue; }
+    if (rest.startsWith('LZ|')) { i += 3; push(); continue; }
+    if (rest.startsWith('LZ')) { i += 2; push(); continue; }
+
+    const spacer = rest.match(/^Y{1,3}/);
+    if (spacer) {
+      if (hasContent()) push();
+      current.systemBreak = true;
+      current.verticalSpace = spacer[0].length;
+      cellCursor = 0;
+      i += spacer[0].length;
+      continue;
+    }
+
+    const token = rest[0];
+    if (token === ',') { i += 1; continue; }
+    if (token === 's') { smallChordMode = true; i += 1; continue; }
+    if (token === 'l') { smallChordMode = false; i += 1; continue; }
+    if (token === '{') { startStructuralBar(); current.startRepeat = true; i += 1; continue; }
+    if (token === '}') { current.endRepeat = true; i += 1; push(); continue; }
+    if (token === '[') { startStructuralBar(); current.doubleStart = true; i += 1; continue; }
+    if (token === ']') { current.doubleEnd = true; i += 1; push(); continue; }
+    if (rest.startsWith('||')) { current.doubleEnd = true; i += 2; push(); continue; }
+    if (token === '|') { i += 1; push(); continue; }
+    if (token === 'Z') { current.final = true; i += 1; push(); continue; }
+    if (token === 'S') { current.symbols.push('segno'); i += 1; continue; }
+    if (token === 'Q') {
+      const hasHarmony = current.chords.length > 0 || current.repeatBar || current.repeatTwoBars || current.repeatTwoBarsContinuation;
+      const followingHasHarmony = hasHarmonyBeforeBarBoundary(raw, i + 1);
+      if (hasHarmony) {
+        current.symbols.push('coda');
+        current.codaEnd = true;
+      } else if (followingHasHarmony) {
+        current.symbols.push('coda');
+        current.codaStart = true;
+      } else if (bars.length && bars[bars.length - 1].repeatTwoBarsContinuation) {
+        // A Q immediately after the second measure represented by `r` belongs
+        // to that completed repeat measure as To Coda. Restrict the backward
+        // association to this known protocol pattern; a standalone Q elsewhere
+        // begins the following Coda, even when layout tokens precede its chord.
+        const previous = bars[bars.length - 1];
+        if (!(previous.symbols || []).includes('coda')) previous.symbols.push('coda');
+        previous.codaEnd = true;
+      } else {
+        current.symbols.push('coda');
+        current.codaStart = true;
+      }
+      i += 1;
+      continue;
+    }
+    if (token === 'f') { pendingFermataCount += 1; i += 1; continue; }
+    if (token === 'U') { current.endMarker = true; i += 1; continue; }
+    if (token === 'x') {
+      if (current.chords.length) push();
+      current.repeatBar = true;
+      addPrimaryChord('%');
+      i += 1;
+      continue;
+    }
+    if (token === 'r') {
+      // `r` represents two visible measures. Alternate chords can be written
+      // immediately before it and belong to the first repeat measure. Preserve
+      // them across any structural-bar push instead of dropping them at the
+      // boundary.
+      const repeatAlternates = pendingAlternates;
+      pendingAlternates = [];
+      if (hasContent()) push();
+      current.repeatTwoBars = true;
+      if (repeatAlternates.length) {
+        pendingAlternates = repeatAlternates;
+        const host = ensureAlternateHost(Math.min(...repeatAlternates.map((item) => Number(item.cell) || 0)));
+        attachPendingAlternatesTo(host);
+      }
+      current.cellCount = Math.max(1, cellCursor || 4);
+      push(true);
+      current.repeatTwoBarsContinuation = true;
+      current.cellCount = 4;
+      i += 1;
+      continue;
+    }
+    if (token === 'p') { addPrimaryChord('/'); i += 1; continue; }
+    if (token === 'n') { addPrimaryChord('N.C.'); i += 1; continue; }
+
+    const alternate = scanAlternateChord(rest);
+    if (alternate) {
+      if (lastChordSlot) {
+        // Alternate chords occupy the current chart cell but do not consume a
+        // cell of their own. Immediately following a regular chord they share
+        // that chord's cell; after one or more spaces they retain those source
+        // positions independently of the regular harmony below.
+        attachAlternate(
+          lastChordSlot,
+          alternate,
+          Math.max(Number(lastChordSlot.cell) || 0, cellCursor - 1)
+        );
+      } else if (current.repeatTwoBars || current.repeatTwoBarsContinuation) {
+        // A two-measure repeat has no ordinary chord slot, but alternates can
+        // still annotate either represented measure. Use an invisible host so
+        // the alternate survives parsing and participates in the normal cell
+        // layout without drawing an extra harmony symbol.
+        const host = ensureAlternateHost(cellCursor);
+        attachAlternate(host, alternate, cellCursor);
+      } else {
+        // iReal charts can place an alternate before a one-measure repeat, for
+        // example `(Ab-7)x (Db7)`. Keep it until the following primary token is
+        // parsed instead of silently dropping it.
+        pendingAlternates.push({ ...alternate, cell: cellCursor });
+      }
+      i += alternate.length;
+      continue;
+    }
+
+    const legacyChord = scanLegacyStarChord(rest);
+    if (legacyChord) {
+      addPrimaryChord(legacyChord.value);
+      addParserWarning(`Legacy non-standard chord token "${legacyChord.original}" was normalized as ${legacyChord.value}.`);
+      i += legacyChord.length;
+      continue;
+    }
+
+    const chord = scanChordToken(rest);
+    if (chord) {
+      addPrimaryChord(chord.value);
+      i += chord.length;
+      continue;
+    }
+
+    const unknownSnippet = raw.slice(Math.max(0, i - 8), Math.min(raw.length, i + 9)).replace(/\s+/g, ' ');
+    addParserWarning(`Unrecognized chart token "${token}" at character ${i + 1} near "${unknownSnippet}" was ignored.`);
+    i += 1;
+  }
+
+  if (hasContent()) push();
+
+  // A final, double, or repeat-close token can follow the second cell of an
+  // `r` two-measure repeat. It belongs to the preceding visible measure and
+  // must not be discarded as an empty structural record.
+  for (let index = 1; index < bars.length; index += 1) {
+    const bar = bars[index];
+    const boundaryOnly = !bar.chords.length && !bar.section && !Number.isFinite(bar.ending) &&
+      !bar.symbols.length && !bar.texts.length && !bar.startRepeat && !bar.doubleStart &&
+      !bar.repeatBar && !bar.repeatTwoBars && !bar.repeatTwoBarsContinuation &&
+      (bar.final || bar.doubleEnd || bar.endRepeat);
+    if (!boundaryOnly) continue;
+
+    const previous = bars[index - 1];
+    previous.final = Boolean(previous.final || bar.final);
+    previous.doubleEnd = Boolean(previous.doubleEnd || bar.doubleEnd);
+    previous.endRepeat = Boolean(previous.endRepeat || bar.endRepeat);
+    bars.splice(index, 1);
+    index -= 1;
+  }
+
+  // Symbols or text can occur just before the chord-bearing cell of a bar.
+  // Merge such decoration-only records forward, but never merge a real empty
+  // ending or repeat measure.
+  for (let index = 0; index < bars.length - 1; index += 1) {
+    const bar = bars[index];
+    const decorationOnly = !bar.chords.length && !bar.section && !Number.isFinite(bar.ending) &&
+      !bar.startRepeat && !bar.endRepeat && !bar.doubleStart && !bar.doubleEnd &&
+      !bar.final && !bar.repeatBar && !bar.repeatTwoBars && !bar.repeatTwoBarsContinuation;
+    if (!decorationOnly || (!bar.symbols.length && !bar.texts.length && !bar.codaStart && !bar.systemBreak)) continue;
+
+    const next = bars[index + 1];
+    next.symbols = [...(bar.symbols || []), ...(next.symbols || [])];
+    next.navigationSymbols = [...(bar.navigationSymbols || []), ...(next.navigationSymbols || [])];
+    next.displayDirectives = [...(bar.displayDirectives || []), ...(next.displayDirectives || [])];
+    next.texts = [...(bar.texts || []), ...(next.texts || [])];
+    next.codaStart = Boolean(bar.codaStart || next.codaStart);
+    next.codaEnd = Boolean(bar.codaEnd || next.codaEnd);
+    next.systemBreak = Boolean(bar.systemBreak || next.systemBreak);
+    next.verticalSpace = Math.max(Number(bar.verticalSpace) || 0, Number(next.verticalSpace) || 0);
+    next.meterGrouping = bar.meterGrouping || next.meterGrouping;
+    bars.splice(index, 1);
+    index -= 1;
+  }
+
+  positionJumpDirectives(bars);
+
+  const visibleBars = bars.filter((bar) =>
+    bar.chords.length || bar.section || bar.symbols.length ||
+    (bar.navigationSymbols || []).length || (bar.displayDirectives || []).length || bar.texts.length ||
+    bar.repeatTwoBars || bar.repeatTwoBarsContinuation || Number.isFinite(bar.ending)
+  );
+  const repeatAnalysis = analyseRepeatStructure(visibleBars);
+  const navigationAnalysis = analyseNavigationStructure(visibleBars);
+  return {
+    bars: visibleBars,
+    timeSignature: visibleBars[0]?.timeSignature || initialTimeSignature || '4/4',
+    warnings: [...parserWarnings, ...repeatAnalysis.warnings, ...navigationAnalysis.warnings]
+  };
+}
+
+function positionJumpDirectives(bars) {
+  const pending = [];
+
+  for (let index = 0; index < bars.length; index += 1) {
+    const symbols = Array.isArray(bars[index].symbols) ? bars[index].symbols : [];
+    const kept = [];
+    for (const symbol of symbols) {
+      const text = String(symbol);
+      const endingMatch = text.match(/^D\.[CS]\.\s+al\s+(\d+)(?:st|nd|rd|th)\s+end(?:ing|\.)?/i);
+      const alFine = /^D\.[CS]\.\s+al\s+fine\b/i.test(text);
+      const alCoda = /^D\.[CS]\.\s+al\s+coda\b/i.test(text);
+      if (endingMatch || alFine || alCoda) {
+        pending.push({
+          symbol,
+          ending: endingMatch ? Number(endingMatch[1]) : null,
+          originalIndex: index,
+          alFine,
+          alCoda
+        });
+        bars[index].navigationSymbols = [...(bars[index].navigationSymbols || []), symbol];
+      } else {
+        kept.push(symbol);
+      }
+    }
+    bars[index].symbols = kept;
+  }
+
+  for (const item of pending) {
+    // A D.C./D.S. instruction is written at the end of the current form. The
+    // named ending or Fine describes the destination after the jump; it must
+    // not pull the printed instruction back onto that earlier measure.
+    const destination = findJumpDisplayTerminal(bars, item.originalIndex);
+
+    bars[destination].displayDirectives = [
+      ...(bars[destination].displayDirectives || []),
+      item.symbol
+    ];
+  }
+}
+
+function findJumpDisplayTerminal(bars, start) {
+  let lastHarmony = Math.max(0, start);
+  for (let index = Math.max(0, start); index < bars.length; index += 1) {
+    const bar = bars[index];
+    if (index > start && bar.section) return lastHarmony;
+    if (bar.chords.length || bar.repeatBar || bar.repeatTwoBars || bar.repeatTwoBarsContinuation) {
+      lastHarmony = index;
+    }
+    if (bar.final || bar.doubleEnd || bar.endRepeat) return lastHarmony;
+  }
+  return lastHarmony;
+}
+
+function newBar() {
+  return {
+    chords: [], chordSlots: [], alternateChords: [], section: null, ending: null,
+    symbols: [], navigationSymbols: [], displayDirectives: [], texts: [],
+    startRepeat: false, endRepeat: false, doubleStart: false, doubleEnd: false,
+    final: false, repeatBar: false, repeatTwoBars: false, repeatTwoBarsContinuation: false,
+    repeatCount: null, cellCount: 0, verticalSpace: 0,
+    timeSignature: null, meterGrouping: null, systemBreak: false, codaStart: false, codaEnd: false,
+    endMarker: false
+  };
+}
+
+function normaliseStaffText(value) {
+  let text = String(value || '').trim();
+
+  // iReal staff text may begin with a vertical-position prefix such as *69.
+  // The position controls placement in iReal Pro and is not part of the caption.
+  text = text.replace(/^\*\d{2}/, '');
+
+  // Some exported irealb charts contain internal layout sentinels adjacent to
+  // staff text. They are chart-control tokens, not printable text. Restrict the
+  // cleanup to the edges so legitimate words inside a caption are untouched.
+  const controls = /^(?:(?:XyQ|QyX|Kcl|LZ\|?|ZL)\s*)+|(?:(?:XyQ|QyX|Kcl|LZ\|?|ZL)\s*)+$/g;
+  let previous;
+  do {
+    previous = text;
+    text = text.replace(controls, '').trim();
+  } while (text !== previous);
+
+  return text;
+}
+
+function normaliseMacro(text) {
+  const value = text.toLowerCase().replace(/\s+/g, ' ').trim();
+  if (value === 'fine') return 'Fine';
+  if (value === 'break') return 'Break';
+  if (value === 'd.c.') return 'D.C.';
+  if (value === 'd.s.') return 'D.S.';
+  if (/^d\.c\. al /.test(value)) return text.replace(/\s+/g, ' ').trim();
+  if (/^d\.s\. al /.test(value)) return text.replace(/\s+/g, ' ').trim();
+  if (value === 'to coda') return 'To Coda';
+  return null;
+}
+
+function normaliseKey(key) {
+  const value = String(key || 'C').trim().replace(/([A-G])b/g, '$1♭').replace(/([A-G])#/g, '$1♯');
+  const match = value.match(/^([A-G])([♭♯]?)(m|min|-|−)?$/i);
+  if (!match) return value;
+  return `${match[1].toUpperCase()}${match[2]}${match[3] ? 'm' : ''}`;
+}
+return { extractIRealUrl, parseIRealCollection, unscramble, parseChart, normaliseStaffText, createSongId };
+})();
+const { extractIRealUrl, parseIRealCollection, unscramble, parseChart, normaliseStaffText } = __ireal;
+
+const __demo = (() => {
+'use strict';
+const DEMO_SONG = {
+  id: 'demo-autumn-leaves',
+  title: 'Autumn Leaves',
+  composer: 'Kosma Joseph',
+  style: 'Medium Swing',
+  key: 'Gm',
+  timeSignature: '4/4',
+  source: 'demo',
+  bars: [
+    bar(['C-7'], { section: 'A', startRepeat: true, timeSignature: '4/4' }),
+    bar(['F7']),
+    bar(['Bb^7']),
+    bar(['Eb^7']),
+
+    bar(['Ah7']),
+    bar(['D7b13']),
+    bar(['G-6']),
+    bar(['%'], { repeatBar: true, endRepeat: true }),
+
+    bar(['Ah7'], { section: 'B', doubleStart: true }),
+    bar(['D7b13']),
+    bar(['G-6']),
+    bar(['%'], { repeatBar: true }),
+
+    bar(['C-7']),
+    bar(['F7']),
+    bar(['Bb^7']),
+    bar(['Eb^7'], { doubleEnd: true }),
+
+    bar(['Ah7'], { section: 'C', doubleStart: true }),
+    bar(['D7b13']),
+    bar(['G-7', 'Gb7']),
+    bar(['F-7', 'E7']),
+
+    bar(['Ah7']),
+    bar(['D7b13']),
+    bar(['G-6']),
+    bar(['%'], { repeatBar: true, final: true })
+  ]
+};
+
+function bar(chords, extra = {}) {
+  return {
+    chords,
+    chordSlots: chords.map((chord) => ({ chord, alternates: [] })),
+    alternateChords: [],
+    section: null,
+    ending: null,
+    symbols: [],
+    texts: [],
+    startRepeat: false,
+    endRepeat: false,
+    doubleStart: false,
+    doubleEnd: false,
+    final: false,
+    repeatBar: false,
+    repeatTwoBars: false,
+    timeSignature: null,
+    systemBreak: false,
+    codaStart: false,
+    codaEnd: false,
+    ...extra
+  };
+}
+return { DEMO_SONG };
+})();
+const { DEMO_SONG } = __demo;
+
+const __storage = (() => {
+'use strict';
+const DB_NAME = 'ireal-chart-viewer';
+const DB_VERSION = 1;
+const STORE_NAME = 'library';
+const LIBRARY_KEY = 'library-v1';
+const LEGACY_SONGS_KEY = 'songs-v6';
+const LOCAL_FALLBACK_KEY = 'ireal-chart-viewer-local-library-v1';
+const LEGACY_LOCAL_FALLBACK_KEY = 'ireal-chart-viewer-local-songs-v2';
+const LIBRARY_SCHEMA_VERSION = 1;
+
+function openDatabase() {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in globalThis)) {
+      reject(new Error('This browser does not support large song-library storage.'));
+      return;
+    }
+
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error ?? new Error('The song library could not be opened.'));
+    request.onblocked = () => reject(new Error('The song library cannot be updated while the app is open in another tab.'));
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(STORE_NAME)) database.createObjectStore(STORE_NAME);
+    };
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
+async function runTransaction(mode, operation) {
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, mode);
+    const store = transaction.objectStore(STORE_NAME);
+    let result;
+    let settled = false;
+
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      database.close();
+      reject(normaliseStorageError(error));
+    };
+
+    let request;
+    try {
+      request = operation(store);
+    } catch (error) {
+      fail(error);
+      return;
+    }
+
+    request.onsuccess = () => { result = request.result; };
+    request.onerror = () => fail(request.error);
+    transaction.onabort = () => fail(transaction.error);
+    transaction.onerror = () => fail(transaction.error);
+    transaction.oncomplete = () => {
+      if (settled) return;
+      settled = true;
+      database.close();
+      resolve(result);
+    };
+  });
+}
+
+function compactLibrary(songs, preservedEntries = []) {
+  const entries = songs.map((song) => {
+    const record = song?.sourceRecord;
+    if (
+      song?.source === 'ireal' &&
+      record &&
+      /^(?:irealb|irealbook):\/\/$/i.test(record.protocol || '') &&
+      typeof record.body === 'string'
+    ) {
+      return {
+        kind: 'ireal',
+        protocol: record.protocol,
+        body: record.body,
+        importedAt: Number(song.importedAt) || Date.now()
+      };
+    }
+    // Old releases stored only parsed objects. Keep those entries intact
+    // until the user reimports the same charts, at which point they are
+    // replaced by compact source records without data loss.
+    return { kind: 'legacy', song };
+  });
+
+  const currentKeys = new Set(entries.map(libraryEntryIdentity).filter(Boolean));
+  for (const entry of Array.isArray(preservedEntries) ? preservedEntries : []) {
+    const identity = libraryEntryIdentity(entry);
+    if (identity && currentKeys.has(identity)) continue;
+    entries.push(entry);
+  }
+  return { schemaVersion: LIBRARY_SCHEMA_VERSION, entries };
+}
+
+function libraryEntryIdentity(entry) {
+  if (entry?.kind === 'ireal' && typeof entry.body === 'string') {
+    const fields = entry.body.split('=');
+    return `${fields[0] || ''}\n${fields[1] || ''}`;
+  }
+  const song = entry?.kind === 'legacy' ? entry.song : null;
+  if (song && typeof song === 'object') return `${song.title || ''}\n${song.composer || ''}`;
+  return null;
+}
+
+function expandLibrary(payload) {
+  const result = { songs: [], failedEntries: [], warnings: [] };
+  if (!payload || !Array.isArray(payload.entries)) return result;
+  if (payload.schemaVersion !== LIBRARY_SCHEMA_VERSION) {
+    result.warnings.push(`Stored library schema ${String(payload.schemaVersion ?? 'unknown')} is not current. Compatible source entries were preserved and reparsed where possible.`);
+  }
+  for (const entry of payload.entries) {
+    if (entry?.kind === 'legacy' && entry.song && typeof entry.song === 'object') {
+      result.songs.push(entry.song);
+      continue;
+    }
+    if (entry?.kind !== 'ireal' || typeof entry.body !== 'string') {
+      result.failedEntries.push(entry);
+      result.warnings.push('An unrecognized stored library entry was preserved but could not be displayed.');
+      continue;
+    }
+    const protocol = /^(?:irealb|irealbook):\/\/$/i.test(entry.protocol || '')
+      ? entry.protocol
+      : 'irealb://';
+    try {
+      const song = parseIRealCollection(`${protocol}${encodeURIComponent(entry.body)}`).songs[0];
+      if (!song) throw new Error('No song was produced by the parser.');
+      song.importedAt = Number(entry.importedAt) || song.importedAt;
+      result.songs.push(song);
+    } catch (error) {
+      result.failedEntries.push(entry);
+      const title = entry.body.split('=', 1)[0] || 'Untitled';
+      result.warnings.push(`Stored chart "${title}" could not be reparsed and was kept in storage. Reimport it to restore display.`);
+      console.warn('A stored chart could not be reparsed and was preserved:', error);
+    }
+  }
+  return result;
+}
+
+async function readDatabaseValue(key) {
+  try {
+    return await runTransaction('readonly', (store) => store.get(key));
+  } catch {
+    return undefined;
+  }
+}
+
+async function loadSongLibrary() {
+  const localCompact = readLocalFallbackPayload();
+  const localExpanded = expandLibrary(localCompact);
+  if (localExpanded.songs.length || localExpanded.failedEntries.length) return localExpanded;
+
+  const compact = await readDatabaseValue(LIBRARY_KEY);
+  const expanded = expandLibrary(compact);
+  if (expanded.songs.length || expanded.failedEntries.length) return expanded;
+
+  // Safe migration path from v0.1.71 and earlier. Parsed legacy data remains
+  // usable. A subsequent reimport transparently replaces matching songs with
+  // compact source records.
+  const legacyDatabase = await readDatabaseValue(LEGACY_SONGS_KEY);
+  if (Array.isArray(legacyDatabase)) return { songs: legacyDatabase, failedEntries: [], warnings: [] };
+  return { songs: readLegacyLocalFallbackLibrary(), failedEntries: [], warnings: [] };
+}
+
+async function saveSongLibrary(songs, preservedEntries = []) {
+  const payload = compactLibrary(songs, preservedEntries);
+  try {
+    await runTransaction('readwrite', (store) => store.put(payload, LIBRARY_KEY));
+    try { await runTransaction('readwrite', (store) => store.delete(LEGACY_SONGS_KEY)); } catch {}
+    removeLocalFallbackLibraries();
+  } catch {
+    writeLocalFallbackPayload(payload);
+  }
+}
+
+async function clearSongLibrary() {
+  const localErrors = removeLocalFallbackLibraries();
+  const databaseErrors = [];
+  if ('indexedDB' in globalThis) {
+    for (const key of [LIBRARY_KEY, LEGACY_SONGS_KEY]) {
+      try {
+        await runTransaction('readwrite', (store) => store.delete(key));
+      } catch (error) {
+        if (!isUnavailableDatabaseError(error)) databaseErrors.push(error);
+      }
+    }
+  }
+  if (databaseErrors.length) throw normaliseStorageError(databaseErrors[0]);
+  if (localErrors.length) throw normaliseStorageError(localErrors[0]);
+}
+
+function isUnavailableDatabaseError(error) {
+  return ['SecurityError', 'NotSupportedError', 'InvalidStateError'].includes(error?.name)
+    || /does not support|not available|file:\/\//i.test(String(error?.message || ''));
+}
+
+function readLocalFallbackPayload() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_FALLBACK_KEY) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+function readLegacyLocalFallbackLibrary() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LEGACY_LOCAL_FALLBACK_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalFallbackPayload(payload) {
+  try {
+    localStorage.setItem(LOCAL_FALLBACK_KEY, JSON.stringify(payload));
+    try { localStorage.removeItem(LEGACY_LOCAL_FALLBACK_KEY); } catch {}
+  } catch (error) {
+    throw normaliseStorageError(error);
+  }
+}
+
+function removeLocalFallbackLibraries() {
+  const errors = [];
+  for (const key of [LOCAL_FALLBACK_KEY, LEGACY_LOCAL_FALLBACK_KEY]) {
+    try { localStorage.removeItem(key); }
+    catch (error) { errors.push(error); }
+  }
+  return errors;
+}
+
+function normaliseStorageError(error) {
+  if (error?.name === 'QuotaExceededError') {
+    return new Error('Browser storage is full. Remove unnecessary site data and try again.');
+  }
+  return error instanceof Error ? error : new Error('The song library could not be saved.');
+}
+return { loadSongLibrary, saveSongLibrary, clearSongLibrary, compactLibrary, expandLibrary };
+})();
+const { loadSongLibrary, saveSongLibrary, clearSongLibrary } = __storage;
+
+const __fitTypography = (() => {
+'use strict';
+function fitChartTypography(root) {
+  for (const chord of root.querySelectorAll('[data-fit-chord]')) {
+    chord.style.fontSize = '';
+    if (chord.classList.contains('repeat-glyph')) continue;
+
+    const slot = chord.closest('.chord-slot');
+    if (!slot) continue;
+    const available = Math.max(1, slot.clientWidth - 4);
+    const natural = chord.scrollWidth;
+    if (natural <= available + 0.5) continue;
+
+    const fullSize = Number.parseFloat(getComputedStyle(chord).fontSize) || 44;
+    const fitted = Math.max(29, Math.floor(fullSize * available / natural * 0.98));
+    chord.style.fontSize = `${fitted}px`;
+  }
+
+  for (const alternate of root.querySelectorAll('[data-fit-alternate]')) {
+    alternate.style.fontSize = '';
+    const available = Math.max(1, alternate.clientWidth - 4);
+    const natural = alternate.scrollWidth;
+    if (natural <= available + 0.5) continue;
+
+    const fullSize = Number.parseFloat(getComputedStyle(alternate).fontSize) || 25;
+    const fitted = Math.max(10, Math.floor(fullSize * available / natural * 0.98));
+    alternate.style.fontSize = `${fitted}px`;
+  }
+
+  const measureInlineContent = (box) => {
+    if (!box) return 0;
+    const children = Array.from(box.children).filter((child) => getComputedStyle(child).display !== 'none');
+    if (!children.length) return 0;
+    const gap = Number.parseFloat(getComputedStyle(box).columnGap) || 0;
+    return children.reduce((total, child) => total + child.getBoundingClientRect().width, 0)
+      + gap * Math.max(0, children.length - 1);
+  };
+
+  for (const directive of root.querySelectorAll('[data-fit-directive]')) {
+    directive.style.fontSize = '';
+    directive.style.transform = '';
+  }
+
+  for (const box of root.querySelectorAll('.bar-symbols-left, .bar-symbols-right')) {
+    const directives = Array.from(box.querySelectorAll('[data-fit-directive]'));
+    if (!directives.length) continue;
+    const symbols = box.parentElement;
+    if (!symbols) continue;
+
+    const isLeft = box.classList.contains('bar-symbols-left');
+    const otherBox = symbols.querySelector(isLeft ? '.bar-symbols-right' : '.bar-symbols-left');
+    const boxStyle = getComputedStyle(box);
+    const ownInset = Number.parseFloat(isLeft ? boxStyle.left : boxStyle.right) || 0;
+    const otherStyle = otherBox ? getComputedStyle(otherBox) : null;
+    const otherInset = otherStyle
+      ? (Number.parseFloat(isLeft ? otherStyle.right : otherStyle.left) || 0)
+      : 0;
+    const otherWidth = measureInlineContent(otherBox);
+    const available = Math.max(1, symbols.clientWidth - ownInset - otherInset - otherWidth - (otherWidth ? 7 : 0));
+    const totalWidth = measureInlineContent(box);
+    if (totalWidth <= available + 0.5) continue;
+
+    const directiveWidth = directives.reduce((total, directive) => total + directive.getBoundingClientRect().width, 0);
+    const fixedWidth = Math.max(0, totalWidth - directiveWidth);
+    const targetDirectiveWidth = Math.max(1, available - fixedWidth);
+    const ratio = Math.min(1, targetDirectiveWidth / Math.max(1, directiveWidth) * 0.97);
+
+    for (const directive of directives) {
+      const fullSize = Number.parseFloat(getComputedStyle(directive).fontSize) || 25;
+      directive.style.fontSize = `${Math.max(14, Math.floor(fullSize * ratio))}px`;
+    }
+
+    const fittedWidth = measureInlineContent(box);
+    if (fittedWidth > available + 0.5) {
+      const remainingRatio = Math.max(0.68, Math.min(1, available / fittedWidth * 0.98));
+      for (const directive of directives) {
+        directive.style.transformOrigin = isLeft ? 'left top' : 'right top';
+        directive.style.transform = `scaleX(${remainingRatio})`;
+      }
+    }
+  }
+}
+return { fitChartTypography };
+})();
+const { fitChartTypography } = __fitTypography;
+
+const __layout = (() => {
+'use strict';
+function resolveBarlines(bars, { expanded = false } = {}) {
+  const resolved = bars.map((bar) => ({ ...bar }));
+  if (!resolved.length) return resolved;
+
+  const explicitDoubleStarts = resolved.map((bar) => Boolean(bar.doubleStart));
+  const explicitDoubleEnds = resolved.map((bar) => Boolean(bar.doubleEnd));
+  const explicitFinals = resolved.map((bar) => Boolean(bar.final));
+
+  for (const bar of resolved) {
+    bar.doubleStart = false;
+    bar.doubleEnd = false;
+    bar.final = false;
+    if (expanded) {
+      bar.startRepeat = false;
+      bar.endRepeat = false;
+    }
+  }
+
+  for (let index = 1; index < resolved.length; index += 1) {
+    const previous = resolved[index - 1];
+    const current = resolved[index];
+    const structuralBoundary = Boolean(
+      current.section || current.codaStart || explicitDoubleStarts[index] || explicitDoubleEnds[index - 1]
+    );
+    const repeatBoundary = Boolean(previous.endRepeat || current.startRepeat);
+    const previousIsFinal = !expanded && explicitFinals[index - 1];
+
+    if (structuralBoundary && !repeatBoundary && !previousIsFinal) {
+      previous.doubleEnd = true;
+    }
+  }
+
+  if (!expanded) {
+    for (let index = 0; index < resolved.length; index += 1) {
+      if (explicitFinals[index] && !resolved[index].endRepeat) {
+        resolved[index].final = true;
+        resolved[index].doubleEnd = false;
+      }
+    }
+  }
+
+  const last = resolved.at(-1);
+  if (!last.endRepeat) {
+    last.final = true;
+    last.doubleEnd = false;
+  }
+
+  for (const bar of resolved) {
+    if (bar.startRepeat) bar.doubleStart = false;
+    if (bar.endRepeat) {
+      bar.doubleEnd = false;
+      bar.final = false;
+    }
+  }
+
+  return resolved;
+}
+
+
+function resolveTimeSignatures(bars, initialTimeSignature = '4/4') {
+  const source = Array.isArray(bars) ? bars : [];
+  let active = normaliseTimeSignature(initialTimeSignature) || '4/4';
+  let previous = null;
+
+  return source.map((bar, index) => {
+    const explicit = normaliseTimeSignature(bar?.timeSignature);
+    if (explicit) active = explicit;
+    const showTimeSignature = index === 0 || active !== previous;
+    previous = active;
+    return {
+      ...bar,
+      effectiveTimeSignature: active,
+      showTimeSignature
+    };
+  });
+}
+
+function normaliseTimeSignature(value) {
+  const match = String(value || '').trim().match(/^(\d{1,2})\/(\d{1,2})$/);
+  return match ? `${Number(match[1])}/${Number(match[2])}` : null;
+}
+
+function buildRows(bars, columns = 4, options = {}) {
+  const resolvedBars = resolveBarlines(bars, options);
+  const endingNumbers = deriveEndingNumbers(resolvedBars);
+  const decoratedBars = resolvedBars.map((bar, index) => ({
+    ...bar,
+    endingOriginal: Number.isFinite(bar.ending) ? Number(bar.ending) : null,
+    ending: endingNumbers[index]
+  }));
+
+  const rows = [];
+  let row = [];
+  let firstEndingColumn = null;
+  let activeEnding = null;
+
+  const flush = () => {
+    if (!row.length) return;
+    while (row.length < columns) row.push({ spacer: true });
+    rows.push(row);
+    row = [];
+  };
+
+  for (const bar of decoratedBars) {
+    const startsSystem = Boolean(bar.section) || Boolean(bar.codaStart) || Boolean(bar.systemBreak);
+    if (startsSystem && row.length) flush();
+
+    if (bar.ending === 1 && activeEnding !== 1) {
+      firstEndingColumn = row.length;
+      activeEnding = 1;
+    } else if (bar.ending && bar.ending > 1 && activeEnding !== bar.ending) {
+      flush();
+      const pad = Math.min(firstEndingColumn ?? 0, columns - 1);
+      for (let i = 0; i < pad; i += 1) row.push({ spacer: true, endingSpacer: true });
+      activeEnding = bar.ending;
+    } else if (!bar.ending && activeEnding && row.length === 0) {
+      activeEnding = null;
+    }
+
+    if (bar.repeatTwoBars && row.length === columns - 1) flush();
+    row.push(bar);
+    if (row.length === columns) flush();
+  }
+  flush();
+
+  for (const currentRow of rows) {
+    for (let i = 0; i < currentRow.length; i += 1) {
+      const bar = currentRow[i];
+      if (bar.spacer || !bar.ending) continue;
+      const prev = currentRow[i - 1];
+      const next = currentRow[i + 1];
+      bar.endingStart = !prev || prev.spacer || prev.ending !== bar.ending;
+      bar.endingEnd = !next || next.spacer || next.ending !== bar.ending;
+    }
+  }
+  return rows;
+}
+return { resolveBarlines, resolveTimeSignatures, buildRows };
+})();
+const { resolveBarlines, resolveTimeSignatures, buildRows } = __layout;
+
+const __chartRenderer = (() => {
+'use strict';
+function renderChartMarkup(song, rows, notation, columns, { semitones = 0, accidental = 'auto' } = {}) {
+  const warnings = Array.isArray(song.warnings) ? song.warnings.filter(Boolean) : [];
+  return `
+    <header class="score-header">
+      <div class="score-meta score-meta-left"><strong>${escapeHtml(displayComposer(song.composer) || ' ')}</strong></div>
+      <h1>${escapeHtml(song.title)}</h1>
+      <div class="score-meta score-meta-right"><strong>${escapeHtml(song.style || ' ')}</strong></div>
+    </header>
+    ${warnings.length ? `<div class="chart-warning" role="status">${warnings.map(escapeHtml).join('<br>')}</div>` : ''}
+    <div class="systems">
+      ${rows.map((row, rowIndex) => renderRow(row, rowIndex, song, notation, columns, { semitones, accidental })).join('')}
+    </div>`;
+}
+
+function renderRow(row, rowIndex, song, notation, columns, options) {
+  const firstReal = row.find((bar) => !bar.spacer);
+  const section = firstReal?.section;
+  const leadMeter = firstReal?.showTimeSignature ? firstReal.effectiveTimeSignature : null;
+  const startsSection = Boolean(section || firstReal?.codaStart);
+  const gapLevel = Math.max(Number(firstReal?.verticalSpace) || 0, startsSection ? 1 : 0);
+  const rowClass = [
+    'system-row',
+    rowIndex > 0 && gapLevel ? 'section-break' : '',
+    rowIndex > 0 && gapLevel > 1 ? `section-break-${Math.min(gapLevel, 3)}` : ''
+  ].filter(Boolean).join(' ');
+  return `<section class="${rowClass}">
+    <div class="system-lead">
+      ${section ? `<span class="rehearsal-mark">${escapeHtml(section)}</span>` : ''}
+      ${leadMeter ? renderTimeSignature(leadMeter) : ''}
+    </div>
+    <div class="bar-grid" style="--columns:${columns}">
+      ${row.map((bar) => renderBar(bar, song, notation, options, { suppressTimeSignature: bar === firstReal && Boolean(leadMeter) })).join('')}
+    </div>
+  </section>`;
+}
+
+function renderBar(bar, song, notation, options, { suppressTimeSignature = false } = {}) {
+  if (bar.spacer) return `<div class="bar spacer ${bar.endingSpacer ? 'ending-spacer' : ''}" aria-hidden="true"></div>`;
+  const classes = ['bar'];
+  const hasEndingBracket = Number.isFinite(bar.endingOriginal);
+  const visibleEnding = hasEndingBracket && Number(bar.endingOriginal) > 0 ? Number(bar.endingOriginal) : null;
+  if (bar.startRepeat) classes.push('repeat-start');
+  if (bar.endRepeat) classes.push('repeat-end');
+  if (bar.doubleStart) classes.push('double-start');
+  if (bar.doubleEnd) classes.push('double-end');
+  if (bar.final) classes.push('final-bar');
+  if (bar.repeatTwoBars) classes.push('two-measure-repeat-start');
+  if (bar.repeatTwoBarsContinuation) classes.push('two-measure-repeat-continuation');
+  if (hasEndingBracket) classes.push('ending', `ending-${Number(bar.endingOriginal)}`, 'ending-start');
+  const showBarMeter = Boolean(bar.showTimeSignature && !suppressTimeSignature);
+  if (showBarMeter) classes.push('has-time-signature');
+
+  const symbols = [
+    ...(bar.symbols || []),
+    ...(bar.displayDirectives || [])
+  ].filter((symbol) => symbol !== 'coda');
+  const hasFineSymbol = symbols.some((symbol) => /^fine$/i.test(symbol));
+  const staffDirectives = (Array.isArray(bar.texts) ? bar.texts : [])
+    .filter(Boolean)
+    .map(renderStaffDirective)
+    .join('');
+  const centerSymbols = symbols.filter(isCenteredSymbol).map(renderSymbol).join('');
+  const leftSymbols = symbols.filter((symbol) => !isCenteredSymbol(symbol) && isLeftAlignedSymbol(symbol)).map(renderSymbol).join('') + staffDirectives;
+  const rightSymbols = symbols.filter((symbol) => !isCenteredSymbol(symbol) && !isLeftAlignedSymbol(symbol)).map(renderSymbol).join('')
+    + (bar.endMarker && !hasFineSymbol ? renderEndMarker() : '');
+  const leftSymbolOffset = bar.codaStart ? 34 : 1;
+  const rightSymbolOffset = bar.codaEnd ? 38 : ((bar.endRepeat || bar.final) ? 14 : 6);
+  if (leftSymbols) classes.push('has-left-symbol');
+  if (centerSymbols) classes.push('has-center-symbol');
+  if (rightSymbols) classes.push('has-right-symbol');
+  if (bar.codaEnd) classes.push('has-coda-end');
+  const chordSlots = normaliseChordSlots(bar);
+  const cellLayout = resolveMusicalCellLayout(bar, chordSlots, song.timeSignature);
+  const cellCount = cellLayout.totalCells;
+  const usesCellGrid = cellLayout.usesCellGrid;
+  const alternateGroups = cellLayout.alternateGroups || [];
+  const hasAlternateBass = alternateGroups.some((group) => group.chords.some((chord) => String(chord).includes('/')));
+  if (usesCellGrid) classes.push('has-cell-grid');
+  if (alternateGroups.length) classes.push('has-alternate-layer');
+  if (hasAlternateBass) classes.push('has-alternate-bass');
+  const chordMarkup = chordSlots.map((slot, index) => {
+    const positioned = cellLayout.slots[index];
+    return renderChordSlot(
+      slot,
+      song,
+      notation,
+      options,
+      chordSlots.length || 1,
+      index,
+      usesCellGrid,
+      positioned?.startCell ?? index,
+      positioned?.span ?? 1,
+      cellCount
+    );
+  }).join('');
+  const alternateMarkup = renderAlternateLayer(alternateGroups, song, notation, options, cellCount);
+
+  return `<div class="${classes.join(' ')}">
+    ${bar.startRepeat ? '<span class="repeat-barline repeat-barline-start" aria-hidden="true"><i class="repeat-thick"></i><i class="repeat-thin"></i></span><span class="repeat-dots repeat-dots-start" aria-hidden="true"><i></i><i></i></span>' : ''}
+    ${bar.endRepeat ? '<span class="repeat-barline repeat-barline-end" aria-hidden="true"><i class="repeat-thin"></i><i class="repeat-thick"></i></span><span class="repeat-dots repeat-dots-end" aria-hidden="true"><i></i><i></i></span>' : ''}
+    ${bar.final ? '<span class="final-barline" aria-hidden="true"><i class="final-thin"></i><i class="final-thick"></i></span>' : ''}
+    ${bar.repeatTwoBars ? '<span class="two-measure-repeat-marker" aria-hidden="true"><span class="two-measure-repeat-count">2</span><span class="measure-repeat-sign"><span class="mrs-dot mrs-dot-top"></span><span class="repeat-slash"></span><span class="mrs-dot mrs-dot-bottom"></span></span></span><span class="sr-only">repeat previous two measures</span>' : ''}
+    ${bar.codaStart ? `<span class="coda-marker coda-marker-start" role="img" title="Coda" aria-label="Coda">${renderCodaGlyph()}</span>` : ''}
+    ${bar.codaEnd ? `<span class="coda-marker coda-marker-end" role="img" title="To Coda" aria-label="To Coda">${renderCodaGlyph()}</span>` : ''}
+    ${visibleEnding != null ? `<span class="ending-number">${visibleEnding}.</span>` : ''}
+    ${showBarMeter ? renderTimeSignature(bar.effectiveTimeSignature, 'time-signature bar-time-signature') : ''}
+    <div class="bar-symbols">
+      ${leftSymbols ? `<span class="bar-symbols-left" style="--left-symbol-offset:${leftSymbolOffset}px">${leftSymbols}</span>` : ''}
+      ${centerSymbols ? `<span class="bar-symbols-center">${centerSymbols}</span>` : ''}
+      ${rightSymbols ? `<span class="bar-symbols-right" style="--right-symbol-offset:${rightSymbolOffset}px">${rightSymbols}</span>` : ''}
+    </div>
+    <div class="chords chords-${Math.min(chordSlots.length || 1, 4)}${usesCellGrid ? ' chords-cell-grid' : ''}${alternateGroups.length ? ' has-alternate-layer' : ''}${hasAlternateBass ? ' has-alternate-bass' : ''}" style="--cell-count:${cellCount}">${alternateMarkup}${chordMarkup}</div>
+  </div>`;
+}
+
+function renderStaffDirective(value) {
+  return `<span class="directive staff-directive" data-fit-directive>${escapeHtml(value)}</span>`;
+}
+
+function meterGridFor(value, grouping = null) {
+  const [topText = '4', bottomText = '4'] = String(value || '4/4').split('/');
+  const top = Math.max(1, Number.parseInt(topText, 10) || 4);
+  const bottom = Math.max(1, Number.parseInt(bottomText, 10) || 4);
+  const groupingParts = String(grouping || '').match(/^(\d+)\+(\d+)$/);
+  const requestedGrouping = groupingParts
+    ? [Number(groupingParts[1]), Number(groupingParts[2])]
+    : null;
+  let groupDurations;
+
+  // iReal Pro defaults to 3+2 in 5/4 and 5/8, and 4+3 in 7/4
+  // and 7/8. A 2+3 or 3+4 staff-text instruction reverses the
+  // grouping from that measure onward until the opposite instruction.
+  if ((bottom === 4 || bottom === 8) && (top === 5 || top === 7)) {
+    const defaultGrouping = top === 5 ? [3, 2] : [4, 3];
+    groupDurations = requestedGrouping && requestedGrouping[0] + requestedGrouping[1] === top
+      ? requestedGrouping
+      : defaultGrouping;
+  } else if (bottom === 8) {
+    if (top >= 6 && top % 3 === 0) groupDurations = Array(top / 3).fill(3);
+    else groupDurations = Array(top).fill(1);
+  } else if ((top === 6 && bottom === 4) || (top === 3 && bottom === 2)) {
+    groupDurations = [3, 3];
+  } else if (top === 2 && bottom === 2) {
+    groupDurations = [1, 1, 1, 1];
+  } else {
+    groupDurations = Array(top).fill(1);
+  }
+
+  return {
+    groupDurations,
+    groupCount: groupDurations.length,
+    totalUnits: groupDurations.reduce((sum, duration) => sum + duration, 0)
+  };
+}
+
+
+function gridPositionToCell(position, meterGrid, subdivisionsPerUnit) {
+  const clamped = Math.max(0, Math.min(meterGrid.groupCount, Number(position) || 0));
+  if (clamped >= meterGrid.groupCount) return meterGrid.totalUnits * subdivisionsPerUnit;
+
+  const groupIndex = Math.floor(clamped);
+  const fraction = clamped - groupIndex;
+  let elapsed = 0;
+  for (let index = 0; index < groupIndex; index += 1) {
+    elapsed += meterGrid.groupDurations[index];
+  }
+  elapsed += fraction * meterGrid.groupDurations[groupIndex];
+  return Math.round(elapsed * subdivisionsPerUnit);
+}
+
+function normaliseAlternateEntries(slot) {
+  return (Array.isArray(slot?.alternates) ? slot.alternates : []).map((alternate) => {
+    if (typeof alternate === 'string') {
+      return {
+        chord: alternate,
+        cell: Number.isFinite(slot?.cell) ? Number(slot.cell) : 0
+      };
+    }
+    return {
+      chord: alternate?.chord || '',
+      cell: Number.isFinite(alternate?.cell)
+        ? Number(alternate.cell)
+        : (Number.isFinite(slot?.cell) ? Number(slot.cell) : 0)
+    };
+  }).filter((alternate) => alternate.chord);
+}
+
+function resolveMusicalCellLayout(bar, chordSlots, fallbackMeter = '4/4') {
+  const usesCellGrid = chordSlots.some((slot) => Number.isFinite(slot.cell));
+  if (!usesCellGrid) {
+    return {
+      usesCellGrid: false,
+      totalCells: Math.max(1, chordSlots.length || 1),
+      slots: chordSlots.map((slot, index) => ({ startCell: index, span: 1 })),
+      alternateGroups: []
+    };
+  }
+
+  const meter = bar.effectiveTimeSignature || bar.timeSignature || fallbackMeter;
+  const meterGrid = meterGridFor(meter, bar.meterGrouping);
+  const displayUnits = meterGrid.groupCount;
+  const subdivisionsPerUnit = 8;
+  const totalCells = Math.max(1, meterGrid.totalUnits * subdivisionsPerUnit);
+  const originalRawCells = chordSlots
+    .map((slot) => Number.isFinite(slot.cell) ? Math.max(0, Number(slot.cell)) : 0);
+  const alternateSources = chordSlots.flatMap((slot, slotIndex) =>
+    normaliseAlternateEntries(slot).map((alternate) => ({
+      ...alternate,
+      slotIndex,
+      rawCell: Math.max(0, Number(alternate.cell) || 0)
+    }))
+  );
+  const leadingOffset = originalRawCells.length ? Math.min(...originalRawCells) : 0;
+  const rawCells = originalRawCells.map((cell) => cell - leadingOffset);
+  const alternateRawCells = alternateSources.map((alternate) => Math.max(0, alternate.rawCell - leadingOffset));
+  const rawMaximum = Math.max(0, ...rawCells, ...alternateRawCells);
+
+  // Choose the smallest power-of-two source resolution that contains every
+  // occupied regular or alternate cell. Alternate chords keep their own chart
+  // positions but do not alter the duration of the regular harmony below.
+  let sourceResolution = 1;
+  while (rawMaximum >= displayUnits * sourceResolution && sourceResolution < 64) {
+    sourceResolution *= 2;
+  }
+
+  const mapRawCell = (rawCell) => {
+    const groupPosition = rawCell / sourceResolution;
+    const scaled = gridPositionToCell(groupPosition, meterGrid, subdivisionsPerUnit);
+    return Math.max(0, Math.min(totalCells - 1, scaled));
+  };
+
+  let starts = rawCells.map(mapRawCell);
+
+  const hasExplicitHold = chordSlots.some((slot) => slot.chord === '/');
+  const hasMeasureRepeat = chordSlots.some((slot) => slot.chord === '%' || slot.chord === '%%');
+  const [meterTopText = '4', meterBottomText = '4'] = String(meter).split('/');
+  const meterTop = Math.max(1, Number.parseInt(meterTopText, 10) || 4);
+  const meterBottom = Math.max(1, Number.parseInt(meterBottomText, 10) || 4);
+  const sourceCellCount = Math.max(
+    1,
+    Math.max(0, Number(bar.cellCount) || 0) - leadingOffset,
+    rawMaximum + 1
+  );
+  const evenlySpacedBeatStarts = (count) => Array.from(
+    { length: count },
+    (_, index) => Math.round(index * totalCells / count)
+  );
+
+  if (!hasExplicitHold && !hasMeasureRepeat && chordSlots.length === 1) {
+    // A lone harmony always begins on beat 1. Whitespace before it is only
+    // source-layout padding and must never move the chord into the measure.
+    starts = [0];
+  } else if (
+    !hasExplicitHold && !hasMeasureRepeat && chordSlots.length === 2 &&
+    rawCells[0] === 0 && rawCells[1] === 1
+  ) {
+    // A comma-packed two-chord bar occupies adjacent source cells but still
+    // denotes the main two-part division. Explicit later cells such as [0,3]
+    // are musical placement and must be preserved.
+    const secondStart = meterGrid.groupCount === 2
+      ? meterGrid.groupDurations[0] * subdivisionsPerUnit
+      : Math.floor(totalCells / 2);
+    starts = [0, secondStart];
+  } else if (
+    meterTop === 4 && meterBottom === 4 && chordSlots.length === 3 &&
+    !hasMeasureRepeat && rawCells[0] === 0 && rawCells[1] === 1 && rawCells[2] === 3
+  ) {
+    // Some iReal exports use XyQ plus compact spacing for a three-chord bar.
+    // The source cells then read [0,1,3], but the written rhythm is beats
+    // 1, 3, and 4 (the same final-beat placement used by the iReal chart).
+    starts = [0, Math.floor(totalCells / 2), Math.floor(totalCells * 3 / 4)];
+  } else if (
+    meterTop === 3 && meterBottom === 4 && chordSlots.length === 2 &&
+    rawCells[0] === 0 && rawCells[1] * 2 === sourceCellCount
+  ) {
+    // A four-cell 3/4 source bar split into two equal halves represents
+    // 1.5 beats per chord: beat 1 and the second half of beat 2.
+    starts = [0, Math.floor(totalCells / 2)];
+  } else if (
+    meterTop === 3 && meterBottom === 4 && chordSlots.length === 3 &&
+    !hasMeasureRepeat
+  ) {
+    // Three occupied harmony cells in 3/4 are one event per beat. iReal source
+    // spacing can be [0,1,3] or [0,2,3], but neither should pull the final
+    // event onto an eighth-note subdivision.
+    starts = evenlySpacedBeatStarts(3);
+  } else if (
+    meterTop === 5 && meterBottom === 4 && chordSlots.length === 5 &&
+    !hasMeasureRepeat
+  ) {
+    // Five occupied harmony cells in 5/4 represent beats 1 through 5. Meter
+    // grouping (3+2 or 2+3) affects the main two-part division, not a full
+    // five-cell beat-by-beat pattern.
+    starts = evenlySpacedBeatStarts(5);
+  }
+
+  // Preserve source order even in malformed charts and avoid zero-width slots.
+  for (let index = 1; index < starts.length; index += 1) {
+    if (starts[index] <= starts[index - 1]) {
+      starts[index] = Math.min(totalCells - 1, starts[index - 1] + 1);
+    }
+  }
+
+  const slots = chordSlots.map((slot, index) => {
+    if (slot.chord === '%') {
+      return { startCell: 0, span: totalCells, centeredMeasureRepeat: true };
+    }
+    const nextStart = starts[index + 1];
+    const startCell = starts[index] ?? 0;
+    const span = Math.max(1, (Number.isFinite(nextStart) ? nextStart : totalCells) - startCell);
+    return { startCell, span };
+  });
+
+  const repeatAlternateOffsets = alternateSources.map((alternate, index) =>
+    alternateRawCells[index] - rawCells[alternate.slotIndex]
+  );
+  const usesCompactMeasureRepeatAlternates =
+    chordSlots.length === 1 &&
+    (chordSlots[0].chord === '%' || bar.repeatTwoBars || bar.repeatTwoBarsContinuation) &&
+    alternateSources.length > 0 &&
+    alternateSources.every((alternate) => alternate.slotIndex === 0) &&
+    repeatAlternateOffsets.every((offset) => offset === 0 || offset === 1);
+  const repeatSecondStart = meterGrid.groupCount === 2
+    ? meterGrid.groupDurations[0] * subdivisionsPerUnit
+    : Math.floor(totalCells / 2);
+
+  const mappedAlternates = alternateSources.map((alternate, index) => {
+    const sourceCell = alternateRawCells[index];
+    const regularSourceCell = rawCells[alternate.slotIndex];
+    const regularMappedCell = mapRawCell(regularSourceCell);
+    const regularDisplayCell = starts[alternate.slotIndex] ?? regularMappedCell;
+    // Alternate chords belong to their regular chord slot. If a compact
+    // source pattern such as [0,1] moves the second regular chord to beat 3,
+    // shift every alternate attached to that chord by the same amount while
+    // preserving its source-cell offsets. This keeps sequences such as
+    // 3, 3&, 4, 4& together instead of pulling them toward beat 2.
+    const normalisationShift = regularDisplayCell - regularMappedCell;
+    let startCell;
+    if (usesCompactMeasureRepeatAlternates) {
+      // A one-measure repeat occupies the whole bar. Its compact alternate
+      // cells use 0 for the first half and 1 for the second half, so `x (C7)`
+      // places C7 on beat 3 in 4/4, and `(Ab-7)x (Db7)` yields beats 1 and 3.
+      startCell = repeatAlternateOffsets[index] === 0 ? regularDisplayCell : repeatSecondStart;
+    } else {
+      startCell = mapRawCell(sourceCell) + normalisationShift;
+    }
+    startCell = Math.max(0, Math.min(totalCells - 1, startCell));
+    return { ...alternate, startCell };
+  }).sort((a, b) => a.startCell - b.startCell || a.slotIndex - b.slotIndex);
+
+  const grouped = [];
+  for (const alternate of mappedAlternates) {
+    const previous = grouped.at(-1);
+    if (previous && previous.startCell === alternate.startCell) {
+      previous.chords.push(alternate.chord);
+    } else {
+      grouped.push({ startCell: alternate.startCell, chords: [alternate.chord] });
+    }
+  }
+  const alternateGroups = grouped.map((group, index) => ({
+    ...group,
+    span: Math.max(1, (grouped[index + 1]?.startCell ?? totalCells) - group.startCell)
+  }));
+
+  return { usesCellGrid: true, totalCells, slots, displayUnits, sourceResolution, alternateGroups };
+}
+
+function normaliseChordSlots(bar) {
+  if (Array.isArray(bar.chordSlots) && bar.chordSlots.length) {
+    return bar.chordSlots.map((slot) => ({
+      chord: slot.chord,
+      alternates: normaliseAlternateEntries(slot),
+      cell: Number.isFinite(slot.cell) ? Number(slot.cell) : null,
+      small: Boolean(slot.small),
+      fermata: Boolean(slot.fermata),
+      hidden: Boolean(slot.hidden)
+    }));
+  }
+  return (bar.chords?.length ? bar.chords : ['']).map((chord, index) => ({
+    chord,
+    alternates: [],
+    cell: index,
+    small: false,
+    fermata: false
+  }));
+}
+
+function renderAlternateLayer(groups, song, notation, { semitones, accidental }, totalCells) {
+  if (!groups?.length) return '';
+  const cells = groups.map((group) => {
+    const values = group.chords.map((chord) => formatChord(chord, semitones, accidental, notation, song.key));
+    const hasBass = values.some((value) => value.includes('/'));
+    const chords = values.map((value) => `<span class="alternate-chord${value.includes('/') ? ' has-slash' : ''}">${renderChordMarkup(value)}</span>`).join('');
+    return `<span class="alternate-cell${hasBass ? ' alternate-cell-with-bass' : ''}" data-fit-alternate style="grid-column:${group.startCell + 1} / span ${group.span}">${chords}</span>`;
+  }).join('');
+  const hasBass = groups.some((group) => group.chords.some((chord) => String(chord).includes('/')));
+  return `<span class="alternate-layer${hasBass ? ' alternate-layer-with-bass' : ''}" style="--cell-count:${totalCells}">${cells}</span>`;
+}
+
+function renderChordSlot(slot, song, notation, { semitones, accidental }, slotCount = 1, slotIndex = 0, usesCellGrid = false, startCell = 0, span = 1, totalCells = 1) {
+  if (slot.hidden) return '';
+  const formatted = formatChord(slot.chord, semitones, accidental, notation, song.key);
+  const repeatClass = slot.chord === '/' || slot.chord === '%' || slot.chord === '%%' ? ' repeat-glyph' : '';
+  const slashClass = formatted !== '/' && formatted.includes('/') ? ' has-slash' : '';
+  const slotClasses = [
+    'chord-slot',
+    slot.small ? 'small-chord-slot' : '',
+    usesCellGrid ? 'cell-positioned-slot' : '',
+    slot.chord === '%' ? 'measure-repeat-slot' : ''
+  ].filter(Boolean).join(' ');
+  const cellStyle = usesCellGrid ? `grid-column:${startCell + 1} / span ${span}` : '';
+  const fermataMarkup = slot.fermata
+    ? `<span class="chord-fermata">${renderFermataSymbol()}</span>`
+    : '';
+  return `<span class="${slotClasses}" data-slot-count="${slotCount}" data-slot-index="${slotIndex}" data-grid-start="${startCell}" data-grid-span="${span}" data-grid-total="${totalCells}" style="${cellStyle}">
+    <span class="chord${repeatClass}${slashClass}" data-fit-chord>${fermataMarkup}${renderChordMarkup(formatted)}</span>
+  </span>`;
+}
+
+function renderChordMarkup(value) {
+  if (value === '/') return '<span class="beat-repeat-sign" aria-hidden="true"><span class="repeat-slash"></span></span><span class="sr-only">repeat previous beat</span>';
+  if (value === '%') return '<span class="measure-repeat-sign" aria-hidden="true"><span class="mrs-dot mrs-dot-top"></span><span class="repeat-slash"></span><span class="mrs-dot mrs-dot-bottom"></span></span><span class="sr-only">repeat previous measure</span>';
+  if (value === '%%') return '<span class="measure-repeat-sign" aria-hidden="true"><span class="mrs-dot mrs-dot-top"></span><span class="repeat-slash"></span><span class="mrs-dot mrs-dot-bottom"></span></span><span class="sr-only">repeat previous two measures</span>';
+  if (value === 'N.C.') return escapeHtml(value);
+  const invisible = String(value).match(/^\/([A-G])([♭♯]?)$/);
+  if (invisible) {
+    return '<span class="chord-stack invisible-root">' +
+      '<span class="slash-bass"><span class="slash-mark">/</span><span class="bass-note"><span class="bass-root">' +
+      escapeHtml(invisible[1]) + '</span>' +
+      (invisible[2] ? '<span class="bass-accidental">' + escapeHtml(invisible[2]) + '</span>' : '') +
+      '</span></span></span>';
+  }
+  const match = String(value).match(/^([A-G])([♭♯]?)([^/]*)(?:\/([A-G])([♭♯]?))?$/);
+  if (!match) return escapeHtml(value);
+  const [, root, accidental, quality, bass, bassAccidental] = match;
+  const mainMarkup = '<span class="chord-main"><span class="chord-root">' + escapeHtml(root) + '</span>'
+    + (accidental ? '<span class="chord-accidental">' + escapeHtml(accidental) + '</span>' : '')
+    + (quality ? '<span class="chord-quality">' + renderQualityMarkup(quality) + '</span>' : '')
+    + '</span>';
+  const bassMarkup = bass
+    ? '<span class="slash-bass"><span class="slash-mark">/</span><span class="bass-note"><span class="bass-root">' + escapeHtml(bass) + '</span>' + (bassAccidental ? '<span class="bass-accidental">' + escapeHtml(bassAccidental) + '</span>' : '') + '</span></span>'
+    : '';
+  return '<span class="chord-stack' + (bass ? ' with-bass' : '') + '">' + mainMarkup + bassMarkup + '</span>';
+}
+
+function renderQualityMarkup(quality) {
+  // The notation setting already supplies either MuseJazz private-use glyphs
+  // or Unicode fallbacks. Do not convert Unicode ø/○ back to private-use code
+  // points when the font is unavailable.
+  return escapeHtml(String(quality || ''));
+}
+
+function renderTimeSignature(value, className = 'time-signature') {
+  const [top = '4', bottom = '4'] = String(value).split('/');
+  return `<span class="${className}" aria-label="${escapeHtml(value)}"><span class="time-signature-number">${escapeHtml(top)}</span><i class="time-signature-rule" aria-hidden="true"></i><span class="time-signature-number">${escapeHtml(bottom)}</span></span>`;
+}
+
+function isLeftAlignedSymbol(symbol) {
+  return symbol === 'segno';
+}
+
+function isCenteredSymbol(symbol) {
+  return symbol === 'pause';
+}
+
+function renderFermataSymbol() {
+  return '<span class="fermata-symbol" title="Fermata" aria-label="Fermata"><i class="fermata-arc"></i><i class="fermata-dot"></i></span>';
+}
+
+function renderSymbol(symbol) {
+  if (symbol === 'segno') return renderSegnoSymbol();
+  if (symbol === 'coda') return renderCodaSymbol();
+  if (symbol === 'pause') return renderFermataSymbol();
+  return `<span class="directive" data-fit-directive>${escapeHtml(symbol)}</span>`;
+}
+
+function renderEndMarker() {
+  return '<span class="directive end-marker" data-fit-directive title="End" aria-label="End">End</span>';
+}
+
+function renderCodaGlyph() {
+  return `<svg class="coda-glyph" viewBox="0 0 78 90" aria-hidden="true" focusable="false">
+    <ellipse cx="39" cy="45" rx="24" ry="30"></ellipse>
+    <path d="M39 3v84"></path>
+    <path d="M3 45h72"></path>
+  </svg>`;
+}
+
+function renderCodaSymbol() {
+  return `<span class="coda-marker coda-inline" title="Coda" aria-label="Coda">${renderCodaGlyph()}</span>`;
+}
+
+function renderSegnoSymbol() {
+  return `<span class="segno-symbol" title="Segno" aria-label="Segno">
+    <svg class="segno-glyph" viewBox="16 12 68 76" aria-hidden="true" focusable="false">
+      <path d="M22 78 78 22"></path>
+      <g transform="matrix(.965926 -.258819 .258819 .965926 -11.237244 14.644661)">
+        <path d="M64 32c0-15-28-15-28 2 0 16 28 16 28 32 0 17-28 17-28 2"></path>
+      </g>
+      <circle cx="22" cy="50" r="4.5"></circle>
+      <circle cx="78" cy="50" r="4.5"></circle>
+    </svg>
+  </span>`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+}
+return { renderChartMarkup, escapeHtml };
+})();
+const { renderChartMarkup, escapeHtml } = __chartRenderer;
+
+(() => {
+'use strict';
+const STORAGE_SETTINGS = 'ireal-chart-viewer-settings-v3';
+const STORAGE_LAST_SONG = 'ireal-chart-viewer-last-song-v1';
+const DEFAULT_SETTINGS = {
+  accidental: 'auto',
+  scale: 100,
+  scaleAuto: true,
+  major: '\uE18A',
+  minor: 'm',
+  halfDim: '\uE18F7',
+  dim: '\uE18E7'
+};
+
+const storedSettings = loadJson(STORAGE_SETTINGS, {});
+const initialSettings = { ...DEFAULT_SETTINGS, ...storedSettings };
+
+const SEARCH_RESULT_LIMIT = 100;
+
+const state = {
+  songs: [DEMO_SONG],
+  selectedId: null,
+  semitones: 0,
+  settings: initialSettings,
+  searchOpen: false,
+  searchActiveIndex: -1,
+  viewMode: 'original',
+  fitScale: 1,
+  museJazzAvailable: false,
+  preservedLibraryEntries: [],
+  libraryWarnings: [],
+  libraryLoading: true
+};
+state.selectedId = state.songs[0]?.id ?? DEMO_SONG.id;
+
+const el = Object.fromEntries([
+  'search', 'searchOptions', 'toolbarControls', 'toolbarControlsShell', 'keyDown', 'keyUp', 'keyValue', 'accidentalGroup', 'viewModeGroup', 'scale', 'scaleAuto',
+  'settingsButton', 'chartViewport', 'chartScaleFrame', 'chartPage', 'importDialog', 'settingsDialog',
+  'importText', 'importFile', 'importError', 'importConfirm', 'deleteAll', 'majorStyle', 'minorStyle',
+  'halfDimStyle', 'dimStyle', 'settingsClose', 'importClose', 'fontNotice', 'fontNoticeClose'
+].map((id) => [id, document.getElementById(id)]));
+
+function updateToolbarScrollHint() {
+  const controls = el.toolbarControls;
+  const shell = el.toolbarControlsShell;
+  if (!controls || !shell) return;
+  const maxScroll = Math.max(0, controls.scrollWidth - controls.clientWidth);
+  shell.classList.toggle('can-scroll-left', controls.scrollLeft > 1);
+  shell.classList.toggle('can-scroll-right', controls.scrollLeft < maxScroll - 1);
+}
+
+function currentSong() {
+  return state.songs.find((song) => song.id === state.selectedId) ?? DEMO_SONG;
+}
+
+// Imported song IDs are regenerated when the saved library is reparsed, so
+// persist a stable source identity instead of the in-memory ID. The fallback
+// also keeps this working for older stored records without sourceRecord data.
+function songSelectionKey(song) {
+  if (!song) return '';
+  if (song.source === 'demo') return `demo:${song.id || DEMO_SONG.id}`;
+  const record = song.sourceRecord;
+  if (record?.body) return `ireal:${record.protocol || ''}\n${record.body}`;
+  return `song:${song.title || ''}\n${song.composer || ''}\n${song.style || ''}\n${song.key || ''}`;
+}
+
+function readLastSongKey() {
+  try {
+    return localStorage.getItem(STORAGE_LAST_SONG) || '';
+  } catch {
+    return '';
+  }
+}
+
+function saveLastSong(song) {
+  const key = songSelectionKey(song);
+  if (!key) return;
+  try {
+    localStorage.setItem(STORAGE_LAST_SONG, key);
+  } catch {
+    // The current selection remains active when persistent storage is unavailable.
+  }
+}
+
+function searchDisplayTitle(song) {
+  return song?.source === 'demo'
+    ? `${song.title} (Demo) [See Help ? to Import Songs]`
+    : (song?.title || '');
+}
+
+function searchListTitle(song) {
+  return song?.source === 'demo'
+    ? `${song.title} (Demo)`
+    : (song?.title || '');
+}
+
+function renderLoadingState() {
+  document.body.classList.add('jampanion-library-loading');
+  el.search.value = 'Loading saved song…';
+  el.search.disabled = true;
+  el.search.setAttribute('aria-busy', 'true');
+  el.searchOptions.hidden = true;
+  el.chartPage.innerHTML = '<div class="library-loading" role="status">Loading saved song…</div>';
+}
+
+function render() {
+  if (state.libraryLoading) {
+    renderLoadingState();
+    return;
+  }
+  if (!document.body.classList.contains('jampanion-playback')) {
+    document.body.classList.remove('jampanion-library-loading');
+    el.search.disabled = false;
+    el.search.removeAttribute('aria-busy');
+  }
+  renderToolbar();
+  renderSearchOptions();
+  renderChart();
+  queueFit();
+  requestAnimationFrame(updateToolbarScrollHint);
+}
+
+function renderToolbar() {
+  const song = currentSong();
+  if (!state.searchOpen) el.search.value = searchDisplayTitle(song);
+  el.keyValue.textContent = transposeKey(song.key, state.semitones, state.settings.accidental, state.settings.minor);
+  el.scale.value = String(state.settings.scale);
+  el.scaleAuto.classList.toggle('selected', state.settings.scaleAuto);
+  el.scaleAuto.setAttribute('aria-pressed', String(state.settings.scaleAuto));
+  for (const button of el.accidentalGroup.querySelectorAll('button')) {
+    button.classList.toggle('selected', button.dataset.value === state.settings.accidental);
+  }
+  for (const button of el.viewModeGroup.querySelectorAll('button')) {
+    const selected = button.dataset.value === state.viewMode;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  }
+}
+
+function renderSearchOptions() {
+  const query = el.search.value.trim().toLocaleLowerCase();
+  const matchingSongs = state.songs.filter((song) => {
+    if (!query) return true;
+    const title = searchListTitle(song).toLocaleLowerCase();
+    const composer = displayComposer(song.composer).toLocaleLowerCase();
+    return title.includes(query) || composer.includes(query);
+  });
+  const choices = matchingSongs.slice(0, SEARCH_RESULT_LIMIT);
+  const hiddenCount = Math.max(0, matchingSongs.length - choices.length);
+  if (state.searchActiveIndex >= choices.length) state.searchActiveIndex = choices.length - 1;
+  el.searchOptions.innerHTML = choices.length
+    ? choices.map((song, index) => {
+      const composer = displayComposer(song.composer);
+      const secondary = composer || song.style || '';
+      const active = index === state.searchActiveIndex;
+      return `<button id="search-option-${index}" type="button" role="option" aria-selected="${active}" class="${active ? 'active' : ''}" data-option-index="${index}" data-song-id="${escapeHtml(song.id)}"><strong>${escapeHtml(searchListTitle(song))}</strong><span>${escapeHtml(secondary)}</span></button>`;
+    }).join('') + (hiddenCount
+      ? `<div class="empty-option search-limit-note">Showing the first ${SEARCH_RESULT_LIMIT} matches. Refine the search to see more.</div>`
+      : '')
+    : '<div class="empty-option">No matching songs</div>';
+  el.searchOptions.hidden = !state.searchOpen;
+  el.search.setAttribute('aria-expanded', String(state.searchOpen));
+  if (state.searchOpen && state.searchActiveIndex >= 0 && choices.length) {
+    el.search.setAttribute('aria-activedescendant', `search-option-${state.searchActiveIndex}`);
+    el.searchOptions.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
+  } else {
+    el.search.removeAttribute('aria-activedescendant');
+  }
+}
+
+function openSearch() {
+  state.searchOpen = true;
+  state.searchActiveIndex = -1;
+  el.search.value = '';
+  renderSearchOptions();
+}
+
+function closeSearch({ restore = true } = {}) {
+  state.searchOpen = false;
+  state.searchActiveIndex = -1;
+  if (restore) el.search.value = searchDisplayTitle(currentSong());
+  renderSearchOptions();
+}
+
+function renderChart() {
+  const song = currentSong();
+  const columns = responsiveColumns();
+  const rawDisplayBars = state.viewMode === 'expanded'
+    ? expandChartBars(song.bars)
+    : song.bars.map((bar) => ({ ...bar }));
+  const displayBars = resolveTimeSignatures(rawDisplayBars, song.timeSignature || '4/4');
+  const rows = buildRows(displayBars, columns, { expanded: state.viewMode === 'expanded' });
+  const notation = {
+    major: state.settings.major === '\uE18A' && !state.museJazzAvailable ? '△' : state.settings.major,
+    minor: state.settings.minor,
+    halfDim: state.settings.halfDim === '\uE18F7' && !state.museJazzAvailable ? 'ø7' : state.settings.halfDim,
+    dim: state.settings.dim === '\uE18E7' && !state.museJazzAvailable ? '○7' : state.settings.dim
+  };
+
+  const renderSong = state.libraryWarnings.length
+    ? { ...song, warnings: [...(song.warnings || []), ...state.libraryWarnings] }
+    : song;
+  el.chartPage.innerHTML = renderChartMarkup(renderSong, rows, notation, columns, {
+    semitones: state.semitones,
+    accidental: state.settings.accidental
+  });
+}
+
+function queueFit() {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    fitChartTypography(el.chartPage);
+    fitChart();
+  }));
+}
+
+function fitChart() {
+  const viewport = el.chartViewport;
+  const page = el.chartPage;
+  if (!viewport.clientWidth || !page.scrollWidth) return;
+  page.style.transform = 'none';
+  el.chartScaleFrame.style.width = 'auto';
+  el.chartScaleFrame.style.height = 'auto';
+  const naturalWidth = page.scrollWidth;
+  const naturalHeight = page.scrollHeight;
+  const availableWidth = Math.max(100, viewport.clientWidth - 12);
+  const availableHeight = Math.max(100, viewport.clientHeight - 10);
+  const narrow = window.innerWidth < 620;
+  const widthScale = Math.min(availableWidth / naturalWidth, 1.35);
+  const fittedScale = narrow
+    ? widthScale
+    : Math.min(widthScale, availableHeight / naturalHeight, 1.35);
+  // Expanded charts can be much taller. Preserve a readable floor and allow
+  // vertical scrolling rather than shrinking long forms into illegibility.
+  state.fitScale = narrow ? fittedScale : Math.max(fittedScale, Math.min(widthScale, 0.45));
+  const scale = state.fitScale * state.settings.scale / 100;
+  page.style.transform = `scale(${scale})`;
+  el.chartScaleFrame.style.width = `${naturalWidth * scale}px`;
+  el.chartScaleFrame.style.height = `${naturalHeight * scale}px`;
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(state.settings));
+  } catch {
+    // Keep the setting active for the current session even when persistent
+    // storage is unavailable. Rendering must never be blocked by this failure.
+  }
+}
+
+function findRememberedSong(songs) {
+  const rememberedKey = readLastSongKey();
+  const directMatch = songs.find((song) => songSelectionKey(song) === rememberedKey);
+  if (directMatch) return directMatch;
+
+  // Integrated mode keeps a title-based reference as a second restore path.
+  try {
+    const stored = JSON.parse(localStorage.getItem('jampanion-jazz-last-song-v1') || 'null');
+    const identity = typeof stored?.identity === 'string' ? stored.identity : '';
+    if (!identity) return null;
+    const lineBreak = String.fromCharCode(10);
+    return songs.find((song) => {
+      const record = song.sourceRecord;
+      if (record?.body) {
+        const fields = String(record.body).split('=');
+        const sourceIdentity = [fields[0] || song.title || '', fields[1] || song.composer || ''].join(lineBreak).trim();
+        if (sourceIdentity === identity) return true;
+      }
+      return [song.title || '', song.composer || ''].join(lineBreak).trim() === identity;
+    }) || null;
+  } catch {
+    return null;
+  }
+}
+
+async function initialiseLibrary() {
+  state.libraryLoading = true;
+  render();
+  try {
+    const loaded = await loadSongLibrary();
+    state.preservedLibraryEntries = loaded.failedEntries || [];
+    state.libraryWarnings = loaded.warnings || [];
+    const rememberedSong = findRememberedSong(loaded.songs || []);
+    if (rememberedSong) {
+      state.songs = loaded.songs;
+      state.selectedId = rememberedSong.id;
+    } else {
+      // Keep the demo as a true fallback, never as a transient first screen.
+      state.songs = [DEMO_SONG, ...(loaded.songs || []).filter((song) => song.source !== 'demo')];
+      state.selectedId = DEMO_SONG.id;
+    }
+  } catch (error) {
+    console.error('Could not load song library; using demo fallback:', error);
+    state.songs = [DEMO_SONG];
+    state.selectedId = DEMO_SONG.id;
+  } finally {
+    state.libraryLoading = false;
+    render();
+  }
+}
+
+function loadJson(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key) || '') ?? fallback; }
+  catch { return fallback; }
+}
+
+el.search.addEventListener('focus', openSearch);
+el.toolbarControls?.addEventListener('scroll', updateToolbarScrollHint, { passive: true });
+el.search.addEventListener('input', () => {
+  state.searchOpen = true;
+  state.searchActiveIndex = -1;
+  renderSearchOptions();
+});
+el.search.addEventListener('keydown', (event) => {
+  const options = [...el.searchOptions.querySelectorAll('[data-song-id]')];
+  if (event.key === 'Escape') {
+    closeSearch();
+    el.search.blur();
+    return;
+  }
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    if (!state.searchOpen) state.searchOpen = true;
+    if (!options.length) return;
+    const direction = event.key === 'ArrowDown' ? 1 : -1;
+    const start = state.searchActiveIndex < 0 ? (direction > 0 ? -1 : 0) : state.searchActiveIndex;
+    state.searchActiveIndex = (start + direction + options.length) % options.length;
+    renderSearchOptions();
+    return;
+  }
+  if (event.key === 'Enter') {
+    const target = options[state.searchActiveIndex] || options[0];
+    if (target) {
+      event.preventDefault();
+      selectSong(target.dataset.songId);
+    }
+  }
+});
+
+function selectSong(songId) {
+  state.selectedId = songId;
+  state.searchOpen = false;
+  state.searchActiveIndex = -1;
+  render();
+  saveLastSong(currentSong());
+  el.search.blur();
+}
+// JAMPANION_SELECTION_TRANSPOSE_V1
+
+el.searchOptions.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-song-id]');
+  if (!button) return;
+  selectSong(button.dataset.songId);
+});
+document.addEventListener('pointerdown', (event) => {
+  if (!event.target.closest('.search-wrap') && state.searchOpen) closeSearch();
+});
+
+el.keyDown.addEventListener('click', () => { state.semitones -= 1; render(); });
+el.keyUp.addEventListener('click', () => { state.semitones += 1; render(); });
+el.accidentalGroup.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-value]');
+  if (!button) return;
+  state.settings.accidental = button.dataset.value;
+  saveSettings();
+  render();
+});
+el.viewModeGroup.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-value]');
+  if (!button || button.dataset.value === state.viewMode) return;
+  state.viewMode = button.dataset.value;
+  render();
+});
+el.scale.addEventListener('input', () => {
+  state.settings.scale = Number(el.scale.value);
+  state.settings.scaleAuto = false;
+  saveSettings();
+  renderToolbar();
+  fitChart();
+});
+el.scaleAuto.addEventListener('click', () => {
+  state.settings.scale = 100;
+  state.settings.scaleAuto = true;
+  saveSettings();
+  renderToolbar();
+  fitChart();
+});
+
+el.settingsButton.addEventListener('click', () => {
+  el.majorStyle.value = state.settings.major;
+  el.minorStyle.value = state.settings.minor;
+  el.halfDimStyle.value = state.settings.halfDim;
+  el.dimStyle.value = state.settings.dim;
+  el.settingsDialog.showModal();
+});
+el.settingsClose.addEventListener('click', () => el.settingsDialog.close());
+for (const select of [el.majorStyle, el.minorStyle, el.halfDimStyle, el.dimStyle]) {
+  select.addEventListener('change', () => {
+    state.settings.major = el.majorStyle.value;
+    state.settings.minor = el.minorStyle.value;
+    state.settings.halfDim = el.halfDimStyle.value;
+    state.settings.dim = el.dimStyle.value;
+    saveSettings();
+    render();
+  });
+}
+
+document.getElementById('openImport').addEventListener('click', () => {
+  el.settingsDialog.close();
+  el.importError.textContent = '';
+  el.importText.value = '';
+  el.importFile.value = '';
+  el.importDialog.showModal();
+});
+el.importClose.addEventListener('click', () => el.importDialog.close());
+el.importFile.addEventListener('change', async () => {
+  const file = el.importFile.files?.[0];
+  if (file) el.importText.value = await file.text();
+});
+el.importConfirm.addEventListener('click', async () => {
+  try {
+    const collection = parseIRealCollection(el.importText.value);
+    const existing = new Map(state.songs.filter((song) => song.source !== 'demo').map((song) => [`${song.title}\n${song.composer}`, song]));
+    for (const song of collection.songs) existing.set(`${song.title}\n${song.composer}`, song);
+    const nextSongs = [...existing.values()];
+    const importedIdentities = new Set(collection.songs.map((song) => `${song.title || ''}\n${song.composer || ''}`));
+    const remainingPreservedEntries = state.preservedLibraryEntries.filter((entry) => {
+      if (entry?.kind !== 'ireal' || typeof entry.body !== 'string') return true;
+      const fields = entry.body.split('=');
+      return !importedIdentities.has(`${fields[0] || ''}\n${fields[1] || ''}`);
+    });
+    // Remove a repaired raw entry before saving so a successful reimport truly
+    // replaces it rather than leaving a hidden duplicate in persistent storage.
+    await saveSongLibrary(nextSongs, remainingPreservedEntries);
+    state.preservedLibraryEntries = remainingPreservedEntries;
+    state.libraryWarnings = state.preservedLibraryEntries.length
+      ? state.libraryWarnings
+      : [];
+    state.songs = nextSongs.length ? nextSongs : [DEMO_SONG];
+    state.selectedId = collection.songs[0].id;
+    el.importDialog.close();
+    state.semitones = 0;
+    render();
+    saveLastSong(currentSong());
+  } catch (error) {
+    el.importError.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+
+async function restoreSongsByIds(songIds) {
+  const ids = new Set((Array.isArray(songIds) ? songIds : []).map((id) => String(id)));
+  if (!ids.size) return { restored: 0 };
+  const targets = state.songs.filter((song) => ids.has(String(song.id)) && song.source !== 'demo');
+  if (!targets.length) return { restored: 0 };
+  const restoredById = new Map();
+  for (const song of targets) {
+    const original = song.originalSourceRecord;
+    if (song.originalSourceSong) {
+      restoredById.set(String(song.id), JSON.parse(JSON.stringify(song.originalSourceSong)));
+      continue;
+    }
+    if (!original?.body || typeof parseIRealCollection !== 'function') {
+      restoredById.set(String(song.id), song);
+      continue;
+    }
+    try {
+      const protocol = /^(?:irealb|irealbook):\/\/$/i.test(original.protocol || '') ? original.protocol : 'irealb://';
+      restoredById.set(String(song.id), parseIRealCollection(`${protocol}${encodeURIComponent(original.body)}`).songs?.[0] || song);
+    } catch {
+      restoredById.set(String(song.id), song);
+    }
+  }
+  const restoredSongs = state.songs.map((song) => restoredById.get(String(song.id)) || song);
+  await saveSongLibrary(restoredSongs.filter((song) => song.source !== 'demo'), state.preservedLibraryEntries);
+  state.songs = restoredSongs;
+  const selectedReplacement = restoredById.get(String(state.selectedId));
+  if (selectedReplacement) state.selectedId = selectedReplacement.id;
+  state.semitones = 0;
+  saveLastSong(currentSong());
+  render();
+  return { restored: targets.length };
+}
+
+el.deleteAll.addEventListener('click', async () => {
+  const importedSongs = state.songs.filter((song) => song.source !== 'demo');
+  if (!importedSongs.length) {
+    alert('No imported songs to delete.');
+    return;
+  }
+  if (!confirm('Delete all imported songs?')) return;
+  const removedSongs = state.songs.filter((song) => song.source !== 'demo').map((song) => ({
+    id: song.id,
+    nativeIdentity: song.nativeIdentity || '',
+    title: song.title || '',
+    composer: song.composer || '',
+    source: song.source || '',
+    sourceRecord: song.sourceRecord || null,
+    originalSourceRecord: song.originalSourceRecord || null,
+    originalSourceSong: song.originalSourceSong || null
+  }));
+  try {
+    await clearSongLibrary();
+  } catch (error) {
+    alert(error instanceof Error ? error.message : String(error));
+    return;
+  }
+  state.songs = [DEMO_SONG];
+  state.preservedLibraryEntries = [];
+  state.libraryWarnings = [];
+  state.selectedId = DEMO_SONG.id;
+  state.semitones = 0;
+  saveLastSong(DEMO_SONG);
+  window.dispatchEvent(new CustomEvent('jampanion-library-cleared', { detail: { songs: removedSongs } }));
+  el.settingsDialog.close();
+  render();
+});
+
+
+document.getElementById('fullscreen').addEventListener('click', async () => {
+  if (!document.fullscreenElement) await document.documentElement.requestFullscreen?.();
+  else await document.exitFullscreen?.();
+});
+
+let lastColumns = responsiveColumns();
+window.addEventListener('resize', () => {
+  const columns = responsiveColumns();
+  if (columns !== lastColumns) {
+    lastColumns = columns;
+    render();
+  } else {
+    queueFit();
+  }
+  updateToolbarScrollHint();
+});
+el.fontNoticeClose?.addEventListener('click', () => {
+  el.fontNotice.hidden = true;
+  try { localStorage.setItem('jazz-viewer-font-notice-dismissed', '1'); } catch {}
+});
+
+async function detectMuseJazzText() {
+  // FontFaceSet.check() may return false before a remotely defined font has
+  // actually been requested, especially when this file is opened via file://.
+  // Explicitly loading the MuseJazz private-use major symbol avoids that false
+  // warning. Failure is harmless because the renderer has a Unicode fallback.
+  if (!document.fonts?.load) {
+    state.museJazzAvailable = false;
+    el.fontNotice.hidden = true;
+    render();
+    return;
+  }
+
+  try {
+    const faces = await document.fonts.load('16px "MuseJazz Text"', '\uE18A');
+    const loaded = faces.length > 0;
+    state.museJazzAvailable = loaded;
+    const dismissed = (() => {
+      try { return localStorage.getItem('jazz-viewer-font-notice-dismissed') === '1'; }
+      catch { return false; }
+    })();
+    el.fontNotice.hidden = loaded || dismissed;
+  } catch (error) {
+    console.warn('MuseJazz Text font check failed:', error);
+    state.museJazzAvailable = false;
+    // The Unicode fallback is fully usable, so do not show an undismissable or
+    // misleading warning merely because file:// font detection is restricted.
+    el.fontNotice.hidden = true;
+  }
+  render();
+}
+
+detectMuseJazzText();
+
+const libraryReady = initialiseLibrary();
+// JAMPANION_LIBRARY_STARTUP_V1
+// JAMPANION_LIBRARY_SEARCH_UNLOCK_V1
+window.__chartViewer = { state, parseIRealCollection, buildRows, expandChartBars, deriveEndingNumbers, displayComposer, normaliseStaffText, libraryReady, restoreSongsByIds };
+// JAMPANION_CUSTOMIZED_SONGS_V1
+
+function responsiveColumns() {
+  return 4;
+}
+})();
+</script>
+
+  <script type="module" data-jampanion-embedded-bridge="v12">
+    import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=33";
+    initializeEmbeddedViewer().catch(error => {
+      console.error("Jampanion embedded bridge failed", error);
+      document.documentElement.classList.remove("jampanion-startup-pending");
+      const bridgeTargetOrigin = window.location.origin === "null" ? "*" : window.location.origin;
+      window.parent?.postMessage({
+        channel: "jampanion-jcv-v12",
+        type: "bridge-error",
+        error: error instanceof Error ? error.message : String(error)
+      }, bridgeTargetOrigin);
+    });
+  </script>
+</body>
+</html>

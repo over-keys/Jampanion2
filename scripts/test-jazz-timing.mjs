@@ -1,6 +1,6 @@
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
-const modulePath = resolve(process.argv[2] || "integration/overlay/src/Jampanion.Web/wwwroot/js/jazz-chart-host.js");
+const modulePath = resolve(process.argv[2] || "src/Jampanion.Web/web-src/jazz-chart-host.js");
 const {
   gridCellToTick,
   buildSoloSequenceWithExpander,

@@ -1,3 +1,7 @@
 .build/
 dist/
 .DS_Store
+src/Jampanion.Web/node_modules/
+src/Jampanion.Web/wwwroot/js/
+**/bin/
+**/obj/

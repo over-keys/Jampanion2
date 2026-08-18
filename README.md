@@ -73,3 +73,25 @@ On smartphones, the Session controls remain available at the top while the chart
 ## Saving and browser data
 
 Songs and settings are saved in the current browser. If you clear browser data or open Jampanion2 on another device, import your songs again.
+
+## Development
+
+Jampanion2 is self-contained. The application source, accompaniment engine,
+browser audio layer, and chart viewer all live in this repository under `src/`.
+The build does not clone or overlay the earlier Jampanion or Jazz Chart Viewer
+repositories.
+
+Requirements:
+
+- .NET SDK 10
+- Node.js 24
+- npm
+
+Validate and build locally:
+
+```bash
+scripts/validate-static.sh
+scripts/build.sh
+```
+
+The published static site is written to `dist/`.

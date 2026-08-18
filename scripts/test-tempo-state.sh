@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LOGIC="$ROOT/integration/overlay/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs"
-MODELS="$ROOT/integration/overlay/src/Jampanion.Web/Models/JazzChartModels.cs"
-HOST="$ROOT/integration/overlay/src/Jampanion.Web/wwwroot/js/jazz-chart-host.js"
-HOME_RAZOR="$ROOT/integration/overlay/src/Jampanion.Web/Pages/Home.razor"
+LOGIC="$ROOT/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs"
+MODELS="$ROOT/src/Jampanion.Web/Models/JazzChartModels.cs"
+HOST="$ROOT/src/Jampanion.Web/web-src/jazz-chart-host.js"
+HOME_RAZOR="$ROOT/src/Jampanion.Web/Pages/Home.razor"
 
 grep -q 'var identityChanged = forceAccompanimentSettings || !_hasBootstrap' "$LOGIC"
 grep -q 'TempoIsExplicit = bootstrap.TempoExplicit;' "$LOGIC"
@@ -28,8 +28,8 @@ if grep -q 'storedTempo !== 140' "$HOST"; then
   echo 'Legacy 140 migration heuristic must not be present.' >&2
   exit 1
 fi
-grep -q './js/jazz-chart-host.js?v=52' "$LOGIC"
-grep -q 'viewer/index.html?integrated=14' "$HOME_RAZOR"
+grep -q './js/jazz-chart-host.js?v=33' "$LOGIC"
+grep -q 'viewer/index.html?integrated=33' "$HOME_RAZOR"
 echo 'Style-aware tempo regression checks passed.'
 
 ! grep -q 'AutomaticThemeReturnEnabled' "$LOGIC"

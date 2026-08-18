@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Jampanion2の譜面表示、編集、伴奏機能の使い方。">
+  <title>ヘルプ · Jampanion2</title>
+  <link rel="stylesheet" href="./help.css?v=33">
+</head>
+<body>
+  <header class="help-header">
+    <div class="help-header-inner">
+      <a class="help-brand" href="./index.html"><span class="help-mark" aria-hidden="true">♭</span><span>Jampanion2 ヘルプ</span></a>
+      <div class="help-header-actions">
+        <a class="header-link" href="./help.en.html?v=33" lang="en">English</a>
+        <a class="header-link primary" href="./index.html">ビューアーを開く</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="help-layout">
+    <nav class="help-nav" aria-label="ヘルプの目次">
+      <strong>目次</strong>
+      <a href="#jampanion">伴奏・編集</a>
+      <a href="#quick-start">まず使ってみる</a>
+      <a href="#import">曲のインポート</a>
+      <a href="#search">曲を選ぶ</a>
+      <a href="#transpose">キー変更</a>
+      <a href="#views">Original / Expanded</a>
+      <a href="#display">大きさと表示</a>
+      <a href="#settings">設定</a>
+      <a href="#storage">保存とプライバシー</a>
+      <a href="#font">フォント</a>
+      <a href="#troubleshooting">トラブル対処</a>
+    </nav>
+
+    <main class="help-main">
+      <section class="hero">
+        <h1>Jampanion2</h1>
+        <p>iReal形式のジャズ・コード譜を表示し、ピアノ・ベース・ドラムの伴奏に合わせて練習・演奏できるアプリです。コードやリハーサルマークの編集、移調、リピート展開など、Jampanion2を使うために必要な操作をまとめています。</p>
+      </section>
+
+      <section id="jampanion" class="help-section">
+        <h2>伴奏と譜面編集</h2>
+        <p>Jampanion2では、譜面を読むだけでなく、コード進行に合わせたピアノ・ベース・ドラムの伴奏をブラウザで再生できます。まず曲をインポートして選び、画面左の<strong>Accompaniment</strong>と<strong>Session</strong>を使います。</p>
+
+        <h3>最初の演奏</h3>
+        <ol>
+          <li>曲を選び、キー、<strong>Original / Expanded</strong>、テンポ、スタイルを確認します。</li>
+          <li><strong>Tempo</strong>を入力し、<strong>Style</strong>で<strong>Swing / Ballad / Bossa Nova / Latin</strong>を選びます。4/4以外の曲では対応するスタイルだけが表示されます。</li>
+          <li><strong>Start session</strong>を押すとカウントインの後に演奏が始まります。演奏中は譜面が現在位置へ自動スクロールします。</li>
+          <li>すぐに演奏を止めるときは<strong>Stop</strong>を押します。再生中のノートオフも同時に送られます。</li>
+          <li>テーマに戻って自然に終わらせるときは、演奏中の<strong>Back to head</strong>を押します。<strong>Head Out</strong>がキューされ、現在の区切りからテーマに戻って演奏したあと、曲が終了します。キューされるとボタンは<strong>Head out queued</strong>に変わります。</li>
+        </ol>
+
+        <div class="note"><strong>StopとHead Outの違い</strong>Stopはその場で伴奏を止めます。Head Outは演奏をすぐには止めず、テーマに戻る流れをキューしてから終了します。</div>
+
+        <h3>テンポ、スタイル、保存</h3>
+        <table class="control-table">
+          <tbody>
+            <tr><th>Tempo</th><td>上下操作は5 BPMずつ変わります。数値を直接入力すれば、1 BPM単位の値も指定できます。</td></tr>
+            <tr><th>Style</th><td>Swing、Ballad、Bossa Nova、Latinから伴奏スタイルを選びます。リハーサルマークごとに別のスタイルも指定できます。</td></tr>
+            <tr><th>Save / Revert</th><td>Saveはコード、リハーサルマーク、移調したキー、テンポ、スタイルの変更をまとめて保存します。Saveを押すまでは一時的な変更です。Revertは保存したキー、テンポ、スタイルを元に戻し、インポート元を残した編集版の曲では元のiReal譜面にも戻します。</td></tr>
+          </tbody>
+        </table>
+        <div class="note"><strong>Key</strong>−／＋で変更した移調キーも、Saveで曲ごとに保存され、次回自動復元されます。</div>
+        <div class="note"><strong>演奏中の変更</strong>スタイル変更は次の4小節区切り、テンポ変更は次の小節区切りから適用されます。</div>
+
+        <h3>コードとリハーサルマークを編集する</h3>
+        <ul>
+          <li>コードを<strong>ダブルクリック</strong>して編集します。入力を空にして確定すると、そのコードを削除します。</li>
+          <li>小節内の空いている場所を<strong>ダブルクリック</strong>すると、その拍位置にコードを追加できます。</li>
+          <li>マークのない行の左側を<strong>ダブルクリック</strong>してリハーサルマークを追加し、既存のマークを<strong>ダブルクリック</strong>して名前を変更します。入力を空にして確定すると削除できます。</li>
+          <li>リハーサルマークまたはその小節を<strong>右クリック</strong>すると、セクションスタイルだけを指定できます。</li>
+          <li>スタイルを指定したリハーサルマークの上には、<strong>Swing / Latin / Bossa / Ballad</strong>が表示されます。曲のデフォルトを使う場合は表示されません。</li>
+          <li>タイトルも<strong>ダブルクリック</strong>で変更できます。</li>
+        </ul>
+        <div class="warning"><strong>編集内容の保存</strong>編集したコードやマークは、<strong>Accompaniment</strong>欄の<strong>Save</strong>で保存します。曲を閉じたり別の曲を選ぶ前にSaveを押してください。最初に編集すると、インポート元を残したまま、このブラウザで編集できる曲として保存されます。</div>
+
+        <h3>MixとMIDI</h3>
+        <ul>
+          <li><strong>Mix</strong>でPiano、Bass、Drumsの音量とミュートを調整できます。設定は曲を閉じても同じブラウザに保存されます。</li>
+          <li><strong>Settings → Audio &amp; MIDI</strong>でMIDI inputとMIDI outputを選べます。外部MIDI出力がない場合も、<strong>Built-in Trio</strong>でブラウザ音源を使えます。</li>
+          <li><strong>MIDI thru</strong>を有効にすると、選択したMIDI inputのノートを出力先へ中継できます。</li>
+        </ul>
+        <div class="note"><strong>スマートフォン</strong>では、Sessionの操作を上部に残し、譜面を縦にスクロールして使います。Mixは譜面の下にあります。</div>
+      </section>
+
+      <section id="quick-start" class="help-section">
+        <h2>まず使ってみる</h2>
+        <ol class="quick-steps">
+          <li>歯車ボタンを開き、<strong>Import iReal data</strong>を選びます。</li>
+          <li>iRealの共有リンクを貼り付けるか、保存済みのテキスト／HTMLファイルを選び、<strong>Import</strong>を押します。</li>
+          <li>検索欄から曲を選びます。</li>
+          <li><strong>− / +</strong>でキーを変更し、<strong>Auto / ♭ / ♯</strong>で表記を選びます。</li>
+          <li>譜面どおりに読む場合は<strong>Original</strong>、演奏順に展開して読む場合は<strong>Expanded</strong>を選びます。</li>
+        </ol>
+      </section>
+
+      <section id="import" class="help-section">
+        <h2>曲をインポートする</h2>
+        <h3>Jazz 1460をインポートする</h3>
+        <div class="link-box">
+          <p>iReal Pro公式コミュニティフォーラムのトピックを開き、最初の投稿にある<strong>Jazz 1460</strong>リンクを探します。</p>
+          <a href="https://forums.irealpro.com/threads/jazz-1460-standards.12753/" target="_blank" rel="noopener">Jazz 1460のトピックを開く</a>
+        </div>
+        <ol>
+          <li><strong>Jazz 1460</strong>というリンクそのものをコピーします。ブラウザ上部のページURLではありません。</li>
+          <li>パソコンではリンクを右クリックして<strong>リンクのアドレスをコピー</strong>または<strong>リンクをコピー</strong>を選びます。スマートフォン／タブレットではChromeでリンクを長押しし、<strong>リンクをコピー</strong>を選びます。Safariではコピーできないため、Chromeまたはパソコンを使ってください。</li>
+          <li>コピーした文字列が<code>irealb://</code>または<code>irealbook://</code>で始まることを確認します。</li>
+          <li>ビューアーで<strong>設定 → Import iReal data</strong>を開き、貼り付けて<strong>Import</strong>を押します。</li>
+        </ol>
+        <div class="warning">以前の全曲集を置き換える場合は、先に<strong>Delete all songs</strong>を実行すると、削除・改名された古い譜面が残りません。</div>
+
+        <h3>その他のiRealデータ</h3>
+        <p><code>irealb://</code>または<code>irealbook://</code>で始まる共有リンクを貼り付けるほか、保存済みの<code>.txt</code>、<code>.html</code>、<code>.htm</code>ファイルも選択できます。</p>
+        <p>新しいインポートは現在のライブラリへ追加されます。同じ曲名・作曲者の譜面は新しい内容で置き換わり、その他の曲は残ります。</p>
+      </section>
+
+      <section id="search" class="help-section">
+        <h2>曲を検索して選ぶ</h2>
+        <p>検索欄では、インポート済みの曲を曲名または作曲者名で検索できます。候補は先頭100件まで表示されます。マウスまたはタッチで選択し、キーボードでは<strong>↑ / ↓</strong>で候補を移動、<strong>Enter</strong>で決定、<strong>Escape</strong>で閉じます。</p>
+        <div class="note"><strong>別の曲を選んだとき</strong>一時的な移調は解除され、選択した曲の原調へ戻ります。</div>
+      </section>
+
+      <section id="transpose" class="help-section">
+        <h2>キーと異名同音表記を変更する</h2>
+        <table class="control-table">
+          <tbody>
+            <tr><th>− / +</th><td>表示中のキーとすべてのコードを半音ずつ下げる／上げる。</td></tr>
+            <tr><th>Auto</th><td>移調後のキーに応じて、フラット系またはシャープ系の表記を自動選択する。</td></tr>
+            <tr><th>♭</th><td>B♭、E♭など、フラット表記を優先する。</td></tr>
+            <tr><th>♯</th><td>F♯、C♯など、シャープ表記を優先する。</td></tr>
+          </tbody>
+        </table>
+        <p>移調は表示だけに適用されます。インポート済みの元譜データは変更されません。</p>
+      </section>
+
+      <section id="views" class="help-section">
+        <h2>OriginalとExpanded</h2>
+        <div class="mode-grid">
+          <article class="mode-panel">
+            <h3>Original</h3>
+            <p>リピート記号、1番・2番カッコ、D.C.、D.S.、Fine、Segno、To Coda、Codaなどを含め、譜面に記載された形のまま表示します。</p>
+          </article>
+          <article class="mode-panel">
+            <h3>Expanded</h3>
+            <p>譜面上のナビゲーションを、上から下へそのまま読める演奏順へ展開します。</p>
+          </article>
+        </div>
+        <p>Expandedではリピートと番号付きカッコを展開し、対応しているD.C.／D.S.は、記載されたFineまたはCodaまでたどります。展開後はリピートの点やカッコを除去しますが、音楽的なセクション境界は複縦線として残します。</p>
+        <div class="warning"><strong>Originalを基準に確認してください</strong>Expandedは、インポートされた譜面のナビゲーションを標準的な規則で解釈する補助表示です。特殊な文章指示や不完全なリピート情報を含む場合は、Originalと比較し、Originalを正として確認してください。</div>
+      </section>
+
+      <section id="display" class="help-section">
+        <h2>譜面の大きさと画面表示</h2>
+        <table class="control-table">
+          <tbody>
+            <tr><th>Scaleスライダー</th><td>譜面の大きさを手動で設定し、Fitを解除する。</td></tr>
+            <tr><th>Fit</th><td>画面に収まる大きさへ再調整する。</td></tr>
+            <tr><th>Fullscreen</th><td>デスクトップの対応ブラウザで全画面表示を開始・終了する。スマートフォンでは表示されない。</td></tr>
+          </tbody>
+        </table>
+        <p>スマートフォンを含め、基本的に1行4小節を保ったまま、画面幅に合わせて全体を縮尺します。元譜に含まれる拍子変更、リハーサルマーク、複縦線、リピート、カッコ、Segno、Coda、終止線も表示します。</p>
+      </section>
+
+      <section id="settings" class="help-section">
+        <h2>設定</h2>
+        <p>歯車ボタンから、次の操作ができます。</p>
+        <ul>
+          <li>メジャー、マイナー、ハーフディミニッシュ、ディミニッシュの表記変更</li>
+          <li>iRealデータの追加インポート</li>
+          <li>インポート済み全曲の削除</li>
+        </ul>
+        <p><strong>Delete all songs</strong>はインポート済みの曲を削除しますが、内蔵のデモ譜面は残ります。</p>
+      </section>
+
+      <section id="storage" class="help-section">
+        <h2>保存場所とプライバシー</h2>
+        <p>本アプリは、ユーザーが選択したコード譜データをブラウザ内で解析・表示します。インポートしたデータは運営者のサーバーには送信されません。インポートするデータを利用する権限があることは、ユーザー自身の責任で確認してください。</p>
+        <p>曲と表示設定は、現在開いているサイト専用のブラウザ内に保存されます。</p>
+        <p>ブラウザデータを削除した場合、別のブラウザや端末を使う場合、サイトのドメイン名やリポジトリのパスが変わった場合は、曲を再インポートしてください。プライベートブラウズでは、セッション終了時にライブラリが消えることがあります。</p>
+      </section>
+
+      <section id="font" class="help-section">
+        <h2>MuseJazz Textフォント <small>（任意）</small></h2>
+        <p>通常は自動で読み込まれます。ローカルにインストールする場合は次の手順です。</p>
+        <ol>
+          <li><a href="https://raw.githubusercontent.com/musescore/MuseScore/c1ad658dec3f29ef7e089a5915c7eed91a7e5349/fonts/musejazz/MuseJazzText.otf" target="_blank" rel="noopener">MuseJazzText.otfをダウンロード</a>します。</li>
+          <li>Windowsではファイルを開いて<strong>インストール</strong>、macOSでは<strong>フォントをインストール</strong>を選びます。Linuxでは<code>~/.local/share/fonts/</code>へコピーし、<code>fc-cache -f</code>を実行します。</li>
+          <li>ブラウザを再起動します。</li>
+        </ol>
+        <p>フォントを読み込めない場合は、通常の<code>△</code>記号で表示します。</p>
+      </section>
+
+      <section id="troubleshooting" class="help-section">
+        <h2>うまくいかない場合</h2>
+        <dl class="faq">
+          <dt>iRealデータが見つからない。</dt>
+          <dd>貼り付けた文字列が<code>irealb://</code>または<code>irealbook://</code>で始まり、途中で切れていないか確認してください。</dd>
+
+          <dt>貼り付けた文字列が<code>https://forums.irealpro.com/</code>で始まる。</dt>
+          <dd>フォーラムのページURLをコピーしています。<strong>Jazz 1460</strong>のリンクそのものをコピーしてください。</dd>
+
+          <dt>Jazz 1460を押すとiReal Proが開く。</dt>
+          <dd>Chromeでリンクを長押しし、<strong>リンクをコピー</strong>を選んでください。Safariではコピーできません。</dd>
+
+          <dt>インポートした曲が消えた。</dt>
+          <dd>ブラウザデータが削除されたか、サイトのURLが変わった可能性があります。プレイリストを再インポートしてください。</dd>
+
+          <dt>譜面が小さすぎる／大きすぎる。</dt>
+          <dd><strong>Fit</strong>を押すか、Scaleスライダーで調整してください。</dd>
+
+          <dt>Expandedの順序が不自然。</dt>
+          <dd>Originalと比較し、元譜のナビゲーション記号が特殊または不完全でないか確認してください。</dd>
+
+          <dt>メジャー記号の形が違う。</dt>
+          <dd>MuseJazz Textをインストールするか、標準の<code>△</code>表示をそのまま使用してください。</dd>
+        </dl>
+      </section>
+
+      <footer class="help-footer">
+        <p><a href="./LICENSE">アプリケーションのライセンス</a> · <a href="./THIRD_PARTY_NOTICES.md">第三者ライセンス表示</a> · <a href="./licenses/MuseJazzText-OFL-1.1.txt">MuseJazz Textライセンス</a></p>
+        <p>iReal ProはTechnimo LLCの商標です。本アプリはTechnimo LLCと提携しておらず、同社による承認も受けていません。Jazz 1460および各コード譜データは、ビューアーには同梱していません。</p>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

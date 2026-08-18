@@ -1,4 +1,4 @@
-name: Deploy integrated Jazz Chart Viewer + Jampanion
+name: Deploy Jampanion2
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out integration source
+      - name: Check out source
         uses: actions/checkout@v7
 
       - name: Set up .NET
@@ -31,11 +31,11 @@ jobs:
         with:
           node-version: 24
 
-      - name: Validate integration source
+      - name: Validate source
         run: scripts/validate-static.sh
 
-      - name: Build integrated site
-        run: scripts/build-integrated.sh
+      - name: Build site
+        run: scripts/build.sh
 
       - name: Prepare GitHub Pages base path
         run: scripts/prepare-pages.sh dist "${GITHUB_REPOSITORY#*/}"
@@ -46,6 +46,7 @@ jobs:
           set -euo pipefail
           test -s dist/index.html
           test -s dist/viewer/index.html
+          test -s dist/viewer/assets/MuseJazzText.otf
           test -s dist/js/jazz-chart-host.js
           test -s dist/js/jampanion-audio.js
           test -s dist/soundfonts/FluidR3_Jampanion.sf3
@@ -57,6 +58,7 @@ jobs:
           path: dist
 
   deploy:
+    if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:

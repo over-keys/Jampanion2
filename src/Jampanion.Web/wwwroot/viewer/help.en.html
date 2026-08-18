@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="User guide for Jampanion2's chart display, editing, and accompaniment.">
+  <title>Help · Jampanion2</title>
+  <link rel="stylesheet" href="./help.css?v=33">
+</head>
+<body>
+  <header class="help-header">
+    <div class="help-header-inner">
+      <a class="help-brand" href="./index.html"><span class="help-mark" aria-hidden="true">♭</span><span>Jampanion2 Help</span></a>
+      <div class="help-header-actions">
+        <a class="header-link" href="./help.html?v=33" lang="ja">日本語</a>
+        <a class="header-link primary" href="./index.html">Open Jampanion2</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="help-layout">
+    <nav class="help-nav" aria-label="Help contents">
+      <strong>Contents</strong>
+      <a href="#jampanion">Accompaniment and editing</a>
+      <a href="#quick-start">Quick start</a>
+      <a href="#import">Import songs</a>
+      <a href="#search">Find songs</a>
+      <a href="#transpose">Change key</a>
+      <a href="#views">Original / Expanded</a>
+      <a href="#display">Size and display</a>
+      <a href="#settings">Settings</a>
+      <a href="#storage">Storage and privacy</a>
+      <a href="#font">Font</a>
+      <a href="#troubleshooting">Troubleshooting</a>
+    </nav>
+
+    <main class="help-main">
+      <section class="hero">
+        <h1>Jampanion2</h1>
+        <p>Jampanion2 displays iReal-format jazz chord charts and lets you practice or play along with piano, bass, and drums. This guide covers accompaniment, chart editing, importing songs, transposition, and repeat expansion.</p>
+      </section>
+
+      <section id="jampanion" class="help-section">
+        <h2>Accompaniment and chart editing</h2>
+        <p>Jampanion2 is more than a chart viewer: it plays piano, bass, and drums along with your chord progression. Select a song, then use <strong>Accompaniment</strong> and <strong>Session</strong>.</p>
+
+        <h3>Starting a session</h3>
+        <ol>
+          <li>Select a song and check the key, <strong>Original / Expanded</strong> view, tempo, and style.</li>
+          <li>Enter the <strong>Tempo</strong> and choose <strong>Swing / Ballad / Bossa Nova / Latin</strong> in <strong>Style</strong>. Only styles supported by the meter are shown.</li>
+          <li>Press <strong>Start session</strong> to begin after the count-in. The chart scrolls to the current position during playback.</li>
+          <li>Press <strong>Stop</strong> to stop immediately. It also sends note-off messages for playing notes.</li>
+          <li>To finish naturally, press <strong>Back to head</strong> while playing. <strong>Head Out</strong> is queued; the accompaniment returns to the theme at the next suitable boundary, plays the theme through, and then ends. The button changes to <strong>Head out queued</strong> while queued.</li>
+        </ol>
+
+        <div class="note"><strong>Stop vs Head Out</strong>Stop stops the accompaniment where it is. Head Out keeps playback running, queues the return to the theme, and ends after the theme is played.</div>
+
+        <h3>Tempo, style, and saving</h3>
+        <table class="control-table">
+          <tbody>
+            <tr><th>Tempo</th><td>The stepper buttons change the tempo by 5 BPM. You can enter any whole-number BPM directly.</td></tr>
+            <tr><th>Style</th><td>Choose Swing, Ballad, Bossa Nova, or Latin. You can assign a different style to each rehearsal mark.</td></tr>
+            <tr><th>Save / Revert</th><td>Save stores chart edits, rehearsal marks, the transposed key, tempo, and style changes together. Changes remain temporary until you press Save. Revert resets saved key, tempo, and style settings; for an edited song that keeps its imported source, it also restores the original iReal chart.</td></tr>
+          </tbody>
+        </table>
+        <div class="note"><strong>Key</strong>The transposition made with − / + is also saved per song when you press Save and restored next time.</div>
+        <div class="note"><strong>Changes during playback</strong>Style changes take effect at the next four-bar boundary. Tempo changes take effect at the next bar boundary.</div>
+
+        <h3>Editing chords and rehearsal marks</h3>
+        <ul>
+          <li><strong>Double-click a chord</strong> to edit it. Confirm an empty value to remove it.</li>
+          <li><strong>Double-click an empty position in a bar</strong> to add a chord at that beat.</li>
+          <li><strong>Double-click the left side of a row without a mark</strong> to add a rehearsal mark. <strong>Double-click an existing mark</strong> to rename it. Confirm an empty value to remove it.</li>
+          <li><strong>Right-click a rehearsal mark or its bar</strong> to assign a section style only.</li>
+          <li>Assigned styles appear above rehearsal marks as <strong>Swing / Latin / Bossa / Ballad</strong>. The label is hidden when the song default is used.</li>
+          <li><strong>Double-click the title</strong> to rename the song.</li>
+        </ul>
+        <div class="warning"><strong>Saving edits</strong>Press <strong>Save</strong> in <strong>Accompaniment</strong> to keep edited chords and marks. Save before closing or changing songs.</div>
+
+        <h3>Mix and MIDI</h3>
+        <ul>
+          <li>Use <strong>Mix</strong> to adjust Piano, Bass, and Drums volume or mute state. These settings are remembered in the same browser.</li>
+          <li>Open <strong>Settings → Audio &amp; MIDI</strong> to choose MIDI input and MIDI output. Choose <strong>Built-in Trio</strong> to use the browser instruments when no external MIDI output is available.</li>
+          <li>Enable <strong>MIDI thru</strong> to relay notes from the selected MIDI input to the output.</li>
+        </ul>
+        <div class="note"><strong>On smartphones</strong>Session controls stay at the top while the chart scrolls vertically. Mix is below the chart.</div>
+      </section>
+
+      <section id="quick-start" class="help-section">
+        <h2>Quick start</h2>
+        <ol class="quick-steps">
+          <li>Open the gear button and choose <strong>Import iReal data</strong>.</li>
+          <li>Paste an iReal shared link or choose a saved text or HTML file, then select <strong>Import</strong>.</li>
+          <li>Choose a song from the search box.</li>
+          <li>Use <strong>− / +</strong> to change key, and <strong>Auto / ♭ / ♯</strong> to control spelling.</li>
+          <li>Use <strong>Original</strong> for the written chart or <strong>Expanded</strong> for linear performance order.</li>
+        </ol>
+      </section>
+
+      <section id="import" class="help-section">
+        <h2>Import songs</h2>
+        <h3>Import Jazz 1460</h3>
+        <div class="link-box">
+          <p>Open the official iReal Pro community forum topic and find the <strong>Jazz 1460</strong> link in the first post.</p>
+          <a href="https://forums.irealpro.com/threads/jazz-1460-standards.12753/" target="_blank" rel="noopener">Open Jazz 1460 forum topic</a>
+        </div>
+        <ol>
+          <li>Copy the <strong>Jazz 1460</strong> link itself. Do not copy the browser's page address.</li>
+          <li>On a computer, right-click the link and choose <strong>Copy link address</strong> or <strong>Copy Link</strong>. On a phone or tablet, use Chrome: touch and hold the link and choose <strong>Copy link</strong>. Safari cannot copy this link, so use Chrome or a computer.</li>
+          <li>Confirm that the copied text begins with <code>irealb://</code> or <code>irealbook://</code>.</li>
+          <li>In Jampanion2, open <strong>Settings → Import iReal data</strong>, paste the link, and select <strong>Import</strong>.</li>
+        </ol>
+        <div class="warning">Replacing an older full playlist: use <strong>Delete all songs</strong> first so obsolete or renamed charts do not remain.</div>
+
+        <h3>Import other iReal data</h3>
+        <p>You can paste any <code>irealb://</code> or <code>irealbook://</code> shared link, or choose a saved <code>.txt</code>, <code>.html</code>, or <code>.htm</code> file.</p>
+        <p>Imports are merged with the current library. A chart with the same title and composer replaces the existing copy; other songs remain.</p>
+      </section>
+
+      <section id="search" class="help-section">
+        <h2>Find and select a song</h2>
+        <p>Search imported songs by title or composer. Only the first 100 matches are shown. Choose a result with the mouse or touch. With a keyboard, use <strong>Up / Down</strong> to move, <strong>Enter</strong> to select, and <strong>Escape</strong> to close the list.</p>
+        <div class="note"><strong>When you change songs</strong>The temporary transposition resets to the selected song's original key.</div>
+      </section>
+
+      <section id="transpose" class="help-section">
+        <h2>Change key and note spelling</h2>
+        <table class="control-table">
+          <tbody>
+            <tr><th>− / +</th><td>Transpose the displayed key and every chord down or up by one semitone.</td></tr>
+            <tr><th>Auto</th><td>Choose flats or sharps according to the transposed key.</td></tr>
+            <tr><th>♭</th><td>Prefer flat spellings, such as B♭ and E♭.</td></tr>
+            <tr><th>♯</th><td>Prefer sharp spellings, such as F♯ and C♯.</td></tr>
+          </tbody>
+        </table>
+        <p>Transposition affects only the displayed chart. The imported source data is not modified.</p>
+      </section>
+
+      <section id="views" class="help-section">
+        <h2>Original and Expanded views</h2>
+        <div class="mode-grid">
+          <article class="mode-panel">
+            <h3>Original</h3>
+            <p>Shows the chart as written, including repeat signs, first and second endings, D.C., D.S., Fine, Segno, To Coda, and Coda markings.</p>
+          </article>
+          <article class="mode-panel">
+            <h3>Expanded</h3>
+            <p>Turns the navigation into a linear top-to-bottom sequence that can be read in performance order.</p>
+          </article>
+        </div>
+        <p>Expanded view resolves written repeats and numbered endings. Supported D.C. and D.S. instructions are followed through Fine or Coda when those markings are present. Repeat dots and ending brackets are removed from the expanded sequence, while musical section boundaries remain visible as double barlines.</p>
+        <div class="warning"><strong>Use Original as the reference</strong>Expanded view follows standard navigation rules encoded in the imported chart. If a source uses unusual text instructions or malformed repeat data, compare it with Original and treat Original as authoritative.</div>
+      </section>
+
+      <section id="display" class="help-section">
+        <h2>Size and screen controls</h2>
+        <table class="control-table">
+          <tbody>
+            <tr><th>Scale slider</th><td>Sets a manual chart size and turns Fit off.</td></tr>
+            <tr><th>Fit</th><td>Fits the chart to the available viewport again.</td></tr>
+            <tr><th>Fullscreen</th><td>Enters or exits fullscreen in supported desktop browsers. It is hidden on smartphones.</td></tr>
+          </tbody>
+        </table>
+        <p>The layout keeps four measures per row, including on mobile screens, and scales the whole page to fit. Time-signature changes, rehearsal marks, double barlines, repeats, endings, Segno, Coda, and final barlines are preserved where present in the source chart.</p>
+      </section>
+
+      <section id="settings" class="help-section">
+        <h2>Settings</h2>
+        <p>Open the gear button to:</p>
+        <ul>
+          <li>choose the display style for major, minor, half-diminished, and diminished chords;</li>
+          <li>import more iReal data;</li>
+          <li>delete all imported songs;</li>
+        </ul>
+        <p><strong>Delete all songs</strong> removes the imported library but leaves the built-in demonstration chart.</p>
+      </section>
+
+      <section id="storage" class="help-section">
+        <h2>Local storage and privacy</h2>
+        <p>This application imports and displays chord-chart data selected by the user. Imported data is processed locally in the browser and is not uploaded to the application operator. Users are responsible for ensuring that they have the right to use the imported content.</p>
+        <p>Songs are stored locally in IndexedDB for the exact site URL, while display settings are stored in localStorage for that URL.</p>
+        <p>Re-import songs after clearing browser data, changing browser or device, or opening the viewer at a different domain or repository path. Private or incognito mode may discard the library when the private session ends.</p>
+      </section>
+
+      <section id="font" class="help-section">
+        <h2>MuseJazz Text font <small>(optional)</small></h2>
+        <p>The viewer tries to load MuseJazz Text automatically. To install it locally:</p>
+        <ol>
+          <li><a href="https://raw.githubusercontent.com/musescore/MuseScore/c1ad658dec3f29ef7e089a5915c7eed91a7e5349/fonts/musejazz/MuseJazzText.otf" target="_blank" rel="noopener">Download MuseJazzText.otf</a>.</li>
+          <li>Open it and choose <strong>Install</strong> on Windows or <strong>Install Font</strong> on macOS. On Linux, copy it to <code>~/.local/share/fonts/</code> and run <code>fc-cache -f</code>.</li>
+          <li>Restart the browser.</li>
+        </ol>
+        <p>If the font is unavailable, the viewer uses the standard <code>△</code> symbol instead.</p>
+      </section>
+
+      <section id="troubleshooting" class="help-section">
+        <h2>Troubleshooting</h2>
+        <dl class="faq">
+          <dt>The import says no iReal data was found.</dt>
+          <dd>Confirm that the pasted text begins with <code>irealb://</code> or <code>irealbook://</code> and was not truncated.</dd>
+
+          <dt>The pasted text begins with <code>https://forums.irealpro.com/</code>.</dt>
+          <dd>You copied the forum page address. Copy the <strong>Jazz 1460</strong> link itself.</dd>
+
+          <dt>Selecting Jazz 1460 opens iReal Pro.</dt>
+          <dd>In Chrome, touch and hold the link and choose <strong>Copy link</strong>. Safari cannot copy this link.</dd>
+
+          <dt>Imported songs disappeared.</dt>
+          <dd>Browser data may have been cleared, or the site's URL changed. Import the playlist again.</dd>
+
+          <dt>The chart is too small or too large.</dt>
+          <dd>Select <strong>Fit</strong>, or move the Scale slider to set a manual size.</dd>
+
+          <dt>Expanded order looks wrong.</dt>
+          <dd>Compare with Original and check whether the source chart uses nonstandard or incomplete navigation markings.</dd>
+
+          <dt>The major symbol looks different.</dt>
+          <dd>Install MuseJazz Text, or continue using the standard <code>△</code> fallback.</dd>
+        </dl>
+      </section>
+
+      <footer class="help-footer">
+        <p><a href="./LICENSE">Application license</a> · <a href="./THIRD_PARTY_NOTICES.md">Third-party notices</a> · <a href="./licenses/MuseJazzText-OFL-1.1.txt">MuseJazz Text license</a></p>
+        <p>iReal Pro is a trademark of Technimo LLC. This application is not affiliated with or endorsed by Technimo LLC. Jazz 1460 and its chart data are not redistributed with the viewer.</p>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>
