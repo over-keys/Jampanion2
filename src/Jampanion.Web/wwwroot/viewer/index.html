@@ -150,37 +150,6 @@ button {
   font-size: 17px;
 }
 
-.jampanion-mode-link {
-  flex: 0 0 30px;
-  width: 30px;
-  height: 30px;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #b9c4c8;
-  border-radius: 5px;
-  background: #fff;
-  color: #253036;
-  text-decoration: none;
-}
-
-.jampanion-mode-link[hidden] {
-  display: none;
-}
-
-.jampanion-mode-link:hover {
-  border-color: #236b83;
-  background: #eef5f7;
-}
-
-.jampanion-mode-link img {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  object-fit: cover;
-}
-
 .chart-viewport {
   position: relative;
   min-height: 0;
@@ -3005,11 +2974,7 @@ textarea:focus-visible {
   }
 }
 </style>
-  <link rel="manifest" href="./manifest.webmanifest?v=1" />
-  <meta name="theme-color" content="#0b6e69" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="Jampanion2 Viewer" />
-  <link rel="icon" type="image/png" href="../icons/jampanion-viewer.png?v=37" />
+  <link rel="icon" type="image/png" href="../icons/jampanion-viewer.png?v=38" />
   <style data-jampanion-startup-guard="v1">html.jampanion-startup-pending .app-shell { visibility:hidden; }</style>
   <script data-jampanion-startup-guard="v1">
     document.documentElement.classList.add('jampanion-startup-pending');
@@ -3028,9 +2993,6 @@ textarea:focus-visible {
   <div class="app-shell">
     <header class="toolbar" aria-label="Chart controls">
       <div class="toolbar-main">
-        <a id="jampanionModeLink" class="jampanion-mode-link" href="../" hidden title="Open Jampanion2 accompaniment mode" aria-label="Open Jampanion2 accompaniment mode">
-          <img src="../icons/jampanion-32.png?v=37" alt="" width="22" height="22" />
-        </a>
         <div class="search-wrap">
           <input id="search" type="search" role="combobox" autocomplete="off" aria-label="Search songs" aria-autocomplete="list" aria-controls="searchOptions" aria-expanded="false" placeholder="Search songs">
           <div id="searchOptions" class="search-options" role="listbox" hidden></div>
@@ -3068,7 +3030,7 @@ textarea:focus-visible {
 
         <div class="utility-group">
           <button id="fullscreen" class="icon-button utility" type="button" title="Fullscreen" aria-label="Fullscreen">⛶</button>
-          <a id="helpButton" class="icon-button utility help-button" href="./help.html?v=36" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
+          <a id="helpButton" class="icon-button utility help-button" href="./help.html?v=37" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
           <button id="settingsButton" class="icon-button utility" type="button" title="Settings" aria-label="Settings">⚙︎</button>
         </div>
         </div>
@@ -3115,7 +3077,7 @@ textarea:focus-visible {
       <section class="about-section">
         <h3>About</h3>
         <p>Jazz Chart Viewer is licensed under the MIT License. MuseJazz Text is loaded from a pinned MuseScore source under the SIL Open Font License 1.1, with a Unicode fallback when unavailable.</p>
-        <p><a href="./help.html?v=36" target="_blank" rel="noopener" lang="en">Help</a> · <a href="./help.en.html?v=36" target="_blank" rel="noopener" lang="en">English help</a></p>
+        <p><a href="./help.html?v=37" target="_blank" rel="noopener" lang="en">Help</a> · <a href="./help.en.html?v=37" target="_blank" rel="noopener" lang="en">English help</a></p>
         <p><a href="./LICENSE" target="_blank" rel="noopener">Application license</a> · <a href="./THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Third-party notices</a></p>
       </section>
     </form>
@@ -6288,29 +6250,28 @@ function responsiveColumns() {
 </script>
 
   <script type="module" data-jampanion-embedded-bridge="v12">
-    const isStandaloneViewer = window.parent === window && !new URL(location.href).searchParams.has("integrated");
-    if (isStandaloneViewer) {
-      document.getElementById("jampanionModeLink")?.removeAttribute("hidden");
+    import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=38";
+    initializeEmbeddedViewer().catch(error => {
+      console.error("Jampanion embedded bridge failed", error);
       document.documentElement.classList.remove("jampanion-startup-pending");
-    } else {
-      import("../js/jazz-chart-host.js?v=37").then(({ initializeEmbeddedViewer }) => {
-        return initializeEmbeddedViewer();
-      }).catch(error => {
-        console.error("Jampanion embedded bridge failed", error);
-        document.documentElement.classList.remove("jampanion-startup-pending");
-        const bridgeTargetOrigin = window.location.origin === "null" ? "*" : window.location.origin;
-        window.parent?.postMessage({
-          channel: "jampanion-jcv-v12",
-          type: "bridge-error",
-          error: error instanceof Error ? error.message : String(error)
-        }, bridgeTargetOrigin);
-      });
-    }
+      const bridgeTargetOrigin = window.location.origin === "null" ? "*" : window.location.origin;
+      window.parent?.postMessage({
+        channel: "jampanion-jcv-v12",
+        type: "bridge-error",
+        error: error instanceof Error ? error.message : String(error)
+      }, bridgeTargetOrigin);
+    });
   </script>
   <script>
-    if ("serviceWorker" in navigator && window.parent === window && location.protocol !== "file:") {
-      navigator.serviceWorker.register("./viewer-service-worker.js", { scope: "./" })
-        .catch(error => console.warn("Offline Viewer installation failed:", error));
+    // Remove the old optional Viewer worker from installations made by earlier
+    // builds. The current online Viewer does not register a replacement worker.
+    if ("serviceWorker" in navigator && location.protocol !== "file:") {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        const viewerPath = new URL(".", document.baseURI).pathname;
+        return Promise.all(registrations
+          .filter(registration => new URL(registration.scope).pathname === viewerPath)
+          .map(registration => registration.unregister()));
+      }).catch(() => {});
     }
   </script>
 </body>

@@ -17,8 +17,6 @@ test -s "$WEB/Jampanion.Web.csproj"
 test -s "$HOST"
 test -s "$AUDIO"
 test -s "$VIEWER"
-test -s "$WEB/wwwroot/viewer/manifest.webmanifest"
-test -s "$WEB/wwwroot/viewer/viewer-service-worker.js"
 
 node --check "$HOST"
 node --check "$AUDIO"
@@ -36,7 +34,7 @@ node "$ROOT/scripts/test-viewer-navigation.mjs" "$VIEWER"
 node "$ROOT/scripts/test-help-contract.mjs" "$HELP"
 node "$ROOT/scripts/test-help-en-contract.mjs" "$HELP_EN"
 node "$ROOT/scripts/test-shell-contract.mjs" \
-  "$INDEX" "$WEB/App.razor" "$WEB/wwwroot/manifest.webmanifest"
+  "$INDEX" "$WEB/App.razor"
 
 legacy_hits="$(grep -R -n \
   --exclude-dir=node_modules --exclude-dir=bin --exclude-dir=obj --exclude-dir=js \
@@ -49,9 +47,9 @@ if [[ -n "$legacy_hits" ]]; then
   exit 1
 fi
 
-grep -q 'const APP_VERSION = "36"' "$INDEX"
+grep -q 'const APP_VERSION = "37"' "$INDEX"
 test -s "$WEB/wwwroot/app-version.json"
-grep -q '"version": "36"' "$WEB/wwwroot/app-version.json"
+grep -q '"version": "37"' "$WEB/wwwroot/app-version.json"
 grep -q 'The app could not start after automatic cache recovery. Press Reload to try again.' "$INDEX"
 grep -q 'web-src/jazz-chart-host.js' "$WEB/scripts/build-audio.mjs"
 grep -q 'url("assets/MuseJazzText.otf")' "$WEB/wwwroot/viewer/index.html"

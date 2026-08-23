@@ -3,11 +3,12 @@ import fs from "node:fs";
 const file = process.argv[2] || "local-viewer/index.html";
 const html = fs.readFileSync(file, "utf8");
 const checks = [
-  ["local bundle marker", html.includes('data-jampanion-local-bundle="v1"')],
+  ["local bundle marker", html.includes('data-jampanion-local-bundle="v2"')],
   ["embedded Viewer code is present", html.includes("const __names")],
   ["font is embedded", html.includes("data:font/otf;base64,")],
   ["Viewer icon is embedded", html.includes("data:image/png;base64,")],
-  ["service worker is not required", !html.includes("serviceWorker.register")],
+  ["local accompaniment link is present", html.includes('id="jampanionModeLink"') && html.includes('href="https://over-keys.github.io/Jampanion2/"')],
+  ["service worker is not required", !html.includes("serviceWorker")],
   ["main link stays online", html.includes("https://over-keys.github.io/Jampanion2/")],
   ["local storage library remains", html.includes("localStorage")]
 ];
