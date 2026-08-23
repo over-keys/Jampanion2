@@ -45,8 +45,10 @@ if [[ -n "$legacy_hits" ]]; then
   exit 1
 fi
 
-grep -q 'const APP_VERSION = "34"' "$INDEX"
-grep -q "Please clear your browser's cached files for this site, then reload the page." "$INDEX"
+grep -q 'const APP_VERSION = "35"' "$INDEX"
+test -s "$WEB/wwwroot/app-version.json"
+grep -q '"version": "35"' "$WEB/wwwroot/app-version.json"
+grep -q 'The app could not start after automatic cache recovery. Press Reload to try again.' "$INDEX"
 grep -q 'web-src/jazz-chart-host.js' "$WEB/scripts/build-audio.mjs"
 grep -q 'url("assets/MuseJazzText.otf")' "$WEB/wwwroot/viewer/index.html"
 ! grep -q 'cdn.jsdelivr.net.*MuseJazzText.otf' "$WEB/wwwroot/viewer/index.html"

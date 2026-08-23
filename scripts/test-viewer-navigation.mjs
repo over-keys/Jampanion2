@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 const htmlPath = process.argv[2];
 if (!htmlPath) throw new Error("Usage: node test-viewer-navigation.mjs VIEWER_INDEX_HTML");
 
-const html = readFileSync(htmlPath, "utf8");
+const html = readFileSync(htmlPath, "utf8").replace(/\r\n/g, "\n");
 const start = html.indexOf("const __expand = (() => {");
 const end = html.indexOf("\n})();\nconst { expandChartBars", start);
 if (start < 0 || end < 0) throw new Error("Viewer expansion module was not found.");

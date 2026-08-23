@@ -50,6 +50,8 @@ jobs:
           test -s dist/js/jazz-chart-host.js
           test -s dist/js/jampanion-audio.js
           test -s dist/soundfonts/FluidR3_Jampanion.sf3
+          test -s dist/app-version.json
+          grep -q '"version": "35"' dist/app-version.json
           grep -q "<base href=\"/${GITHUB_REPOSITORY#*/}/\" />" dist/index.html
 
       - name: Upload Pages artifact

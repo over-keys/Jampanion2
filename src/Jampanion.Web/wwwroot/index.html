@@ -6,35 +6,38 @@
     <meta name="theme-color" content="#0b6e69" />
     <meta name="description" content="Jampanion adaptive jazz backing partner" />
     <base href="/" />
-    <link rel="manifest" href="manifest.webmanifest?v=34" />
-    <link rel="icon" type="image/png" sizes="32x32" href="icons/jampanion-32.png?v=34" />
-    <link rel="icon" type="image/png" sizes="48x48" href="icons/jampanion-48.png?v=34" />
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/jampanion-180.png?v=34" />
-    <link rel="stylesheet" href="css/app.css?v=34" />
+    <link rel="manifest" href="manifest.webmanifest?v=35" />
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/jampanion-32.png?v=35" />
+    <link rel="icon" type="image/png" sizes="48x48" href="icons/jampanion-48.png?v=35" />
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/jampanion-180.png?v=35" />
+    <link rel="stylesheet" href="css/app.css?v=35" />
     <title>Jampanion2</title>
 </head>
 <body>
     <div id="app">
         <div class="boot-screen">
-            <img src="icons/jampanion-192.png?v=34" alt="" width="72" height="72" />
+            <img src="icons/jampanion-192.png?v=35" alt="" width="72" height="72" />
             <strong>Jampanion2</strong>
             <span>Loading the web app…</span>
         </div>
     </div>
 
     <div id="blazor-error-ui">
-        An unexpected error occurred. Please clear your browser's cached files for this site, then reload the page.
+        The app could not start after automatic cache recovery. Press Reload to try again.
         <a href="." class="reload">Reload</a>
         <button class="dismiss" type="button">×</button>
     </div>
 
     <script>
         (() => {
-            const APP_VERSION = "34";
+            const APP_VERSION = "35";
             const CACHE_VERSION_KEY = "jampanion-web-cache-version";
             const RESET_RELOAD_KEY = "jampanion-web-cache-reset-reload";
             const BOOT_RECOVERY_KEY = "jampanion-web-boot-recovery";
+            const SHELL_REFRESH_KEY = "jampanion-web-shell-refresh";
+            const SHELL_REFRESH_QUERY = "_jampanion_shell";
             const RECOVERY_QUERY_KEY = "_jampanion_recover";
+            const PUBLISHED_VERSION_URL = "app-version.json";
             const isLocal = location.hostname === "localhost" || location.hostname === "127.0.0.1";
             let forceFreshBoot = isLocal;
 
@@ -49,12 +52,33 @@
             async function unregisterJampanionWorkers() {
                 if (!("serviceWorker" in navigator)) return false;
                 const wasControlled = navigator.serviceWorker.controller !== null;
-                const baseUrl = new URL(".", document.baseURI).href;
+                const baseUrl = new URL(".", document.baseURI);
                 const registrations = await navigator.serviceWorker.getRegistrations();
                 await Promise.all(registrations
-                    .filter(registration => registration.scope.startsWith(baseUrl))
+                    .filter(registration => {
+                        const scope = new URL(registration.scope);
+                        return scope.origin === baseUrl.origin &&
+                            (baseUrl.href.startsWith(scope.href) || scope.href.startsWith(baseUrl.href));
+                    })
                     .map(registration => registration.unregister()));
                 return wasControlled;
+            }
+
+            async function readPublishedVersion() {
+                if (isLocal) return null;
+                try {
+                    const url = new URL(PUBLISHED_VERSION_URL, document.baseURI);
+                    url.searchParams.set("probe", String(Date.now()));
+                    const response = await fetch(url.href, {
+                        cache: "no-store",
+                        credentials: "same-origin"
+                    });
+                    if (!response.ok) return null;
+                    const payload = await response.json();
+                    return typeof payload.version === "string" ? payload.version : null;
+                } catch {
+                    return null;
+                }
             }
 
             function hasRecoveryQuery() {
@@ -67,10 +91,18 @@
                 return url.href;
             }
 
-            function clearRecoveryQuery() {
+            function shellRefreshUrl(publishedVersion) {
                 const url = new URL(location.href);
-                if (!url.searchParams.has(RECOVERY_QUERY_KEY)) return;
+                url.searchParams.set(SHELL_REFRESH_QUERY, publishedVersion);
+                url.searchParams.set(RECOVERY_QUERY_KEY, `${publishedVersion}-${Date.now()}`);
+                return url.href;
+            }
+
+            function clearBootQueries() {
+                const url = new URL(location.href);
+                if (!url.searchParams.has(RECOVERY_QUERY_KEY) && !url.searchParams.has(SHELL_REFRESH_QUERY)) return;
                 url.searchParams.delete(RECOVERY_QUERY_KEY);
+                url.searchParams.delete(SHELL_REFRESH_QUERY);
                 history.replaceState(history.state, "", url.href);
             }
 
@@ -87,19 +119,27 @@
                     // Storage can be unavailable in restricted browsing modes.
                 }
 
+                const wasControlled = await unregisterJampanionWorkers();
+                const publishedVersion = await readPublishedVersion();
+                if (publishedVersion && publishedVersion !== APP_VERSION) {
+                    try {
+                        if (sessionStorage.getItem(SHELL_REFRESH_KEY) !== publishedVersion) {
+                            sessionStorage.setItem(SHELL_REFRESH_KEY, publishedVersion);
+                            location.replace(shellRefreshUrl(publishedVersion));
+                            return false;
+                        }
+                    } catch {
+                        location.replace(shellRefreshUrl(publishedVersion));
+                        return false;
+                    }
+                }
+
                 const versionChanged = installedVersion !== APP_VERSION;
                 const recoveryRequested = hasRecoveryQuery();
-                forceFreshBoot = isLocal || versionChanged || recoveryRequested;
+                forceFreshBoot = isLocal || versionChanged || recoveryRequested || wasControlled;
                 if (!forceFreshBoot) return true;
 
-                const wasControlled = await unregisterJampanionWorkers();
                 await removeJampanionCaches();
-
-                try {
-                    localStorage.setItem(CACHE_VERSION_KEY, APP_VERSION);
-                } catch {
-                    // A clean network boot remains possible without localStorage.
-                }
 
                 if (!isLocal && wasControlled) {
                     try {
@@ -156,7 +196,7 @@
                 }
 
                 const script = document.createElement("script");
-                    script.src = "_framework/blazor.webassembly.js?v=34";
+                script.src = "_framework/blazor.webassembly.js?v=35";
                 script.async = false;
                 script.setAttribute("autostart", "false");
 
@@ -182,11 +222,16 @@
                             });
 
                             try {
+                                localStorage.setItem(CACHE_VERSION_KEY, APP_VERSION);
+                            } catch {
+                                // A clean network boot remains possible without localStorage.
+                            }
+                            try {
                                 sessionStorage.removeItem(BOOT_RECOVERY_KEY);
                             } catch {
                                 // Ignore unavailable session storage.
                             }
-                            clearRecoveryQuery();
+                            clearBootQueries();
                         } catch (error) {
                             await recoverBoot(error);
                         }

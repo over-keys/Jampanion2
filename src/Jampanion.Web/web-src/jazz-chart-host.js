@@ -7,7 +7,7 @@ const NATIVE_STORE = "songs";
 const NATIVE_DB_VERSION = 1;
 const PPQ = 480;
 const IREAL_MUSIC_PREFIX = "1r34LbKcu7";
-const JAMPANION_ICON_PATH = "../icons/jampanion-32.png?v=34";
+const JAMPANION_ICON_PATH = "../icons/jampanion-32.png?v=35";
 
 let frame;
 let win;

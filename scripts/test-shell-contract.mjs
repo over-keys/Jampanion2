@@ -9,11 +9,11 @@ for (const file of targets) {
   if (source.includes('const APP_VERSION = "26"')) throw new Error(`Old cache version remains: ${file}`);
 
   if (source.includes("blazor-error-ui") &&
-      !source.includes("Please clear your browser's cached files for this site, then reload the page.")) {
-    throw new Error(`Fatal error cache-recovery guidance missing: ${file}`);
+      !source.includes("The app could not start after automatic cache recovery. Press Reload to try again.")) {
+    throw new Error(`Fatal error automatic recovery guidance missing: ${file}`);
   }
   if (source.includes("blazor-error-ui") &&
-      !source.includes('const APP_VERSION = "34"')) {
+      !source.includes('const APP_VERSION = "35"')) {
     throw new Error(`Standalone cache generation missing: ${file}`);
   }
   if (source.includes("blazor-error-ui") &&
@@ -27,6 +27,11 @@ for (const file of targets) {
   if (source.includes("blazor-error-ui") &&
       !source.includes("BOOT_RECOVERY_KEY")) {
     throw new Error(`Automatic stale-cache boot recovery missing: ${file}`);
+  }
+  if (source.includes("blazor-error-ui") &&
+      !source.includes("PUBLISHED_VERSION_URL") ||
+      source.includes("blazor-error-ui") && !source.includes('cache: "no-store"')) {
+    throw new Error(`Published shell version probe missing: ${file}`);
   }
 }
 console.log(`Jampanion2 startup branding contract passed (${targets.length} files).`);
