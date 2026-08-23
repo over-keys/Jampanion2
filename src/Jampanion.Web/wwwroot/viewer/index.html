@@ -150,6 +150,37 @@ button {
   font-size: 17px;
 }
 
+.jampanion-mode-link {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #b9c4c8;
+  border-radius: 5px;
+  background: #fff;
+  color: #253036;
+  text-decoration: none;
+}
+
+.jampanion-mode-link[hidden] {
+  display: none;
+}
+
+.jampanion-mode-link:hover {
+  border-color: #236b83;
+  background: #eef5f7;
+}
+
+.jampanion-mode-link img {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
 .chart-viewport {
   position: relative;
   min-height: 0;
@@ -2978,7 +3009,7 @@ textarea:focus-visible {
   <meta name="theme-color" content="#0b6e69" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Jampanion2 Viewer" />
-  <link rel="icon" type="image/png" href="../icons/jampanion-viewer.png?v=36" />
+  <link rel="icon" type="image/png" href="../icons/jampanion-viewer.png?v=37" />
   <style data-jampanion-startup-guard="v1">html.jampanion-startup-pending .app-shell { visibility:hidden; }</style>
   <script data-jampanion-startup-guard="v1">
     document.documentElement.classList.add('jampanion-startup-pending');
@@ -2997,6 +3028,9 @@ textarea:focus-visible {
   <div class="app-shell">
     <header class="toolbar" aria-label="Chart controls">
       <div class="toolbar-main">
+        <a id="jampanionModeLink" class="jampanion-mode-link" href="../" hidden title="Open Jampanion2 accompaniment mode" aria-label="Open Jampanion2 accompaniment mode">
+          <img src="../icons/jampanion-32.png?v=37" alt="" width="22" height="22" />
+        </a>
         <div class="search-wrap">
           <input id="search" type="search" role="combobox" autocomplete="off" aria-label="Search songs" aria-autocomplete="list" aria-controls="searchOptions" aria-expanded="false" placeholder="Search songs">
           <div id="searchOptions" class="search-options" role="listbox" hidden></div>
@@ -6254,10 +6288,12 @@ function responsiveColumns() {
 </script>
 
   <script type="module" data-jampanion-embedded-bridge="v12">
-    if (window.parent === window && !new URL(location.href).searchParams.has("integrated")) {
+    const isStandaloneViewer = window.parent === window && !new URL(location.href).searchParams.has("integrated");
+    if (isStandaloneViewer) {
+      document.getElementById("jampanionModeLink")?.removeAttribute("hidden");
       document.documentElement.classList.remove("jampanion-startup-pending");
     } else {
-      import("../js/jazz-chart-host.js?v=36").then(({ initializeEmbeddedViewer }) => {
+      import("../js/jazz-chart-host.js?v=37").then(({ initializeEmbeddedViewer }) => {
         return initializeEmbeddedViewer();
       }).catch(error => {
         console.error("Jampanion embedded bridge failed", error);

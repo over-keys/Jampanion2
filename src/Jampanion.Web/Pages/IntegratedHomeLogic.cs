@@ -187,7 +187,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         try
         {
             _self ??= DotNetObjectReference.Create(this);
-            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=36");
+            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=37");
             try { await _chartModule.InvokeVoidAsync("initializeMobileControlsScrollHint"); } catch { }
             var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("initialize", "jcv-frame", _self);
             ApplyBootstrap(bootstrap);
