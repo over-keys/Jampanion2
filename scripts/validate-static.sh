@@ -30,6 +30,8 @@ python3 "$ROOT/scripts/test-app-invariants.py"
 "$ROOT/scripts/test-chart-bridge.sh"
 
 node "$ROOT/scripts/test-viewer-contract.mjs" "$VIEWER"
+node "$ROOT/scripts/build-local-viewer.mjs"
+node "$ROOT/scripts/test-local-viewer.mjs" "$ROOT/local-viewer/index.html"
 node "$ROOT/scripts/test-viewer-navigation.mjs" "$VIEWER"
 node "$ROOT/scripts/test-help-contract.mjs" "$HELP"
 node "$ROOT/scripts/test-help-en-contract.mjs" "$HELP_EN"
