@@ -1,4 +1,4 @@
-const CACHE_NAME = "jampanion-viewer-offline-v1";
+const CACHE_NAME = "jampanion-viewer-offline-v2";
 const CORE_ASSETS = [
   "./index.html",
   "./help.html",
@@ -6,13 +6,27 @@ const CORE_ASSETS = [
   "./help.css",
   "./assets/MuseJazzText.otf",
   "./licenses/MuseJazzText-OFL-1.1.txt",
-  "./licenses/ireal-reader-MIT.txt"
+  "./licenses/ireal-reader-MIT.txt",
+  "../icons/jampanion-32.png?v=37"
 ];
+
+async function cacheCoreAssets() {
+  const cache = await caches.open(CACHE_NAME);
+  const results = await Promise.all(CORE_ASSETS.map(async asset => {
+    try {
+      await cache.add(asset);
+      return true;
+    } catch (error) {
+      console.warn("Offline Viewer asset could not be cached:", asset, error);
+      return false;
+    }
+  }));
+  if (!results[0]) throw new Error("Offline Viewer shell could not be cached.");
+}
 
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(CORE_ASSETS))
+    cacheCoreAssets()
       .then(() => self.skipWaiting())
   );
 });

@@ -53,8 +53,8 @@ jobs:
           test -s dist/js/jampanion-audio.js
           test -s dist/soundfonts/FluidR3_Jampanion.sf3
           test -s dist/app-version.json
-          grep -q '"version": "35"' dist/app-version.json
-          grep -q 'jampanion-viewer-offline-v1' dist/viewer/viewer-service-worker.js
+          grep -q '"version": "36"' dist/app-version.json
+          grep -q 'jampanion-viewer-offline-v2' dist/viewer/viewer-service-worker.js
           grep -q "<base href=\"/${GITHUB_REPOSITORY#*/}/\" />" dist/index.html
 
       - name: Upload Pages artifact
