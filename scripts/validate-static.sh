@@ -45,7 +45,7 @@ if [[ -n "$legacy_hits" ]]; then
   exit 1
 fi
 
-grep -q 'const APP_VERSION = "33"' "$INDEX"
+grep -q 'const APP_VERSION = "34"' "$INDEX"
 grep -q "Please clear your browser's cached files for this site, then reload the page." "$INDEX"
 grep -q 'web-src/jazz-chart-host.js' "$WEB/scripts/build-audio.mjs"
 grep -q 'url("assets/MuseJazzText.otf")' "$WEB/wwwroot/viewer/index.html"
