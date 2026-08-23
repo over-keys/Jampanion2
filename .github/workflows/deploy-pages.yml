@@ -46,12 +46,15 @@ jobs:
           set -euo pipefail
           test -s dist/index.html
           test -s dist/viewer/index.html
+          test -s dist/viewer/manifest.webmanifest
+          test -s dist/viewer/viewer-service-worker.js
           test -s dist/viewer/assets/MuseJazzText.otf
           test -s dist/js/jazz-chart-host.js
           test -s dist/js/jampanion-audio.js
           test -s dist/soundfonts/FluidR3_Jampanion.sf3
           test -s dist/app-version.json
           grep -q '"version": "35"' dist/app-version.json
+          grep -q 'jampanion-viewer-offline-v1' dist/viewer/viewer-service-worker.js
           grep -q "<base href=\"/${GITHUB_REPOSITORY#*/}/\" />" dist/index.html
 
       - name: Upload Pages artifact

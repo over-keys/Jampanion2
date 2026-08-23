@@ -17,6 +17,8 @@ test -s "$WEB/Jampanion.Web.csproj"
 test -s "$HOST"
 test -s "$AUDIO"
 test -s "$VIEWER"
+test -s "$WEB/wwwroot/viewer/manifest.webmanifest"
+test -s "$WEB/wwwroot/viewer/viewer-service-worker.js"
 
 node --check "$HOST"
 node --check "$AUDIO"

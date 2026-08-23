@@ -2974,7 +2974,11 @@ textarea:focus-visible {
   }
 }
 </style>
-  <link rel="icon" type="image/png" href="../icons/jampanion-viewer.png?v=35" />
+  <link rel="manifest" href="./manifest.webmanifest?v=1" />
+  <meta name="theme-color" content="#0b6e69" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Jampanion2 Viewer" />
+  <link rel="icon" type="image/png" href="../icons/jampanion-viewer.png?v=36" />
   <style data-jampanion-startup-guard="v1">html.jampanion-startup-pending .app-shell { visibility:hidden; }</style>
   <script data-jampanion-startup-guard="v1">
     document.documentElement.classList.add('jampanion-startup-pending');
@@ -6250,17 +6254,30 @@ function responsiveColumns() {
 </script>
 
   <script type="module" data-jampanion-embedded-bridge="v12">
-    import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=35";
-    initializeEmbeddedViewer().catch(error => {
-      console.error("Jampanion embedded bridge failed", error);
+    if (window.parent === window && !new URL(location.href).searchParams.has("integrated")) {
       document.documentElement.classList.remove("jampanion-startup-pending");
-      const bridgeTargetOrigin = window.location.origin === "null" ? "*" : window.location.origin;
-      window.parent?.postMessage({
-        channel: "jampanion-jcv-v12",
-        type: "bridge-error",
-        error: error instanceof Error ? error.message : String(error)
-      }, bridgeTargetOrigin);
-    });
+    } else {
+      import("../js/jazz-chart-host.js?v=36").then(({ initializeEmbeddedViewer }) => {
+        return initializeEmbeddedViewer();
+      }).catch(error => {
+        console.error("Jampanion embedded bridge failed", error);
+        document.documentElement.classList.remove("jampanion-startup-pending");
+        const bridgeTargetOrigin = window.location.origin === "null" ? "*" : window.location.origin;
+        window.parent?.postMessage({
+          channel: "jampanion-jcv-v12",
+          type: "bridge-error",
+          error: error instanceof Error ? error.message : String(error)
+        }, bridgeTargetOrigin);
+      });
+    }
+  </script>
+  <script>
+    if ("serviceWorker" in navigator && window.parent === window && location.protocol !== "file:") {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./viewer-service-worker.js", { scope: "./" })
+          .catch(error => console.warn("Offline Viewer installation failed:", error));
+      }, { once: true });
+    }
   </script>
 </body>
 </html>
