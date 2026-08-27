@@ -9,7 +9,7 @@ const viewerIconPath = path.join(root, "src/Jampanion.Web/wwwroot/icons/jampanio
 const appIconPath = path.join(root, "src/Jampanion.Web/wwwroot/icons/jampanion-32.png");
 const outputPath = path.join(root, "local-viewer/index.html");
 
-const LOCAL_VIEWER_VERSION = "2";
+const LOCAL_VIEWER_VERSION = "3";
 const MAIN_URL = "https://over-keys.github.io/Jampanion2/";
 const ONLINE_VIEWER_URL = `${MAIN_URL}viewer/`;
 
@@ -28,8 +28,8 @@ html = html
   .replace(/\s*<link rel="manifest" href="\.\/manifest\.webmanifest\?v=1" \/>/, "")
   .replace('url("assets/MuseJazzText.otf")', `url("${fontUrl}")`)
   .replaceAll("../icons/jampanion-viewer.png?v=38", viewerIconUrl)
-  .replaceAll('./help.html?v=37', `${ONLINE_VIEWER_URL}help.html?v=37`)
-  .replaceAll('./help.en.html?v=37', `${ONLINE_VIEWER_URL}help.en.html?v=37`)
+  .replaceAll('./help.html?v=38', `${ONLINE_VIEWER_URL}help.html?v=38`)
+  .replaceAll('./help.en.html?v=38', `${ONLINE_VIEWER_URL}help.en.html?v=38`)
   .replace(
     '      <div class="toolbar-main">\n        <div class="search-wrap">',
     `      <div class="toolbar-main">\n${localModeLink}\n        <div class="search-wrap">`

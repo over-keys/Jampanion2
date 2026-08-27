@@ -1628,7 +1628,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     }
 
     private async Task<IJSObjectReference> EnsureAudioModuleAsync() =>
-        _audioModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-audio.js?v=37");
+        _audioModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-audio.js?v=38");
 
     private static string FormatTime(double seconds)
     {

@@ -125,17 +125,18 @@ public static partial class ChordSymbolParser
             return ChordFactory.Major7(root, normalized);
         }
 
-        if (lower is "maj9" or "major9" || compact is "M9")
+        // iReal uses ^9/^11/^13 as compact major-extension spellings.
+        if (lower is "maj9" or "major9" || compact is "M9" or "^9")
         {
             return ChordFactory.Major9(root, normalized);
         }
 
-        if (lower is "maj11" or "major11" || compact is "M11")
+        if (lower is "maj11" or "major11" || compact is "M11" or "^11")
         {
             return ChordFactory.Major11(root, normalized);
         }
 
-        if (lower is "maj13" or "major13" || compact is "M13")
+        if (lower is "maj13" or "major13" || compact is "M13" or "^13")
         {
             return ChordFactory.Major13(root, normalized);
         }

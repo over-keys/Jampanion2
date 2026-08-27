@@ -47,9 +47,9 @@ if [[ -n "$legacy_hits" ]]; then
   exit 1
 fi
 
-grep -q 'const APP_VERSION = "37"' "$INDEX"
+grep -q 'const APP_VERSION = "38"' "$INDEX"
 test -s "$WEB/wwwroot/app-version.json"
-grep -q '"version": "37"' "$WEB/wwwroot/app-version.json"
+grep -q '"version": "38"' "$WEB/wwwroot/app-version.json"
 grep -q 'The app could not start after automatic cache recovery. Press Reload to try again.' "$INDEX"
 grep -q 'web-src/jazz-chart-host.js' "$WEB/scripts/build-audio.mjs"
 grep -q 'url("assets/MuseJazzText.otf")' "$WEB/wwwroot/viewer/index.html"

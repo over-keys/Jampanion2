@@ -4,6 +4,7 @@ root = Path(__file__).resolve().parents[1]
 host = (root / "src/Jampanion.Web/web-src/jazz-chart-host.js").read_text()
 logic = (root / "src/Jampanion.Web/Pages/IntegratedHomeLogic.cs").read_text()
 planner = (root / "src/Jampanion.Web/Audio/IntegratedSessionPlanner.cs").read_text()
+chord_parser = (root / "src/Jampanion.Core/Music/ChordSymbolParser.cs").read_text()
 home = (root / "src/Jampanion.Web/Pages/Home.razor").read_text()
 css = (root / "src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text()
 viewer_source = (root / "src/Jampanion.Web/wwwroot/viewer/index.html").read_text()
@@ -57,8 +58,8 @@ checks = {
     "mobile controls stay compact": 'height:56px' in (root / "src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text() and 'height:50px' in (root / "src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text(),
     "integrated brand row has icon and text only": '<img src="icons/jampanion-32.png' in home and '<strong>Jampanion2</strong>' in home and 'jamp-brand-actions' not in home,
     "desktop brand row is above session": '.jamp-brand-row { order:-1; align-self:center; margin-top:0;' in (root / "src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text(),
-    "startup shell is standalone": 'Jampanion2' in index and '<strong>Jampanion</strong>' not in index and 'const APP_VERSION = \"37\"' in index,
-    "cache-busted page versions": 'APP_VERSION = \"37\"' in index and 'help.html?v=37' in viewer_source and 'help.en.html?v=37' in viewer_source and 'help.css?v=37' in help_source and 'jazz-chart-host.js?v=38' in viewer_source and 'jazz-chart-host.js?v=38' in logic and 'viewer/index.html?integrated=38' in home,
+    "startup shell is standalone": 'Jampanion2' in index and '<strong>Jampanion</strong>' not in index and 'const APP_VERSION = \"38\"' in index,
+    "cache-busted page versions": 'APP_VERSION = \"38\"' in index and 'help.html?v=38' in viewer_source and 'help.en.html?v=38' in viewer_source and 'help.css?v=38' in help_source and 'jazz-chart-host.js?v=38' in viewer_source and 'jazz-chart-host.js?v=38' in logic and 'viewer/index.html?integrated=38' in home,
     "online viewer bridge is direct and cache-busted": 'import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=38"' in viewer_source and 'initializeEmbeddedViewer().catch' in viewer_source,
     "online viewer has no PWA runtime": 'manifest.webmanifest' not in viewer_source and 'serviceWorker.register' not in viewer_source and 'viewer-service-worker.js' not in viewer_source,
     "English Jampanion help is bundled": bool(help_en_source.strip()) and (root / 'scripts/test-help-en-contract.mjs').exists(),
@@ -69,6 +70,7 @@ checks = {
     "draft chord insertion replaces same-beat slots": 'upsertChordSlotAtCell(sourceSlots, sourceCell, chord)' in host and 'A draft edit must not create two chord slots at one beat' in host,
     "edge chord edits show the existing value": 'const existingSlot = sourceSlots.find(slot =>' in host and 'const initialValue = existingSlot?.chord || ""' in host and 'openEditorAtPoint(inputLeft, chordTop, initialValue' in host,
     "playback errors identify the chord location": 'Cannot interpret chord' in planner and 'source.SourceIndex + 1' in planner and 'change.StartTick' in planner and 'PlaybackErrorText' in logic and 'jamp-playback-error' in home,
+    "iReal major extension aliases parse": 'compact is "M9" or "^9"' in chord_parser and 'compact is "M11" or "^11"' in chord_parser and 'compact is "M13" or "^13"' in chord_parser,
     "blank chords explain the correction": 'is blank. Enter a chord symbol.' in planner,
     "blank rendered chords fail before arrangement": 'sourceBar.jampanionNoChord !== true' in host and 'gridCellToTick(start, total, activeMeter)' in host and 'function playbackEmptyBarMessage(sourceIndex)' in host and 'Bar ${sourceIndex + 1} has no chord.' in host,
     "chord input normalizes roots without changing flat-five quality": 'function normalizeChordInput(value)' in host and 'Bm7b5' in host and 'Only the root and an optional accidental are normalized' in host,
@@ -84,7 +86,7 @@ checks = {
     "startup builds native-sized preparation window": 'generatedSegments: 2' in logic and 'int? generatedSegments = null' in planner and 'segmentLimit' in planner,
     "settings dialog manages keyboard focus": 'initializeSettingsDialog' in host and 'disposeSettingsDialog' in host and 'aria-labelledby="settings-dialog-title"' in home,
     "mobile shell has no forced bottom spacer": 'min-height:100svh' in css and 'min-height:100dvh' in css and 'padding-bottom:0' in css and '100svh + 96px' not in css and '100dvh + 1px' not in css,
-    "mobile CSS cache is bumped": 'jazz-integration.css?v=37' in home,
+    "mobile CSS cache is bumped": 'jazz-integration.css?v=38' in home,
     "desktop panes use compact top insets": 'padding:6px 8px 8px' in css and 'padding-top:0' in css,
     "viewer toolbar owns all chart actions": 'SaveChartFromToolbar' in logic and 'RevertChartFromToolbar' in logic and 'DeleteNativeSongFromToolbar' in logic and 'toolbarSave' in host and 'toolbarRevert' in host and 'toolbarDelete' in host and 'fitButton.after(newButton, button, revertButton)' in host and 'toolbarNew' in host and 'NewSongFromToolbar' in logic,
     "integrated brand row has no duplicate actions": 'jamp-brand-actions' not in home and 'standaloneSaveButton.disabled = !editingEnabled || !song || !hasChanges' in host and 'setToolbarState' in logic,
@@ -129,8 +131,8 @@ checks = {
     "empty library actions explain that there is nothing to do": 'No customized songs to revert.' in host and 'No imported songs to delete.' in viewer_source,
     "customized-song confirmation counts songs directly": 'Remove saved changes from 1 song?' in host and 'Remove saved changes from ${targets.length} songs?' in host,
     "customized-song action survives dialog replacement": 'installLibraryActions();' in host and 'button !== libraryDeleteButton' in host and 'Customized-song restoration failed' in host,
-    "background playback does not stop on page visibility": 'visibilityHandler' not in host and 'StopSessionFromVisibility' not in host and 'jampanion-page-hidden' not in browser_source and 'jampanion-audio.js?v=37' in logic,
-    "published shell version matches": '"version": "37"' in (root / "src/Jampanion.Web/wwwroot/app-version.json").read_text(),
+    "background playback does not stop on page visibility": 'visibilityHandler' not in host and 'StopSessionFromVisibility' not in host and 'jampanion-page-hidden' not in browser_source and 'jampanion-audio.js?v=38' in logic,
+    "published shell version matches": '"version": "38"' in (root / "src/Jampanion.Web/wwwroot/app-version.json").read_text(),
     "published shell probe bypasses stale HTTP cache": 'readPublishedVersion' in index and 'PUBLISHED_VERSION_URL' in index and 'cache: "no-store"' in index,
     "online shell has no service worker runtime": 'serviceWorker' not in index,
     "version is stored only after successful boot": index.find('localStorage.setItem(CACHE_VERSION_KEY, APP_VERSION)') > index.find('await window.Blazor.start'),
