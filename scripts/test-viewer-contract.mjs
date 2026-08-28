@@ -12,6 +12,7 @@ const requirements = [
   ["library startup exposes readiness", /const libraryReady = initialiseLibrary\(\)/],
   ["library startup waits for saved song", /libraryLoading[\s\S]*Loading saved song/],
   ["search unlocks after library load", /state\.libraryLoading[\s\S]*el\.search\.disabled = false[\s\S]*el\.search\.removeAttribute\('aria-busy'\)/],
+  ["search normalizes punctuation", /function normaliseSearchText\(value\)[\s\S]*?function renderSearchOptions\(\)[\s\S]*?normaliseSearchText\(searchListTitle\(song\)\)/],
   ["demo is a true fallback", /using demo fallback[\s\S]*state\.songs = \[DEMO_SONG\]/],
   ["integrated last-song reference fallback", /jampanion-jazz-last-song-v1[\s\S]*findRememberedSong/],
   ["customized-song revert control", /id="deleteCustomized"[\s\S]*Revert all customized songs[\s\S]*Delete all imported songs/],

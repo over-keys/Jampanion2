@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-jampanion-local-bundle="v3">
+<html lang="en" data-jampanion-local-bundle="v4">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -3033,7 +3033,7 @@ textarea:focus-visible {
 
         <div class="utility-group">
           <button id="fullscreen" class="icon-button utility" type="button" title="Fullscreen" aria-label="Fullscreen">⛶</button>
-          <a id="helpButton" class="icon-button utility help-button" href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=38" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
+          <a id="helpButton" class="icon-button utility help-button" href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=39" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
           <button id="settingsButton" class="icon-button utility" type="button" title="Settings" aria-label="Settings">⚙︎</button>
         </div>
         </div>
@@ -3080,7 +3080,7 @@ textarea:focus-visible {
       <section class="about-section">
         <h3>About</h3>
         <p>Jazz Chart Viewer is licensed under the MIT License. MuseJazz Text is loaded from a pinned MuseScore source under the SIL Open Font License 1.1, with a Unicode fallback when unavailable.</p>
-        <p><a href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=38" target="_blank" rel="noopener" lang="en">Help</a> · <a href="https://over-keys.github.io/Jampanion2/viewer/help.en.html?v=38" target="_blank" rel="noopener" lang="en">English help</a></p>
+        <p><a href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=39" target="_blank" rel="noopener" lang="en">Help</a> · <a href="https://over-keys.github.io/Jampanion2/viewer/help.en.html?v=39" target="_blank" rel="noopener" lang="en">English help</a></p>
         <p><a href="./LICENSE" target="_blank" rel="noopener">Application license</a> · <a href="./THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Third-party notices</a></p>
       </section>
     </form>
@@ -5765,6 +5765,13 @@ function searchListTitle(song) {
     : (song?.title || '');
 }
 
+function normaliseSearchText(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
 function renderLoadingState() {
   document.body.classList.add('jampanion-library-loading');
   el.search.value = 'Loading saved song…';
@@ -5809,11 +5816,13 @@ function renderToolbar() {
 }
 
 function renderSearchOptions() {
-  const query = el.search.value.trim().toLocaleLowerCase();
+  const rawQuery = el.search.value.trim();
+  const query = normaliseSearchText(rawQuery);
   const matchingSongs = state.songs.filter((song) => {
-    if (!query) return true;
-    const title = searchListTitle(song).toLocaleLowerCase();
-    const composer = displayComposer(song.composer).toLocaleLowerCase();
+    if (!rawQuery) return true;
+    if (!query) return false;
+    const title = normaliseSearchText(searchListTitle(song));
+    const composer = normaliseSearchText(displayComposer(song.composer));
     return title.includes(query) || composer.includes(query);
   });
   const choices = matchingSongs.slice(0, SEARCH_RESULT_LIMIT);
@@ -6257,7 +6266,7 @@ function responsiveColumns() {
     if (isStandaloneViewer) {
       document.documentElement.classList.remove("jampanion-startup-pending");
     } else {
-      import("../js/jazz-chart-host.js?v=38").then(({ initializeEmbeddedViewer }) => {
+      import("../js/jazz-chart-host.js?v=39").then(({ initializeEmbeddedViewer }) => {
         return initializeEmbeddedViewer();
       }).catch(error => {
         console.error("Jampanion embedded bridge failed", error);

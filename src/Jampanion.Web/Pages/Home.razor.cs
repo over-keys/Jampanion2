@@ -56,8 +56,7 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
     protected bool SongSearchOpen { get; set; }
     protected IReadOnlyList<WebSongChoice> VisibleSongChoices =>
         SongChoices
-            .Where(song => string.IsNullOrWhiteSpace(SongSearchText) ||
-                song.Title.Contains(SongSearchText.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Where(song => SongTitleMatches(song.Title, SongSearchText))
             .Take(24)
             .ToArray();
     protected string SelectedStyleValue { get; set; } = AccompanimentStyleNames.StorageName(AccompanimentStyle.Swing);
@@ -392,9 +391,9 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
         var choice = exact
             ?? SongChoices.FirstOrDefault(song =>
                 !song.IsBuiltIn &&
-                song.Title.Contains(query, StringComparison.OrdinalIgnoreCase))
+                SongTitleMatches(song.Title, query))
             ?? SongChoices.FirstOrDefault(song =>
-                song.Title.Contains(query, StringComparison.OrdinalIgnoreCase));
+                SongTitleMatches(song.Title, query));
         if (choice is null)
         {
             SongSearchText = SelectedSongTitle;
@@ -2534,6 +2533,24 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
         SongSearchText = SelectedSongTitle;
     }
 
+    private static bool SongTitleMatches(string title, string query)
+    {
+        if (title.Contains(query, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var normalizedQuery = NormalizeSongSearchText(query);
+        return normalizedQuery.Length > 0 &&
+            NormalizeSongSearchText(title).Contains(normalizedQuery, StringComparison.Ordinal);
+    }
+
+    private static string NormalizeSongSearchText(string value) =>
+        string.Concat(
+            value.Normalize(NormalizationForm.FormKC)
+                .ToLowerInvariant()
+                .Where(char.IsLetterOrDigit));
+
     private static double NextFourBarBoundary(
         WebSessionPlan plan,
         double positionSeconds,
@@ -2843,10 +2860,10 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
     protected sealed record MidiOutputChoice(string Id, string Name);
 
     private async Task<IJSObjectReference> EnsureAudioModuleAsync() =>
-        _audioModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-audio.js?v=38");
+        _audioModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-audio.js?v=39");
 
     private async Task<IJSObjectReference> EnsureBrowserModuleAsync() =>
-        _browserModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-browser.js?v=38");
+        _browserModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-browser.js?v=39");
 
     private async Task SelectElementTextAsync(string id)
     {
