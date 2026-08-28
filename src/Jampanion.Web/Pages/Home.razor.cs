@@ -2547,8 +2547,7 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
 
     private static string NormalizeSongSearchText(string value) =>
         string.Concat(
-            value.Normalize(NormalizationForm.FormKC)
-                .ToLowerInvariant()
+            value.ToLowerInvariant()
                 .Where(char.IsLetterOrDigit));
 
     private static double NextFourBarBoundary(
