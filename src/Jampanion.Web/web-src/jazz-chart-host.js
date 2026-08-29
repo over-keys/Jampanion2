@@ -7,7 +7,7 @@ const NATIVE_STORE = "songs";
 const NATIVE_DB_VERSION = 1;
 const PPQ = 480;
 const IREAL_MUSIC_PREFIX = "1r34LbKcu7";
-const JAMPANION_ICON_PATH = "../icons/jampanion-32.png?v=39";
+const JAMPANION_ICON_PATH = "../icons/jampanion-32.png?v=40";
 
 let frame;
 let win;
@@ -1801,7 +1801,7 @@ function buildHeadOutSequence(loopSource, sourceOffset) {
 
 export function buildHeadOutSequenceWithExpander(loopSource, sourceOffset, expandChartBars) {
     // Head Out follows the same complete, written-form expansion as Viewer.
-    // The ending/root hold is added by IntegratedSessionPlanner after this
+    // The ending/root hold is added by SessionPlanner after this
     // route; it must not cause the chart navigator to be interpreted again.
     const expanded = buildCanonicalPlaybackSequence(loopSource, sourceOffset, expandChartBars);
     if (!loopSource.length || hasJumpDirective(loopSource)) return expanded;

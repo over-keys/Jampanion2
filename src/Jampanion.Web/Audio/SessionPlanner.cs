@@ -11,7 +11,7 @@ namespace Jampanion.Web.Audio;
 /// The chart engine owns form/navigation/timing; this class owns only musical
 /// arrangement and note generation.
 /// </summary>
-public static class IntegratedSessionPlanner
+public static class SessionPlanner
 {
     public const int MaximumOpenEndedChoruses = 12;
 

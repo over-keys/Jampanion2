@@ -8,11 +8,11 @@ using Microsoft.JSInterop;
 
 namespace Jampanion.Web.Pages;
 
-public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
+public class HomeLogic : ComponentBase, IAsyncDisposable
 {
     private IJSObjectReference? _chartModule;
     private IJSObjectReference? _audioModule;
-    private DotNetObjectReference<IntegratedHomeLogic>? _self;
+    private DotNetObjectReference<HomeLogic>? _self;
     private CancellationTokenSource? _progressCancellation;
     private readonly SemaphoreSlim _planMutationGate = new(1, 1);
     private IntegratedSessionPlan? _sessionPlan;
@@ -187,7 +187,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         try
         {
             _self ??= DotNetObjectReference.Create(this);
-            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=39");
+            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=40");
             try { await _chartModule.InvokeVoidAsync("initializeMobileControlsScrollHint"); } catch { }
             var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("initialize", "jcv-frame", _self);
             ApplyBootstrap(bootstrap);
@@ -442,7 +442,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             await primeTask;
             if (generationVersion != _generationVersion) throw new OperationCanceledException();
             _sessionSeed = Random.Shared.Next();
-            _sessionPlan = IntegratedSessionPlanner.BuildSession(
+            _sessionPlan = SessionPlanner.BuildSession(
                 _compiledChart,
                 TempoBpm,
                 SelectedStyle,
@@ -533,7 +533,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                     throw new OperationCanceledException();
             }
 
-            var expanded = await IntegratedSessionPlanner.BuildSessionIncrementallyAsync(
+            var expanded = await SessionPlanner.BuildSessionIncrementallyAsync(
                 _compiledChart,
                 TempoBpm,
                 SelectedStyle,
@@ -579,7 +579,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             var oldPlan = _sessionPlan;
             var currentPosition = await _audioModule.InvokeAsync<double>("getPosition");
             var schedulingPosition = await GetProtectedThroughAsync(currentPosition);
-            var headOutChorus = IntegratedSessionPlanner.ResolveNextHeadOutChorus(oldPlan, schedulingPosition);
+            var headOutChorus = SessionPlanner.ResolveNextHeadOutChorus(oldPlan, schedulingPosition);
             var boundaryBar = NextFourBarBoundary(oldPlan, schedulingPosition, schedulingGuardSeconds)
                 ?? throw new InvalidOperationException("No later four-bar boundary is available for Head Out.");
             StatusText = "Preparing head out";
@@ -591,7 +591,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                 if (!IsPlaying || generationVersion != _generationVersion) throw new OperationCanceledException();
             }
 
-            var replacement = await IntegratedSessionPlanner.BuildSessionIncrementallyAsync(
+            var replacement = await SessionPlanner.BuildSessionIncrementallyAsync(
                 _compiledChart,
                 TempoBpm,
                 SelectedStyle,
@@ -667,7 +667,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
         var sequenceBase = 0;
         var segmentsBeforeStage = 0;
 
-        for (var chorus = 1; chorus <= IntegratedSessionPlanner.MaximumOpenEndedChoruses; chorus++)
+        for (var chorus = 1; chorus <= SessionPlanner.MaximumOpenEndedChoruses; chorus++)
         {
             var barCount = chorus == 1
                 ? chart.OpeningBars.Count
@@ -722,7 +722,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             var liveSegmentLimit = oldPlan.HeadOutChorus is null
                 ? LiveReplacementSegmentLimit(_compiledChart, boundaryBar.SequenceIndex)
                 : (int?)null;
-            var replacement = await IntegratedSessionPlanner.BuildSessionIncrementallyAsync(
+            var replacement = await SessionPlanner.BuildSessionIncrementallyAsync(
                 _compiledChart,
                 TempoBpm,
                 SelectedStyle,
@@ -835,7 +835,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
             var liveSegmentLimit = oldPlan.HeadOutChorus is null
                 ? LiveReplacementSegmentLimit(_compiledChart, boundaryBar.SequenceIndex)
                 : (int?)null;
-            var replacement = await IntegratedSessionPlanner.BuildSessionIncrementallyAsync(
+            var replacement = await SessionPlanner.BuildSessionIncrementallyAsync(
                 _compiledChart,
                 TempoBpm,
                 SelectedStyle,
@@ -944,7 +944,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                     throw new OperationCanceledException();
             }
 
-            var expanded = await IntegratedSessionPlanner.BuildSessionIncrementallyAsync(
+            var expanded = await SessionPlanner.BuildSessionIncrementallyAsync(
                 _compiledChart,
                 TempoBpm,
                 SelectedStyle,
@@ -1112,7 +1112,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
                     EndSeconds: start + plan.BarDurationSeconds);
             }
             sequenceIndex += SessionConstants.BarsPerSegment;
-            if (sequenceIndex > IntegratedSessionPlanner.MaximumOpenEndedChoruses * 512) break;
+            if (sequenceIndex > SessionPlanner.MaximumOpenEndedChoruses * 512) break;
         }
         return null;
     }
@@ -1628,7 +1628,7 @@ public class IntegratedHomeLogic : ComponentBase, IAsyncDisposable
     }
 
     private async Task<IJSObjectReference> EnsureAudioModuleAsync() =>
-            _audioModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-audio.js?v=39");
+            _audioModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-audio.js?v=40");
 
     private static string FormatTime(double seconds)
     {

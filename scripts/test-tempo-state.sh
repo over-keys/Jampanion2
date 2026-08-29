@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LOGIC="$ROOT/src/Jampanion.Web/Pages/IntegratedHomeLogic.cs"
+LOGIC="$ROOT/src/Jampanion.Web/Pages/HomeLogic.cs"
 MODELS="$ROOT/src/Jampanion.Web/Models/JazzChartModels.cs"
 HOST="$ROOT/src/Jampanion.Web/web-src/jazz-chart-host.js"
 HOME_RAZOR="$ROOT/src/Jampanion.Web/Pages/Home.razor"
@@ -28,8 +28,8 @@ if grep -q 'storedTempo !== 140' "$HOST"; then
   echo 'Legacy 140 migration heuristic must not be present.' >&2
   exit 1
 fi
-grep -q './js/jazz-chart-host.js?v=39' "$LOGIC"
-grep -q 'viewer/index.html?integrated=39' "$HOME_RAZOR"
+grep -q './js/jazz-chart-host.js?v=40' "$LOGIC"
+grep -q 'viewer/index.html?integrated=40' "$HOME_RAZOR"
 echo 'Style-aware tempo regression checks passed.'
 
 ! grep -q 'AutomaticThemeReturnEnabled' "$LOGIC"

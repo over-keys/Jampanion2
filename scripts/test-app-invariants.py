@@ -2,24 +2,36 @@
 from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 host = (root / "src/Jampanion.Web/web-src/jazz-chart-host.js").read_text()
-logic = (root / "src/Jampanion.Web/Pages/IntegratedHomeLogic.cs").read_text()
-planner = (root / "src/Jampanion.Web/Audio/IntegratedSessionPlanner.cs").read_text()
+logic = (root / "src/Jampanion.Web/Pages/HomeLogic.cs").read_text()
+planner = (root / "src/Jampanion.Web/Audio/SessionPlanner.cs").read_text()
 chord_parser = (root / "src/Jampanion.Core/Music/ChordSymbolParser.cs").read_text()
 home = (root / "src/Jampanion.Web/Pages/Home.razor").read_text()
-home_logic = (root / "src/Jampanion.Web/Pages/Home.razor.cs").read_text()
 css = (root / "src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text()
 viewer_source = (root / "src/Jampanion.Web/wwwroot/viewer/index.html").read_text()
 audio_source = (root / "src/Jampanion.Web/web-src/jampanion-audio.js").read_text()
-browser_source = (root / "src/Jampanion.Web/web-src/jampanion-browser.js").read_text()
 index = (root / "src/Jampanion.Web/wwwroot/index.html").read_text()
 help_source = (root / "src/Jampanion.Web/wwwroot/viewer/help.html").read_text()
 help_en_source = (root / "src/Jampanion.Web/wwwroot/viewer/help.en.html").read_text()
+retired_web_paths = [
+    "src/Jampanion.Web/Pages/Home.razor.cs",
+    "src/Jampanion.Web/Audio/WebSessionPlanner.cs",
+    "src/Jampanion.Web/Models/WebSongDocument.cs",
+    "src/Jampanion.Web/Models/WebUiModels.cs",
+    "src/Jampanion.Web/Services/ChordSymbolTransposer.cs",
+    "src/Jampanion.Web/Services/LazyBuiltInSongCatalog.cs",
+    "src/Jampanion.Web/web-src/jampanion-browser.js",
+    "src/Jampanion.Web/wwwroot/icons/jampanion-512.png",
+    "src/Jampanion.Web/wwwroot/icons/jampanion-maskable-192.png",
+    "src/Jampanion.Web/wwwroot/icons/jampanion-maskable-512.png",
+]
 style_change_method = logic[logic.find('protected async Task ChangeStyleAsync'):logic.find('private static int DefaultTempoForStyle')]
 tempo_change_method = logic[logic.find('private async Task RebuildLiveTempoAsync'):logic.find('private async Task QueueStyleChangeAsync')]
 style_queue_method = logic[logic.find('private async Task QueueStyleChangeAsync'):logic.find('private async Task<double> GetProtectedThroughAsync')]
 stop_method = logic[logic.find('protected async Task StopSessionAsync'):logic.find('private void BeginProgressUpdates')]
 
 checks = {
+    "retired legacy Web runtime is absent": all(not (root / path).exists() for path in retired_web_paths),
+    "Viewer Mode icon stays compact": (root / "src/Jampanion.Web/wwwroot/icons/jampanion-viewer.png").stat().st_size < 100000,
     "playback disables original search": 'search.disabled = playing' in host,
     "stopping clears search loading state": 'search.removeAttribute("aria-busy")' in host and 'if (playing)' in host,
     "playback locks selected song": 'playbackLockedSongId' in host,
@@ -59,9 +71,9 @@ checks = {
     "mobile controls stay compact": 'height:56px' in (root / "src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text() and 'height:50px' in (root / "src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text(),
     "integrated brand row has icon and text only": '<img src="icons/jampanion-32.png' in home and '<strong>Jampanion2</strong>' in home and 'jamp-brand-actions' not in home,
     "desktop brand row is above session": '.jamp-brand-row { order:-1; align-self:center; margin-top:0;' in (root / "src/Jampanion.Web/wwwroot/css/jazz-integration.css").read_text(),
-    "startup shell is standalone": 'Jampanion2' in index and '<strong>Jampanion</strong>' not in index and 'const APP_VERSION = \"39\"' in index,
-    "cache-busted page versions": 'APP_VERSION = \"39\"' in index and 'help.html?v=39' in viewer_source and 'help.en.html?v=39' in viewer_source and 'help.css?v=39' in help_source and 'jazz-chart-host.js?v=39' in viewer_source and 'jazz-chart-host.js?v=39' in logic and 'viewer/index.html?integrated=39' in home,
-    "online viewer bridge is direct and cache-busted": 'import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=39"' in viewer_source and 'initializeEmbeddedViewer().catch' in viewer_source,
+    "startup shell is standalone": 'Jampanion2' in index and '<strong>Jampanion</strong>' not in index and 'const APP_VERSION = \"40\"' in index,
+    "cache-busted page versions": 'APP_VERSION = \"40\"' in index and 'help.html?v=40' in viewer_source and 'help.en.html?v=40' in viewer_source and 'help.css?v=40' in help_source and 'jazz-chart-host.js?v=40' in viewer_source and 'jazz-chart-host.js?v=40' in logic and 'viewer/index.html?integrated=40' in home,
+    "online viewer bridge is direct and cache-busted": 'import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=40"' in viewer_source and 'initializeEmbeddedViewer().catch' in viewer_source,
     "online viewer has no PWA runtime": 'manifest.webmanifest' not in viewer_source and 'serviceWorker.register' not in viewer_source and 'viewer-service-worker.js' not in viewer_source,
     "English Jampanion help is bundled": bool(help_en_source.strip()) and (root / 'scripts/test-help-en-contract.mjs').exists(),
     "transpose is saved with accompaniment settings": 'CurrentSemitoneShift' in logic and 'SemitoneShift' in (root / "src/Jampanion.Web/Models/JazzChartModels.cs").read_text() and 'semitoneShift' in host and 'saveSongSettings' in logic,
@@ -87,7 +99,7 @@ checks = {
     "startup builds native-sized preparation window": 'generatedSegments: 2' in logic and 'int? generatedSegments = null' in planner and 'segmentLimit' in planner,
     "settings dialog manages keyboard focus": 'initializeSettingsDialog' in host and 'disposeSettingsDialog' in host and 'aria-labelledby="settings-dialog-title"' in home,
     "mobile shell has no forced bottom spacer": 'min-height:100svh' in css and 'min-height:100dvh' in css and 'padding-bottom:0' in css and '100svh + 96px' not in css and '100dvh + 1px' not in css,
-    "mobile CSS cache is bumped": 'jazz-integration.css?v=39' in home,
+    "mobile CSS cache is bumped": 'jazz-integration.css?v=40' in home,
     "desktop panes use compact top insets": 'padding:6px 8px 8px' in css and 'padding-top:0' in css,
     "viewer toolbar owns all chart actions": 'SaveChartFromToolbar' in logic and 'RevertChartFromToolbar' in logic and 'DeleteNativeSongFromToolbar' in logic and 'toolbarSave' in host and 'toolbarRevert' in host and 'toolbarDelete' in host and 'fitButton.after(newButton, button, revertButton)' in host and 'toolbarNew' in host and 'NewSongFromToolbar' in logic,
     "integrated brand row has no duplicate actions": 'jamp-brand-actions' not in home and 'standaloneSaveButton.disabled = !editingEnabled || !song || !hasChanges' in host and 'setToolbarState' in logic,
@@ -132,8 +144,8 @@ checks = {
     "empty library actions explain that there is nothing to do": 'No customized songs to revert.' in host and 'No imported songs to delete.' in viewer_source,
     "customized-song confirmation counts songs directly": 'Remove saved changes from 1 song?' in host and 'Remove saved changes from ${targets.length} songs?' in host,
     "customized-song action survives dialog replacement": 'installLibraryActions();' in host and 'button !== libraryDeleteButton' in host and 'Customized-song restoration failed' in host,
-    "background playback does not stop on page visibility": 'visibilityHandler' not in host and 'StopSessionFromVisibility' not in host and 'jampanion-page-hidden' not in browser_source and 'jampanion-audio.js?v=39' in logic,
-    "published shell version matches": '"version": "39"' in (root / "src/Jampanion.Web/wwwroot/app-version.json").read_text(),
+    "background playback does not stop on page visibility": 'visibilityHandler' not in host and 'StopSessionFromVisibility' not in host and 'jampanion-audio.js?v=40' in logic,
+    "published shell version matches": '"version": "40"' in (root / "src/Jampanion.Web/wwwroot/app-version.json").read_text(),
     "published shell probe bypasses stale HTTP cache": 'readPublishedVersion' in index and 'PUBLISHED_VERSION_URL' in index and 'cache: "no-store"' in index,
     "online shell has no service worker runtime": 'serviceWorker' not in index,
     "version is stored only after successful boot": index.find('localStorage.setItem(CACHE_VERSION_KEY, APP_VERSION)') > index.find('await window.Blazor.start'),
@@ -145,7 +157,7 @@ checks = {
     "double-click beat wins over long chord text": 'const clickedBar = event.target.closest?.(".bar:not(.spacer)")' in host and 'if (Number.isInteger(sourceIndex) && grid.startCell > 0)' in host and 'addChordAtPoint(sourceIndex, clickedBar, event.clientX)' in host,
     "chart edits require an explicit save": 'HasUnsavedChartChanges' in logic and 'saveCurrentChart' in host and 'stageNative(song)' in host,
     "mixer preferences persist": 'saveMixerPreferences' in logic and 'getMixerPreferences' in logic and 'MIXER_SETTINGS_KEY' in host,
-    "song search ignores punctuation": 'function normaliseSearchText(value)' in viewer_source and 'normaliseSearchText(searchListTitle(song))' in viewer_source and 'SongTitleMatches(song.Title, SongSearchText)' in home_logic and 'NormalizeSongSearchText' in home_logic,
+    "song search ignores punctuation": 'function normaliseSearchText(value)' in viewer_source and 'normaliseSearchText(searchListTitle(song))' in viewer_source,
 }
 failed = [name for name, ok in checks.items() if not ok]
 if failed:

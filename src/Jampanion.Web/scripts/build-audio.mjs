@@ -26,10 +26,6 @@ await build({
 
 
 await copyFile(
-    resolve(projectRoot, "web-src/jampanion-browser.js"),
-    resolve(outputDirectory, "jampanion-browser.js"));
-
-await copyFile(
     resolve(projectRoot, "web-src/jazz-chart-host.js"),
     resolve(outputDirectory, "jazz-chart-host.js"));
 

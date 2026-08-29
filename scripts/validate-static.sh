@@ -6,7 +6,6 @@ WEB="$ROOT/src/Jampanion.Web"
 CORE="$ROOT/src/Jampanion.Core"
 HOST="$WEB/web-src/jazz-chart-host.js"
 AUDIO="$WEB/web-src/jampanion-audio.js"
-BROWSER="$WEB/web-src/jampanion-browser.js"
 VIEWER="$WEB/wwwroot/viewer/index.html"
 HELP="$WEB/wwwroot/viewer/help.html"
 HELP_EN="$WEB/wwwroot/viewer/help.en.html"
@@ -20,7 +19,31 @@ test -s "$VIEWER"
 
 node --check "$HOST"
 node --check "$AUDIO"
-node --check "$BROWSER"
+
+retired_web_paths=(
+  "src/Jampanion.Web/Pages/Home.razor.cs"
+  "src/Jampanion.Web/Audio/WebSessionPlanner.cs"
+  "src/Jampanion.Web/Models/WebSongDocument.cs"
+  "src/Jampanion.Web/Models/WebUiModels.cs"
+  "src/Jampanion.Web/Services/ChordSymbolTransposer.cs"
+  "src/Jampanion.Web/Services/LazyBuiltInSongCatalog.cs"
+  "src/Jampanion.Web/web-src/jampanion-browser.js"
+  "src/Jampanion.Web/wwwroot/icons/jampanion-512.png"
+  "src/Jampanion.Web/wwwroot/icons/jampanion-maskable-192.png"
+  "src/Jampanion.Web/wwwroot/icons/jampanion-maskable-512.png"
+)
+for retired in "${retired_web_paths[@]}"; do
+  if [[ -e "$ROOT/$retired" ]]; then
+    echo "Retired Web runtime file is still present: $retired" >&2
+    exit 1
+  fi
+done
+
+viewer_icon_bytes="$(wc -c < "$WEB/wwwroot/icons/jampanion-viewer.png" | tr -d '[:space:]')"
+if (( viewer_icon_bytes >= 100000 )); then
+  echo "Viewer Mode icon is unexpectedly large: ${viewer_icon_bytes} bytes" >&2
+  exit 1
+fi
 
 node "$ROOT/scripts/test-jazz-timing.mjs" "$HOST"
 python3 "$ROOT/scripts/test-app-invariants.py"
@@ -47,9 +70,9 @@ if [[ -n "$legacy_hits" ]]; then
   exit 1
 fi
 
-grep -q 'const APP_VERSION = "39"' "$INDEX"
+grep -q 'const APP_VERSION = "40"' "$INDEX"
 test -s "$WEB/wwwroot/app-version.json"
-grep -q '"version": "39"' "$WEB/wwwroot/app-version.json"
+grep -q '"version": "40"' "$WEB/wwwroot/app-version.json"
 grep -q 'The app could not start after automatic cache recovery. Press Reload to try again.' "$INDEX"
 grep -q 'web-src/jazz-chart-host.js' "$WEB/scripts/build-audio.mjs"
 grep -q 'url("assets/MuseJazzText.otf")' "$WEB/wwwroot/viewer/index.html"
