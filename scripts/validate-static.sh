@@ -13,6 +13,14 @@ INDEX="$WEB/wwwroot/index.html"
 
 test -s "$CORE/Jampanion.Core.csproj"
 test -s "$WEB/Jampanion.Web.csproj"
+grep -q '<PublishTrimmed>true</PublishTrimmed>' "$WEB/Jampanion.Web.csproj"
+grep -q '<TrimMode>partial</TrimMode>' "$WEB/Jampanion.Web.csproj"
+grep -q '<SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>' "$WEB/Jampanion.Web.csproj"
+if grep -q '<RunAOTCompilation>true</RunAOTCompilation>' "$WEB/Jampanion.Web.csproj"; then
+  echo "AOT must remain disabled for this size-focused experiment." >&2
+  exit 1
+fi
+grep -q 'dotnet workload install wasm-tools' "$ROOT/.github/workflows/deploy-pages.yml"
 test -s "$HOST"
 test -s "$AUDIO"
 test -s "$VIEWER"
@@ -70,9 +78,9 @@ if [[ -n "$legacy_hits" ]]; then
   exit 1
 fi
 
-grep -q 'const APP_VERSION = "40"' "$INDEX"
+grep -q 'const APP_VERSION = "41"' "$INDEX"
 test -s "$WEB/wwwroot/app-version.json"
-grep -q '"version": "40"' "$WEB/wwwroot/app-version.json"
+grep -q '"version": "41"' "$WEB/wwwroot/app-version.json"
 grep -q 'The app could not start after automatic cache recovery. Press Reload to try again.' "$INDEX"
 grep -q 'web-src/jazz-chart-host.js' "$WEB/scripts/build-audio.mjs"
 grep -q 'url("assets/MuseJazzText.otf")' "$WEB/wwwroot/viewer/index.html"

@@ -27,9 +27,9 @@ html = html
   .replace('<html lang="en">', `<html lang="en" data-jampanion-local-bundle="v${LOCAL_VIEWER_VERSION}">`)
   .replace(/\s*<link rel="manifest" href="\.\/manifest\.webmanifest\?v=1" \/>/, "")
   .replace('url("assets/MuseJazzText.otf")', `url("${fontUrl}")`)
-  .replaceAll("../icons/jampanion-viewer.png?v=40", viewerIconUrl)
-  .replaceAll('./help.html?v=40', ONLINE_VIEWER_URL + 'help.html?v=40')
-  .replaceAll('./help.en.html?v=40', ONLINE_VIEWER_URL + 'help.en.html?v=40')
+  .replaceAll("../icons/jampanion-viewer.png?v=41", viewerIconUrl)
+  .replaceAll('./help.html?v=41', ONLINE_VIEWER_URL + 'help.html?v=41')
+  .replaceAll('./help.en.html?v=41', ONLINE_VIEWER_URL + 'help.en.html?v=41')
   .replace(
     '      <div class="toolbar-main">\n        <div class="search-wrap">',
     `      <div class="toolbar-main">\n${localModeLink}\n        <div class="search-wrap">`
@@ -42,7 +42,7 @@ html = html
     if (isStandaloneViewer) {
       document.documentElement.classList.remove("jampanion-startup-pending");
     } else {
-      import("../js/jazz-chart-host.js?v=40").then(({ initializeEmbeddedViewer }) => {
+      import("../js/jazz-chart-host.js?v=41").then(({ initializeEmbeddedViewer }) => {
         return initializeEmbeddedViewer();
       }).catch(error => {
         console.error("Jampanion embedded bridge failed", error);

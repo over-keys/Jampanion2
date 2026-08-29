@@ -26,6 +26,9 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Install WebAssembly build tools
+        run: dotnet workload install wasm-tools
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -36,6 +39,23 @@ jobs:
 
       - name: Build site
         run: scripts/build.sh
+
+      - name: Report payload sizes
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '--- optimized payload sizes ---'
+          du -sh dist dist/_framework
+          python3 - <<'PY_SIZE'
+          from pathlib import Path
+          root = Path('dist/_framework')
+          wasm = [p for p in root.glob('*.wasm') if not p.name.endswith(('.br', '.gz'))]
+          br = list(root.glob('*.wasm.br'))
+          print(f'raw framework .wasm total: {sum(p.stat().st_size for p in wasm):,} bytes')
+          print(f'brotli framework .wasm total: {sum(p.stat().st_size for p in br):,} bytes')
+          for p in sorted(wasm, key=lambda p: p.stat().st_size, reverse=True)[:12]:
+              print(f'{p.stat().st_size:>10,}  {p.name}')
+          PY_SIZE
 
       - name: Prepare GitHub Pages base path
         run: scripts/prepare-pages.sh dist "${GITHUB_REPOSITORY#*/}"
@@ -52,7 +72,7 @@ jobs:
           test ! -e dist/js/jampanion-browser.js
           test -s dist/soundfonts/FluidR3_Jampanion.sf3
           test -s dist/app-version.json
-          grep -q '"version": "40"' dist/app-version.json
+          grep -q '"version": "41"' dist/app-version.json
           grep -q "<base href=\"/${GITHUB_REPOSITORY#*/}/\" />" dist/index.html
 
       - name: Upload Pages artifact
