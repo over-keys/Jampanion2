@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-jampanion-local-bundle="v5">
+<html lang="en" data-jampanion-local-bundle="v6">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -2875,7 +2875,7 @@ textarea:focus-visible {
 
   .chart-viewport {
     height: auto;
-    min-height: calc(100lvh - var(--compact-toolbar-height) + 64px);
+    min-height: calc(100lvh - var(--compact-toolbar-height));
     overflow: visible;
     padding-bottom: calc(48px + env(safe-area-inset-bottom));
   }
@@ -2972,7 +2972,7 @@ textarea:focus-visible {
   }
 
   .chart-viewport {
-    min-height: calc(100lvh - var(--compact-toolbar-height) + 64px);
+    min-height: calc(100lvh - var(--compact-toolbar-height));
     height: auto;
     overflow: visible;
     padding-bottom: calc(48px + env(safe-area-inset-bottom));
@@ -3048,7 +3048,7 @@ textarea:focus-visible {
 
         <div class="utility-group">
           <button id="fullscreen" class="icon-button utility" type="button" title="Fullscreen" aria-label="Fullscreen">⛶</button>
-          <a id="helpButton" class="icon-button utility help-button" href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=43" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
+          <a id="helpButton" class="icon-button utility help-button" href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=44" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
           <button id="settingsButton" class="icon-button utility" type="button" title="Settings" aria-label="Settings">⚙︎</button>
         </div>
         </div>
@@ -3095,7 +3095,7 @@ textarea:focus-visible {
       <section class="about-section">
         <h3>About</h3>
         <p>Jazz Chart Viewer is licensed under the MIT License. MuseJazz Text is loaded from a pinned MuseScore source under the SIL Open Font License 1.1, with a Unicode fallback when unavailable.</p>
-        <p><a href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=43" target="_blank" rel="noopener" lang="en">Help</a> · <a href="https://over-keys.github.io/Jampanion2/viewer/help.en.html?v=43" target="_blank" rel="noopener" lang="en">English help</a></p>
+        <p><a href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=44" target="_blank" rel="noopener" lang="en">Help</a> · <a href="https://over-keys.github.io/Jampanion2/viewer/help.en.html?v=44" target="_blank" rel="noopener" lang="en">English help</a></p>
         <p><a href="./LICENSE" target="_blank" rel="noopener">Application license</a> · <a href="./THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Third-party notices</a></p>
       </section>
     </form>
@@ -6281,7 +6281,7 @@ function responsiveColumns() {
     if (isStandaloneViewer) {
       document.documentElement.classList.remove("jampanion-startup-pending");
     } else {
-      import("../js/jazz-chart-host.js?v=43").then(({ initializeEmbeddedViewer }) => {
+      import("../js/jazz-chart-host.js?v=44").then(({ initializeEmbeddedViewer }) => {
         return initializeEmbeddedViewer();
       }).catch(error => {
         console.error("Jampanion embedded bridge failed", error);

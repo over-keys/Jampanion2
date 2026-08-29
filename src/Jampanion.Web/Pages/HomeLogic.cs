@@ -187,7 +187,7 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
         try
         {
             _self ??= DotNetObjectReference.Create(this);
-            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=43");
+            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=44");
             try { await _chartModule.InvokeVoidAsync("initializeMobileControlsScrollHint"); } catch { }
             var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("initialize", "jcv-frame", _self);
             ApplyBootstrap(bootstrap);
@@ -1628,7 +1628,7 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
     }
 
     private async Task<IJSObjectReference> EnsureAudioModuleAsync() =>
-            _audioModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-audio.js?v=43");
+            _audioModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-audio.js?v=44");
 
     private static string FormatTime(double seconds)
     {

@@ -2875,7 +2875,7 @@ textarea:focus-visible {
 
   .chart-viewport {
     height: auto;
-    min-height: calc(100lvh - var(--compact-toolbar-height) + 64px);
+    min-height: calc(100lvh - var(--compact-toolbar-height));
     overflow: visible;
     padding-bottom: calc(48px + env(safe-area-inset-bottom));
   }
@@ -2972,7 +2972,7 @@ textarea:focus-visible {
   }
 
   .chart-viewport {
-    min-height: calc(100lvh - var(--compact-toolbar-height) + 64px);
+    min-height: calc(100lvh - var(--compact-toolbar-height));
     height: auto;
     overflow: visible;
     padding-bottom: calc(48px + env(safe-area-inset-bottom));
@@ -2989,7 +2989,7 @@ textarea:focus-visible {
   }
 }
 </style>
-  <link rel="icon" type="image/png" href="../icons/jampanion-viewer.png?v=43" />
+  <link rel="icon" type="image/png" href="../icons/jampanion-viewer.png?v=44" />
   <style data-jampanion-startup-guard="v1">html.jampanion-startup-pending .app-shell { visibility:hidden; }</style>
   <script data-jampanion-startup-guard="v1">
     document.documentElement.classList.add('jampanion-startup-pending');
@@ -3045,7 +3045,7 @@ textarea:focus-visible {
 
         <div class="utility-group">
           <button id="fullscreen" class="icon-button utility" type="button" title="Fullscreen" aria-label="Fullscreen">⛶</button>
-          <a id="helpButton" class="icon-button utility help-button" href="./help.html?v=43" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
+          <a id="helpButton" class="icon-button utility help-button" href="./help.html?v=44" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
           <button id="settingsButton" class="icon-button utility" type="button" title="Settings" aria-label="Settings">⚙︎</button>
         </div>
         </div>
@@ -3092,7 +3092,7 @@ textarea:focus-visible {
       <section class="about-section">
         <h3>About</h3>
         <p>Jazz Chart Viewer is licensed under the MIT License. MuseJazz Text is loaded from a pinned MuseScore source under the SIL Open Font License 1.1, with a Unicode fallback when unavailable.</p>
-        <p><a href="./help.html?v=43" target="_blank" rel="noopener" lang="en">Help</a> · <a href="./help.en.html?v=43" target="_blank" rel="noopener" lang="en">English help</a></p>
+        <p><a href="./help.html?v=44" target="_blank" rel="noopener" lang="en">Help</a> · <a href="./help.en.html?v=44" target="_blank" rel="noopener" lang="en">English help</a></p>
         <p><a href="./LICENSE" target="_blank" rel="noopener">Application license</a> · <a href="./THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Third-party notices</a></p>
       </section>
     </form>
@@ -6274,7 +6274,7 @@ function responsiveColumns() {
 </script>
 
   <script type="module" data-jampanion-embedded-bridge="v12">
-    import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=43";
+    import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=44";
     initializeEmbeddedViewer().catch(error => {
       console.error("Jampanion embedded bridge failed", error);
       document.documentElement.classList.remove("jampanion-startup-pending");
