@@ -72,7 +72,7 @@ jobs:
           test ! -e dist/js/jampanion-browser.js
           test -s dist/soundfonts/FluidR3_Jampanion.sf3
           test -s dist/app-version.json
-          grep -q '"version": "41"' dist/app-version.json
+          grep -q '"version": "43"' dist/app-version.json
           grep -q "<base href=\"/${GITHUB_REPOSITORY#*/}/\" />" dist/index.html
 
       - name: Upload Pages artifact
