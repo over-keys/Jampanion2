@@ -13,6 +13,8 @@ const requirements = [
   ["library startup waits for saved song", /libraryLoading[\s\S]*Loading saved song/],
   ["search unlocks after library load", /state\.libraryLoading[\s\S]*el\.search\.disabled = false[\s\S]*el\.search\.removeAttribute\('aria-busy'\)/],
   ["search normalizes punctuation", /function normaliseSearchText\(value\)[\s\S]*?function renderSearchOptions\(\)[\s\S]*?normaliseSearchText\(searchListTitle\(song\)\)/],
+  ["search ignores all non-alphanumeric separators", /\.replace\(\/\[\^\\p\{L\}\\p\{N\}\]\+\/gu, ''\)/],
+  ["search ranks title prefixes before interior matches", /title\.startsWith\(query\)[\s\S]*title\.includes\(query\)[\s\S]*composer\.includes\(query\)[\s\S]*sort\(\(left, right\) => left\.rank - right\.rank/],
   ["demo is a true fallback", /using demo fallback[\s\S]*state\.songs = \[DEMO_SONG\]/],
   ["integrated last-song reference fallback", /jampanion-jazz-last-song-v1[\s\S]*findRememberedSong/],
   ["customized-song revert control", /id="deleteCustomized"[\s\S]*Revert all customized songs[\s\S]*Delete all imported songs/],
