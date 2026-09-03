@@ -66,6 +66,27 @@ assertRoute("D.S. al Coda", [
   { marker: "Coda", displayDirectives: ["D.S. al Coda"], final: true }
 ], [0, 1, 2, 3, 4, 0, 1, 3, 4]);
 
+const speakLowLikeChart = Array.from({ length: 32 }, () => ({}));
+Object.assign(speakLowLikeChart[0], { startRepeat: true });
+Object.assign(speakLowLikeChart[9], { codaEnd: true, symbols: ["coda"] });
+Object.assign(speakLowLikeChart[14], { ending: 1 });
+Object.assign(speakLowLikeChart[15], { endRepeat: true });
+Object.assign(speakLowLikeChart[16], { ending: 2 });
+Object.assign(speakLowLikeChart[17], { doubleEnd: true });
+Object.assign(speakLowLikeChart[18], { doubleStart: true });
+Object.assign(speakLowLikeChart[24], { navigationSymbols: ["D.C. al Coda"] });
+Object.assign(speakLowLikeChart[25], { displayDirectives: ["D.C. al Coda"], doubleEnd: true });
+Object.assign(speakLowLikeChart[26], { codaStart: true });
+Object.assign(speakLowLikeChart[31], { final: true });
+
+assertRoute("D.C. al Coda does not repeat written A on return", speakLowLikeChart, [
+  ...Array.from({ length: 16 }, (_, index) => index),
+  ...Array.from({ length: 14 }, (_, index) => index), 16, 17,
+  ...Array.from({ length: 8 }, (_, index) => index + 18),
+  ...Array.from({ length: 10 }, (_, index) => index),
+  ...Array.from({ length: 6 }, (_, index) => index + 26)
+]);
+
 assertRoute("D.C. al 3rd End.", [
   { startRepeat: true }, { marker: "A" }, { ending: 1, endRepeat: true },
   { ending: 2, endRepeat: true },

@@ -2989,7 +2989,7 @@ textarea:focus-visible {
   }
 }
 </style>
-  <link rel="icon" type="image/png" href="../icons/jampanion-viewer.png?v=45" />
+  <link rel="icon" type="image/png" href="../icons/jampanion-viewer.png?v=46" />
   <style data-jampanion-startup-guard="v1">html.jampanion-startup-pending .app-shell { visibility:hidden; }</style>
   <script data-jampanion-startup-guard="v1">
     document.documentElement.classList.add('jampanion-startup-pending');
@@ -3045,7 +3045,7 @@ textarea:focus-visible {
 
         <div class="utility-group">
           <button id="fullscreen" class="icon-button utility" type="button" title="Fullscreen" aria-label="Fullscreen">⛶</button>
-          <a id="helpButton" class="icon-button utility help-button" href="./help.html?v=45" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
+          <a id="helpButton" class="icon-button utility help-button" href="./help.html?v=46" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
           <button id="settingsButton" class="icon-button utility" type="button" title="Settings" aria-label="Settings">⚙︎</button>
         </div>
         </div>
@@ -3092,7 +3092,7 @@ textarea:focus-visible {
       <section class="about-section">
         <h3>About</h3>
         <p>Jazz Chart Viewer is licensed under the MIT License. MuseJazz Text is loaded from a pinned MuseScore source under the SIL Open Font License 1.1, with a Unicode fallback when unavailable.</p>
-        <p><a href="./help.html?v=45" target="_blank" rel="noopener" lang="en">Help</a> · <a href="./help.en.html?v=45" target="_blank" rel="noopener" lang="en">English help</a></p>
+        <p><a href="./help.html?v=46" target="_blank" rel="noopener" lang="en">Help</a> · <a href="./help.en.html?v=46" target="_blank" rel="noopener" lang="en">English help</a></p>
         <p><a href="./LICENSE" target="_blank" rel="noopener">Application license</a> · <a href="./THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Third-party notices</a></p>
       </section>
     </form>
@@ -3258,11 +3258,11 @@ const __expand = (() => {
  * Convert a notated iReal chart into a linear, top-to-bottom play order.
  *
  * Explicit repeat barlines and numbered endings are expanded as they are
- * encountered. D.C./D.S. directives are then executed in written source order;
- * ordinary repeats are taken normally after each jump, To Coda is consumed on
- * the final applicable repeat pass, and reading continues from the Coda so a
- * later navigation directive can also be executed. The returned bars are fresh
- * objects without repeat or volta navigation marks for straight-through display.
+ * encountered. D.C./D.S. directives are then executed in written source order.
+ * A D.C./D.S. return follows the written path linearly until Fine or To Coda;
+ * repeating an already-played written repeat on that return would duplicate
+ * sections such as Speak Low's opening A. The returned bars are fresh objects
+ * without repeat or volta navigation marks for straight-through display.
  */
 function expandChartBars(sourceBars) {
   const source = Array.isArray(sourceBars) ? sourceBars : [];
@@ -3323,8 +3323,7 @@ function expandChartBars(sourceBars) {
       // from being mistaken for the destination.
       const codaStart = source.findIndex((bar, index) => index > jump.index && bar.codaStart);
       if (toCoda >= jumpStart) {
-        const preCodaEnd = codaStart > jump.index ? codaStart - 1 : jump.index;
-        output.push(...pathToCodaAfterRepeats(source, jumpStart, toCoda, preCodaEnd));
+        output.push(...pathToCodaOnReturn(source, jumpStart, toCoda));
       }
       consumedCodaNavigation = true;
       // Continue normal reading from the Coda destination. This permits a
@@ -3532,14 +3531,11 @@ function suppressRepeatedCodaMarkers(bars) {
   }
 }
 
-function pathToCodaAfterRepeats(source, start, target, preCodaEnd) {
-  const routeEnd = Math.max(target, Math.min(preCodaEnd, source.length - 1));
-  const route = expandWrittenRepeats(source.slice(start, routeEnd + 1), start);
-  let finalTargetPosition = -1;
-  for (let index = 0; index < route.length; index += 1) {
-    if (route[index]._sourceIndex === target) finalTargetPosition = index;
-  }
-  if (finalTargetPosition >= 0) return route.slice(0, finalTargetPosition + 1);
+function pathToCodaOnReturn(source, start, target) {
+  // The chart's written repeats have already been performed before D.C./D.S.
+  // sends playback back to the head. Do not expand them a second time while
+  // looking for To Coda; follow the return path once, as a player would read
+  // the instruction on the printed chart.
   return pathToIndex(source, start, target);
 }
 
@@ -6285,7 +6281,7 @@ function responsiveColumns() {
 </script>
 
   <script type="module" data-jampanion-embedded-bridge="v12">
-    import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=45";
+    import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=46";
     initializeEmbeddedViewer().catch(error => {
       console.error("Jampanion embedded bridge failed", error);
       document.documentElement.classList.remove("jampanion-startup-pending");

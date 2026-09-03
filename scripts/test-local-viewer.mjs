@@ -3,7 +3,7 @@ import fs from "node:fs";
 const file = process.argv[2] || "local-viewer/index.html";
 const html = fs.readFileSync(file, "utf8");
 const checks = [
-  ["local bundle marker", html.includes('data-jampanion-local-bundle="v7"')],
+  ["local bundle marker", html.includes('data-jampanion-local-bundle="v8"')],
   ["embedded Viewer code is present", html.includes("const __names")],
   ["font is embedded", html.includes("data:font/otf;base64,")],
   ["Viewer icon is embedded", html.includes("data:image/png;base64,")],
