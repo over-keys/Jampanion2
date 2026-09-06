@@ -161,6 +161,7 @@ checks = {
     "song search ignores punctuation": 'function normaliseSearchText(value)' in viewer_source and 'normaliseSearchText(searchListTitle(song))' in viewer_source,
     "song favorites persist and rank after search": 'STORAGE_FAVORITES' in viewer_source and 'data-favorite-song-id' in viewer_source and 'Number(right.favorite) - Number(left.favorite)' in viewer_source,
     "favorite toggle updates in place": 'function toggleFavorite(songId, toggle)' in viewer_source and 'updateFavoriteToggle(toggle, song, favorite)' in viewer_source,
+    "favorite control is a sibling button": 'return `<div id="search-option-${index}"' in viewer_source and '<button class="search-option-song" type="button"' in viewer_source and '<button class="favorite-toggle' in viewer_source,
 }
 failed = [name for name, ok in checks.items() if not ok]
 if failed:

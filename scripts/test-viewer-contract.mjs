@@ -18,6 +18,7 @@ const requirements = [
   ["favorites persist in search results", /STORAGE_FAVORITES[\s\S]*readFavoriteSongKeys[\s\S]*toggleFavorite[\s\S]*data-favorite-song-id/],
   ["search ranking outranks favorite ranking", /sort\(\(left, right\) => left\.rank - right\.rank[\s\S]*Number\(right\.favorite\) - Number\(left\.favorite\)/],
   ["favorite toggle preserves current result order", /function updateFavoriteToggle[\s\S]*function toggleFavorite\(songId, toggle\)[\s\S]*saveFavoriteSongKeys\(\);[\s\S]*updateFavoriteToggle\(toggle, song, favorite\);/],
+  ["favorite control is a sibling button", /class="search-option-row[\s\S]*<button class="search-option-song"[\s\S]*<button class="favorite-toggle/],
   ["demo is a true fallback", /using demo fallback[\s\S]*state\.songs = \[DEMO_SONG\]/],
   ["integrated last-song reference fallback", /jampanion-jazz-last-song-v1[\s\S]*findRememberedSong/],
   ["customized-song revert control", /id="deleteCustomized"[\s\S]*Revert all customized songs[\s\S]*Delete all imported songs/],

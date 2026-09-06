@@ -73,16 +73,30 @@ button {
   z-index: 50;
 }
 
-.search-options button {
+.search-options .search-option-row {
   width: 100%;
-  border: 0;
   background: transparent;
   display: grid;
-  text-align: left;
-  cursor: pointer;
 }
 
-.search-options button:hover, .search-options button:focus {
+.search-options .search-option-song,
+.search-options .favorite-toggle {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.search-options .search-option-song {
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.search-options .search-option-row:hover,
+.search-options .search-option-row:focus-within,
+.search-options .search-option-song:focus-visible,
+.search-options .favorite-toggle:focus-visible {
   background: #edf4f6;
 }
 
@@ -1229,7 +1243,7 @@ textarea:focus-visible {
   overscroll-behavior: contain;
 }
 
-.search-options button {
+.search-options .search-option-row {
   min-height: 50px;
   grid-template-columns: minmax(0, 1fr) minmax(100px, auto) auto;
   align-items: center;
@@ -1238,19 +1252,21 @@ textarea:focus-visible {
   border-bottom: 1px solid #eceef0;
 }
 
-.search-options button:first-child {
+.search-options .search-option-row:first-child {
   border-radius: 10px 10px 0 0;
 }
 
-.search-options button:last-child {
+.search-options .search-option-row:last-of-type {
   border-bottom: 0;
   border-radius: 0 0 10px 10px;
 }
 
-.search-options button:hover,
-.search-options button:focus-visible {
-  background: var(--accent-soft);
-  outline: 0;
+.search-options .search-option-song {
+  display: grid;
+  grid-column: 1 / span 2;
+  grid-template-columns: minmax(0, 1fr) minmax(100px, auto);
+  align-items: center;
+  gap: 20px;
 }
 
 .search-options strong {
@@ -1273,15 +1289,16 @@ textarea:focus-visible {
 .search-options .favorite-toggle {
   display: grid;
   place-items: center;
-  width: 28px;
-  min-width: 28px;
-  height: 30px;
+  grid-column: 3;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  padding: 0;
   overflow: visible;
   color: #7b868b;
-  font-size: 21px;
+  font-size: 23px;
   line-height: 1;
   text-align: center;
-  cursor: pointer;
   user-select: none;
   border-radius: 6px;
 }
@@ -1296,6 +1313,11 @@ textarea:focus-visible {
   color: #8c5d00;
   outline: 2px solid rgb(31 97 118 / 20%);
   outline-offset: -2px;
+}
+
+.search-options .search-option-row.active,
+.search-options .search-option-row[aria-selected="true"] {
+  background: var(--accent-soft, #edf4f6);
 }
 
 .empty-option {
@@ -1569,9 +1591,13 @@ textarea:focus-visible {
     max-height: 55dvh;
   }
 
-  .search-options button {
+  .search-options .search-option-row {
     min-height: 48px;
-    grid-template-columns: minmax(0, 1fr) minmax(78px, 34%) auto;
+    gap: 10px;
+  }
+
+  .search-options .search-option-song {
+    grid-template-columns: minmax(0, 1fr) minmax(78px, 34%);
     gap: 10px;
   }
 
@@ -1840,11 +1866,6 @@ textarea:focus-visible {
 
 .bar.has-time-signature .chords {
   padding-left: 27px;
-}
-
-.search-options button.active,
-.search-options button[aria-selected="true"] {
-  background: var(--accent-soft, #edf4f6);
 }
 
 .font-notice {
@@ -5938,7 +5959,7 @@ function renderSearchOptions() {
       const favorite = isFavorite(song);
       const favoriteTitle = searchListTitle(song);
       const favoriteLabel = favorite ? `Remove ${favoriteTitle} from favorites` : `Add ${favoriteTitle} to favorites`;
-      return `<button id="search-option-${index}" type="button" role="option" aria-selected="${active}" class="${active ? 'active' : ''}" data-option-index="${index}" data-song-id="${escapeHtml(song.id)}"><strong>${escapeHtml(favoriteTitle)}</strong><span>${escapeHtml(secondary)}</span><span class="favorite-toggle${favorite ? ' is-favorite' : ''}" role="button" tabindex="0" data-favorite-song-id="${escapeHtml(song.id)}" aria-label="${escapeHtml(favoriteLabel)}" aria-pressed="${favorite}" title="${escapeHtml(favoriteLabel)}">${favorite ? '★' : '☆'}</span></button>`;
+      return `<div id="search-option-${index}" role="option" aria-selected="${active}" class="search-option-row${active ? ' active' : ''}" data-option-index="${index}" data-song-id="${escapeHtml(song.id)}"><button class="search-option-song" type="button" aria-label="Select ${escapeHtml(favoriteTitle)}"><strong>${escapeHtml(favoriteTitle)}</strong><span>${escapeHtml(secondary)}</span></button><button class="favorite-toggle${favorite ? ' is-favorite' : ''}" type="button" data-favorite-song-id="${escapeHtml(song.id)}" aria-label="${escapeHtml(favoriteLabel)}" aria-pressed="${favorite}" title="${escapeHtml(favoriteLabel)}">${favorite ? '★' : '☆'}</button></div>`;
     }).join('') + (hiddenCount
       ? `<div class="empty-option search-limit-note">Showing the first ${SEARCH_RESULT_LIMIT} matches. Refine the search to see more.</div>`
       : '')
