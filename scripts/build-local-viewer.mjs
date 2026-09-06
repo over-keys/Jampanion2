@@ -9,7 +9,7 @@ const viewerIconPath = path.join(root, "src/Jampanion.Web/wwwroot/icons/jampanio
 const appIconPath = path.join(root, "src/Jampanion.Web/wwwroot/icons/jampanion-32.png");
 const outputPath = path.join(root, "local-viewer/index.html");
 
-const LOCAL_VIEWER_VERSION = "8";
+const LOCAL_VIEWER_VERSION = "9";
 const MAIN_URL = "https://over-keys.github.io/Jampanion2/";
 const ONLINE_VIEWER_URL = `${MAIN_URL}viewer/`;
 
@@ -27,9 +27,9 @@ html = html
   .replace('<html lang="en">', `<html lang="en" data-jampanion-local-bundle="v${LOCAL_VIEWER_VERSION}">`)
   .replace(/\s*<link rel="manifest" href="\.\/manifest\.webmanifest\?v=1" \/>/, "")
   .replace('url("assets/MuseJazzText.otf")', `url("${fontUrl}")`)
-  .replaceAll("../icons/jampanion-viewer.png?v=46", viewerIconUrl)
-  .replaceAll('./help.html?v=46', ONLINE_VIEWER_URL + 'help.html?v=46')
-  .replaceAll('./help.en.html?v=46', ONLINE_VIEWER_URL + 'help.en.html?v=46')
+  .replaceAll("../icons/jampanion-viewer.png?v=47", viewerIconUrl)
+  .replaceAll('./help.html?v=47', ONLINE_VIEWER_URL + 'help.html?v=47')
+  .replaceAll('./help.en.html?v=47', ONLINE_VIEWER_URL + 'help.en.html?v=47')
   .replace(
     '      <div class="toolbar-main">\n        <div class="search-wrap">',
     `      <div class="toolbar-main">\n${localModeLink}\n        <div class="search-wrap">`
@@ -42,7 +42,7 @@ html = html
     if (isStandaloneViewer) {
       document.documentElement.classList.remove("jampanion-startup-pending");
     } else {
-      import("../js/jazz-chart-host.js?v=46").then(({ initializeEmbeddedViewer }) => {
+      import("../js/jazz-chart-host.js?v=47").then(({ initializeEmbeddedViewer }) => {
         return initializeEmbeddedViewer();
       }).catch(error => {
         console.error("Jampanion embedded bridge failed", error);

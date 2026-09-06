@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-jampanion-local-bundle="v8">
+<html lang="en" data-jampanion-local-bundle="v9">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -1231,7 +1231,7 @@ textarea:focus-visible {
 
 .search-options button {
   min-height: 50px;
-  grid-template-columns: minmax(0, 1fr) minmax(100px, auto);
+  grid-template-columns: minmax(0, 1fr) minmax(100px, auto) auto;
   align-items: center;
   gap: 20px;
   padding: 9px 12px;
@@ -1268,6 +1268,34 @@ textarea:focus-visible {
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.search-options .favorite-toggle {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  min-width: 28px;
+  height: 30px;
+  overflow: visible;
+  color: #7b868b;
+  font-size: 21px;
+  line-height: 1;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px;
+}
+
+.search-options .favorite-toggle.is-favorite {
+  color: #a56f00;
+}
+
+.search-options .favorite-toggle:hover,
+.search-options .favorite-toggle:focus-visible {
+  background: var(--accent-soft);
+  color: #8c5d00;
+  outline: 2px solid rgb(31 97 118 / 20%);
+  outline-offset: -2px;
 }
 
 .empty-option {
@@ -1537,13 +1565,13 @@ textarea:focus-visible {
 
   .search-options {
     left: 0;
-    width: calc(100vw - 16px);
+    width: 100%;
     max-height: 55dvh;
   }
 
   .search-options button {
     min-height: 48px;
-    grid-template-columns: minmax(0, 1fr) minmax(90px, 42%);
+    grid-template-columns: minmax(0, 1fr) minmax(78px, 34%) auto;
     gap: 10px;
   }
 
@@ -3048,7 +3076,7 @@ textarea:focus-visible {
 
         <div class="utility-group">
           <button id="fullscreen" class="icon-button utility" type="button" title="Fullscreen" aria-label="Fullscreen">⛶</button>
-          <a id="helpButton" class="icon-button utility help-button" href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=46" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
+          <a id="helpButton" class="icon-button utility help-button" href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=47" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
           <button id="settingsButton" class="icon-button utility" type="button" title="Settings" aria-label="Settings">⚙︎</button>
         </div>
         </div>
@@ -3095,7 +3123,7 @@ textarea:focus-visible {
       <section class="about-section">
         <h3>About</h3>
         <p>Jazz Chart Viewer is licensed under the MIT License. MuseJazz Text is loaded from a pinned MuseScore source under the SIL Open Font License 1.1, with a Unicode fallback when unavailable.</p>
-        <p><a href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=46" target="_blank" rel="noopener" lang="en">Help</a> · <a href="https://over-keys.github.io/Jampanion2/viewer/help.en.html?v=46" target="_blank" rel="noopener" lang="en">English help</a></p>
+        <p><a href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=47" target="_blank" rel="noopener" lang="en">Help</a> · <a href="https://over-keys.github.io/Jampanion2/viewer/help.en.html?v=47" target="_blank" rel="noopener" lang="en">English help</a></p>
         <p><a href="./LICENSE" target="_blank" rel="noopener">Application license</a> · <a href="./THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Third-party notices</a></p>
       </section>
     </form>
@@ -5684,6 +5712,7 @@ const { renderChartMarkup, escapeHtml } = __chartRenderer;
 'use strict';
 const STORAGE_SETTINGS = 'ireal-chart-viewer-settings-v3';
 const STORAGE_LAST_SONG = 'ireal-chart-viewer-last-song-v1';
+const STORAGE_FAVORITES = 'ireal-chart-viewer-favorites-v1';
 const DEFAULT_SETTINGS = {
   accidental: 'auto',
   scale: 100,
@@ -5704,6 +5733,7 @@ const state = {
   selectedId: null,
   semitones: 0,
   settings: initialSettings,
+  favoriteSongKeys: readFavoriteSongKeys(),
   searchOpen: false,
   searchActiveIndex: -1,
   viewMode: 'original',
@@ -5744,6 +5774,42 @@ function songSelectionKey(song) {
   const record = song.sourceRecord;
   if (record?.body) return `ireal:${record.protocol || ''}\n${record.body}`;
   return `song:${song.title || ''}\n${song.composer || ''}\n${song.style || ''}\n${song.key || ''}`;
+}
+
+function readFavoriteSongKeys() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(STORAGE_FAVORITES) || '[]');
+    return new Set(Array.isArray(stored)
+      ? stored.filter((value) => typeof value === 'string' && value)
+      : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveFavoriteSongKeys() {
+  try {
+    localStorage.setItem(STORAGE_FAVORITES, JSON.stringify([...state.favoriteSongKeys]));
+  } catch {
+    // The current favorite state remains active when persistent storage is unavailable.
+  }
+}
+
+function isFavorite(song) {
+  const key = songSelectionKey(song);
+  return Boolean(key && state.favoriteSongKeys.has(key));
+}
+
+function toggleFavorite(songId) {
+  const song = state.songs.find((candidate) => candidate.id === songId);
+  if (!song) return;
+  const key = songSelectionKey(song);
+  if (!key) return;
+  if (state.favoriteSongKeys.has(key)) state.favoriteSongKeys.delete(key);
+  else state.favoriteSongKeys.add(key);
+  saveFavoriteSongKeys();
+  state.searchActiveIndex = -1;
+  renderSearchOptions();
 }
 
 function readLastSongKey() {
@@ -5831,7 +5897,8 @@ function renderSearchOptions() {
   const query = normaliseSearchText(rawQuery);
   const matchingSongs = state.songs
     .map((song, index) => {
-      if (!rawQuery) return { song, rank: 0, index };
+      const favorite = isFavorite(song);
+      if (!rawQuery) return { song, rank: 0, favorite, index };
       if (!query) return null;
       const title = normaliseSearchText(searchListTitle(song));
       const composer = normaliseSearchText(displayComposer(song.composer));
@@ -5842,10 +5909,12 @@ function renderSearchOptions() {
           : composer.includes(query)
             ? 2
             : -1;
-      return rank >= 0 ? { song, rank, index } : null;
+      return rank >= 0 ? { song, rank, favorite, index } : null;
     })
     .filter((match) => match !== null)
-    .sort((left, right) => left.rank - right.rank || left.index - right.index)
+    .sort((left, right) => left.rank - right.rank
+      || Number(right.favorite) - Number(left.favorite)
+      || left.index - right.index)
     .map((match) => match.song);
   const choices = matchingSongs.slice(0, SEARCH_RESULT_LIMIT);
   const hiddenCount = Math.max(0, matchingSongs.length - choices.length);
@@ -5855,7 +5924,10 @@ function renderSearchOptions() {
       const composer = displayComposer(song.composer);
       const secondary = composer || song.style || '';
       const active = index === state.searchActiveIndex;
-      return `<button id="search-option-${index}" type="button" role="option" aria-selected="${active}" class="${active ? 'active' : ''}" data-option-index="${index}" data-song-id="${escapeHtml(song.id)}"><strong>${escapeHtml(searchListTitle(song))}</strong><span>${escapeHtml(secondary)}</span></button>`;
+      const favorite = isFavorite(song);
+      const favoriteTitle = searchListTitle(song);
+      const favoriteLabel = favorite ? `Remove ${favoriteTitle} from favorites` : `Add ${favoriteTitle} to favorites`;
+      return `<button id="search-option-${index}" type="button" role="option" aria-selected="${active}" class="${active ? 'active' : ''}" data-option-index="${index}" data-song-id="${escapeHtml(song.id)}"><strong>${escapeHtml(favoriteTitle)}</strong><span>${escapeHtml(secondary)}</span><span class="favorite-toggle${favorite ? ' is-favorite' : ''}" role="button" tabindex="0" data-favorite-song-id="${escapeHtml(song.id)}" aria-label="${escapeHtml(favoriteLabel)}" aria-pressed="${favorite}" title="${escapeHtml(favoriteLabel)}">${favorite ? '★' : '☆'}</span></button>`;
     }).join('') + (hiddenCount
       ? `<div class="empty-option search-limit-note">Showing the first ${SEARCH_RESULT_LIMIT} matches. Refine the search to see more.</div>`
       : '')
@@ -6049,9 +6121,23 @@ function selectSong(songId) {
 // JAMPANION_SELECTION_TRANSPOSE_V1
 
 el.searchOptions.addEventListener('click', (event) => {
+  const favorite = event.target.closest('[data-favorite-song-id]');
+  if (favorite) {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleFavorite(favorite.dataset.favoriteSongId);
+    return;
+  }
   const button = event.target.closest('[data-song-id]');
   if (!button) return;
   selectSong(button.dataset.songId);
+});
+el.searchOptions.addEventListener('keydown', (event) => {
+  const favorite = event.target.closest('[data-favorite-song-id]');
+  if (!favorite || !['Enter', ' '].includes(event.key)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  toggleFavorite(favorite.dataset.favoriteSongId);
 });
 document.addEventListener('pointerdown', (event) => {
   if (!event.target.closest('.search-wrap') && state.searchOpen) closeSearch();
@@ -6288,7 +6374,7 @@ function responsiveColumns() {
     if (isStandaloneViewer) {
       document.documentElement.classList.remove("jampanion-startup-pending");
     } else {
-      import("../js/jazz-chart-host.js?v=46").then(({ initializeEmbeddedViewer }) => {
+      import("../js/jazz-chart-host.js?v=47").then(({ initializeEmbeddedViewer }) => {
         return initializeEmbeddedViewer();
       }).catch(error => {
         console.error("Jampanion embedded bridge failed", error);
