@@ -13,7 +13,7 @@ for (const file of targets) {
     throw new Error(`Fatal error automatic recovery guidance missing: ${file}`);
   }
   if (source.includes("blazor-error-ui") &&
-      !source.includes('const APP_VERSION = "47"')) {
+      !source.includes('const APP_VERSION = "48"')) {
     throw new Error(`Standalone cache generation missing: ${file}`);
   }
   if (source.includes("blazor-error-ui") &&

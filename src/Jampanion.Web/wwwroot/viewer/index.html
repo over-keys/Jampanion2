@@ -3017,7 +3017,7 @@ textarea:focus-visible {
   }
 }
 </style>
-  <link rel="icon" type="image/png" href="../icons/jampanion-viewer.png?v=47" />
+  <link rel="icon" type="image/png" href="../icons/jampanion-viewer.png?v=48" />
   <style data-jampanion-startup-guard="v1">html.jampanion-startup-pending .app-shell { visibility:hidden; }</style>
   <script data-jampanion-startup-guard="v1">
     document.documentElement.classList.add('jampanion-startup-pending');
@@ -3073,7 +3073,7 @@ textarea:focus-visible {
 
         <div class="utility-group">
           <button id="fullscreen" class="icon-button utility" type="button" title="Fullscreen" aria-label="Fullscreen">⛶</button>
-          <a id="helpButton" class="icon-button utility help-button" href="./help.html?v=47" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
+          <a id="helpButton" class="icon-button utility help-button" href="./help.html?v=48" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
           <button id="settingsButton" class="icon-button utility" type="button" title="Settings" aria-label="Settings">⚙︎</button>
         </div>
         </div>
@@ -3120,7 +3120,7 @@ textarea:focus-visible {
       <section class="about-section">
         <h3>About</h3>
         <p>Jazz Chart Viewer is licensed under the MIT License. MuseJazz Text is loaded from a pinned MuseScore source under the SIL Open Font License 1.1, with a Unicode fallback when unavailable.</p>
-        <p><a href="./help.html?v=47" target="_blank" rel="noopener" lang="en">Help</a> · <a href="./help.en.html?v=47" target="_blank" rel="noopener" lang="en">English help</a></p>
+        <p><a href="./help.html?v=48" target="_blank" rel="noopener" lang="en">Help</a> · <a href="./help.en.html?v=48" target="_blank" rel="noopener" lang="en">English help</a></p>
         <p><a href="./LICENSE" target="_blank" rel="noopener">Application license</a> · <a href="./THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Third-party notices</a></p>
       </section>
     </form>
@@ -5797,16 +5797,27 @@ function isFavorite(song) {
   return Boolean(key && state.favoriteSongKeys.has(key));
 }
 
-function toggleFavorite(songId) {
+function updateFavoriteToggle(toggle, song, favorite) {
+  if (!toggle) return;
+  const favoriteTitle = searchListTitle(song);
+  const favoriteLabel = favorite ? `Remove ${favoriteTitle} from favorites` : `Add ${favoriteTitle} to favorites`;
+  toggle.classList.toggle('is-favorite', favorite);
+  toggle.setAttribute('aria-label', favoriteLabel);
+  toggle.setAttribute('aria-pressed', favorite);
+  toggle.setAttribute('title', favoriteLabel);
+  toggle.textContent = favorite ? '★' : '☆';
+}
+
+function toggleFavorite(songId, toggle) {
   const song = state.songs.find((candidate) => candidate.id === songId);
   if (!song) return;
   const key = songSelectionKey(song);
   if (!key) return;
-  if (state.favoriteSongKeys.has(key)) state.favoriteSongKeys.delete(key);
-  else state.favoriteSongKeys.add(key);
+  const favorite = !state.favoriteSongKeys.has(key);
+  if (favorite) state.favoriteSongKeys.add(key);
+  else state.favoriteSongKeys.delete(key);
   saveFavoriteSongKeys();
-  state.searchActiveIndex = -1;
-  renderSearchOptions();
+  updateFavoriteToggle(toggle, song, favorite);
 }
 
 function readLastSongKey() {
@@ -6122,7 +6133,7 @@ el.searchOptions.addEventListener('click', (event) => {
   if (favorite) {
     event.preventDefault();
     event.stopPropagation();
-    toggleFavorite(favorite.dataset.favoriteSongId);
+    toggleFavorite(favorite.dataset.favoriteSongId, favorite);
     return;
   }
   const button = event.target.closest('[data-song-id]');
@@ -6134,7 +6145,7 @@ el.searchOptions.addEventListener('keydown', (event) => {
   if (!favorite || !['Enter', ' '].includes(event.key)) return;
   event.preventDefault();
   event.stopPropagation();
-  toggleFavorite(favorite.dataset.favoriteSongId);
+  toggleFavorite(favorite.dataset.favoriteSongId, favorite);
 });
 document.addEventListener('pointerdown', (event) => {
   if (!event.target.closest('.search-wrap') && state.searchOpen) closeSearch();
@@ -6367,7 +6378,7 @@ function responsiveColumns() {
 </script>
 
   <script type="module" data-jampanion-embedded-bridge="v12">
-    import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=47";
+    import { initializeEmbeddedViewer } from "../js/jazz-chart-host.js?v=48";
     initializeEmbeddedViewer().catch(error => {
       console.error("Jampanion embedded bridge failed", error);
       document.documentElement.classList.remove("jampanion-startup-pending");
