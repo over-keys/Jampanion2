@@ -7,7 +7,7 @@ const NATIVE_STORE = "songs";
 const NATIVE_DB_VERSION = 1;
 const PPQ = 480;
 const IREAL_MUSIC_PREFIX = "1r34LbKcu7";
-const JAMPANION_ICON_PATH = "../icons/jampanion-32.png?v=49";
+const JAMPANION_ICON_PATH = "../icons/jampanion-32.png?v=51";
 
 let frame;
 let win;
@@ -25,6 +25,8 @@ let embeddedLayoutTimer;
 let embeddedFrameContentHeight = 0;
 let libraryTimer;
 let lastLibrarySignature = "";
+let lastSelectedSongId = "";
+let viewerDeleteSong;
 let editInput;
 let editRestore;
 let contextMenu;
@@ -120,7 +122,7 @@ function installParentBridgeListener() {
             if (data.name === "bootstrapChanged") {
                 void dotNet?.invokeMethodAsync("ChartBootstrapChanged", data.value);
             } else if (data.name === "edited") {
-                void dotNet?.invokeMethodAsync("ChartEdited", String(data.message || "Chart updated"));
+                void dotNet?.invokeMethodAsync("ChartEdited", String(data.message || "Chart updated"), data.value);
             } else if (data.name === "spaceShortcut") {
                 void dotNet?.invokeMethodAsync("HandleSpaceShortcut");
             } else if (data.name === "toolbarSave") {
@@ -222,6 +224,7 @@ function installEmbeddedBridgeListener() {
                 case "highlightSourceBar": value = highlightSourceBar(args.sourceIndex, args.occurrence); break;
                 case "createNewSong": value = await createNewSong(args.title, args.barCount, args.meter, args.key, args.accompanimentStyle); break;
                 case "deleteCurrentNativeSong": value = await deleteCurrentNativeSong(); break;
+                case "deleteDisplayedSong": value = await deleteDisplayedSong(); break;
                 case "deleteCustomizedSongs": value = await deleteCustomizedSongs(); break;
                 case "setToolbarState": value = setToolbarState(args.dirty, args.canRevert, args.canDelete); break;
                 case "setToolbarRevertVisible": value = setToolbarRevertVisible(args.visible); break;
@@ -647,12 +650,13 @@ function installChartListeners() {
     doc.addEventListener("dblclick", handleDoubleClick, true);
     doc.addEventListener("contextmenu", handleContextMenu, true);
     doc.addEventListener("click", event => {
+        if (event.target.closest?.("[data-favorite-song-id]")) return;
         if (!event.target.closest?.("[data-song-id]")) return;
         setTimeout(() => {
             // Reapply the per-song saved key after the Viewer selection
             // handler has completed, so selection and page reload use the
             // same stored transpose.
-            const restored = restoreStoredTranspose();
+            const restored = restoreSelectedSongTranspose();
             rememberSelectedSong();
             if (restored) queueBootstrapNotification();
             updateStandaloneSaveButton();
@@ -667,6 +671,9 @@ function installChartListeners() {
         // Rebind the customized-song action if that replacement created a
         // new button node.
         installLibraryActions();
+        const selectionChanged = String(viewer?.state?.selectedId || "") !== lastSelectedSongId;
+        restoreSelectedSongTranspose();
+        if (selectionChanged) void notifyBootstrap();
         annotateRenderedBars();
         queueBootstrapNotification();
     });
@@ -710,7 +717,33 @@ function installLibraryActions() {
             libraryDeleteHandler = null;
         }
     }
+    if (!viewerDeleteSong) {
+        viewerDeleteSong = viewer.deleteSongById;
+        viewer.deleteSongById = async songId => {
+            if (!editingEnabled) return false;
+            const song = viewer.state.songs.find(item => String(item.id) === String(songId));
+            if (!song || song.source === "demo") return false;
+            const identity = songIdentity(song);
+            const deleted = await viewerDeleteSong(songId, async () => {
+                if (song.source === "native") await deleteNativeRecord(identity);
+                removeSongSettings(identity);
+                nativeSongs.delete(identity);
+            });
+            restoreSelectedSongTranspose();
+            setToolbarState(false, canRevertSong(currentSong()));
+            rememberSelectedSong(currentSong());
+            queueBootstrapNotification();
+            return deleted;
+        };
+    }
     updateCustomizedSongsButton();
+}
+
+export async function deleteDisplayedSong() {
+    if (!embeddedMode) return requestEmbedded("deleteDisplayedSong", {}, 10000);
+    if (!editingEnabled) return { changed: false, bootstrap: getBootstrap() };
+    const changed = await viewer.deleteCurrentSongWithConfirmation();
+    return { changed, bootstrap: getBootstrap() };
 }
 
 function isCustomizedSong(song) {
@@ -746,12 +779,11 @@ function updateCustomizedSongsButton() {
 
 async function deleteNativeRecord(identity) {
     if (!identity) return;
+    const database = await openNativeDb();
     try {
-        const database = await openNativeDb();
         await transactionRequest(database, "readwrite", store => store.delete(identity));
+    } finally {
         database.close();
-    } catch {
-        // The in-memory map is still cleared when IndexedDB is unavailable.
     }
 }
 
@@ -988,9 +1020,17 @@ function startLibraryWatcher() {
             updateStandaloneSaveButton();
         }
         if (lastSongRestorePending && libraryChanged) restoreLastSelectedSong();
-        else if (libraryChanged) restoreStoredTranspose();
+        else if (libraryChanged) restoreSelectedSongTranspose();
     }, 700);
     lastLibrarySignature = librarySignature();
+    lastSelectedSongId = String(viewer?.state?.selectedId || "");
+}
+
+function restoreSelectedSongTranspose() {
+    const selectedId = String(viewer?.state?.selectedId || "");
+    if (selectedId === lastSelectedSongId) return false;
+    lastSelectedSongId = selectedId;
+    return restoreStoredTranspose();
 }
 
 function librarySignature() {
@@ -1076,7 +1116,7 @@ function loadSettingsMap() {
 
 function saveSettingsMap(value) {
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(value)); }
-    catch { /* current-session state remains usable */ }
+    catch { throw new Error("Song settings could not be saved. Check browser storage and try again."); }
 }
 
 function removeSongSettings(identity) {
@@ -1440,9 +1480,16 @@ function annotateRenderedBars() {
     annotateSongOptions();
     const song = currentSong();
     if (!song) return;
-    const displayed = viewer.state.viewMode === "expanded"
-        ? viewer.expandChartBars(song.bars || [])
-        : (song.bars || []).map((bar, index) => ({ ...bar, _sourceIndex: index }));
+    let displayed;
+    try {
+        displayed = viewer.state.viewMode === "expanded"
+            ? viewer.expandChartBars(song.bars || [])
+            : (song.bars || []).map((bar, index) => ({ ...bar, _sourceIndex: index }));
+    } catch {
+        // The Viewer shows the expansion diagnostic and permits returning to
+        // Original. No rendered bars need annotation in this state.
+        return;
+    }
     const elements = [...doc.querySelectorAll("#chartPage .bar:not(.spacer)")];
     for (let index = 0; index < elements.length; index++) {
         const source = displayed[index];
@@ -2159,6 +2206,7 @@ function editChord(sourceIndex, slotIndex, anchor) {
         if (chord === slot.chord) return;
         promoteNative(song);
         if (!chord) {
+            normalizeBarGridFromDom(bar, anchor.closest(".bar"), bar.cellCount || 4);
             bar.chordSlots.splice(slotIndex, 1);
             bar.jampanionNoChord = bar.chordSlots.filter(item => !item.hidden).length === 0;
             rebuildChordList(bar);
@@ -2189,7 +2237,7 @@ function addChordAtPoint(sourceIndex, barElement, clientX) {
 
     const inputHeight = 28;
     const chordTop = rect.top + (rect.height - inputHeight) / 2;
-    const sourceCell = hasVisibleSlot ? insertCell : startCell;
+    const sourceCell = insertCell;
     const existingSlot = sourceSlots.find(slot =>
         !slot.hidden && Number(slot.cell || 0) === Number(sourceCell));
     // A double-click can land on the edge of a rendered chord while the
@@ -2314,7 +2362,8 @@ function normalizeBarGridFromDom(bar, barElement, total) {
                 : { ...current, cell: startCell };
         }
     }
-    bar.cellCount = total;
+    bar.jampanionGridCells = Number(domSlots[0]?.dataset.gridTotal) || bar.jampanionGridCells || total;
+    bar.cellCount = bar.jampanionGridCells;
 }
 
 function rebuildChordList(bar) {
@@ -2468,8 +2517,8 @@ async function edited(message) {
     setToolbarState(true, canRevertSong(currentSong()));
     updateStandaloneSaveButton();
     queueBootstrapNotification();
-    if (embeddedMode) postToParent({ type: "event", name: "edited", message });
-    else if (dotNet) await dotNet.invokeMethodAsync("ChartEdited", message);
+    if (embeddedMode) postToParent({ type: "event", name: "edited", message, value: getBootstrap() });
+    else if (dotNet) await dotNet.invokeMethodAsync("ChartEdited", message, getBootstrap());
 }
 
 function promoteNative(song) {
@@ -2512,7 +2561,7 @@ export async function saveCurrentChart() {
         songIdentity(song),
         settings.tempoBpm,
         settings.accompanimentStyle,
-        settings.tempoExplicit,
+        settings.tempoUserExplicit,
         Number(viewer.state.semitones) || 0);
 
     if (song.source === "native") await persistNative(song);
@@ -2597,12 +2646,11 @@ function transactionRequest(database, mode, operation) {
 }
 
 async function putNativeRecord(identity, song) {
+    const database = await openNativeDb();
     try {
-        const database = await openNativeDb();
         await transactionRequest(database, "readwrite", store => store.put({ identity, song: structuredCloneSafe(song) }));
+    } finally {
         database.close();
-    } catch {
-        // Do not block chart editing if persistence is unavailable.
     }
 }
 
@@ -2636,8 +2684,8 @@ export async function createNewSong(title, barCount, meter, key, accompanimentSt
         source: "native", sourceRecord: null, originalSourceRecord: null,
         parserVersion: 18, nativeSchemaVersion: 1
     };
-    nativeSongs.set(identity, structuredCloneSafe(song));
     await putNativeRecord(identity, song);
+    nativeSongs.set(identity, structuredCloneSafe(song));
     viewer.state.songs.push(song);
     viewer.state.selectedId = id;
     restoreStoredTranspose();
@@ -2656,14 +2704,6 @@ export async function deleteCurrentNativeSong() {
     const identity = songIdentity(song);
     const originalRecord = song.originalSourceRecord ? structuredCloneSafe(song.originalSourceRecord) : null;
     const originalSong = song.originalSourceSong ? structuredCloneSafe(song.originalSourceSong) : null;
-    removeSongSettings(identity);
-    nativeSongs.delete(identity);
-    try {
-        const database = await openNativeDb();
-        await transactionRequest(database, "readwrite", store => store.delete(identity));
-        database.close();
-    } catch {}
-
     const currentIndex = viewer.state.songs.findIndex(item => item.id === song.id);
     let restored = null;
     if (originalSong) {
@@ -2675,9 +2715,16 @@ export async function deleteCurrentNativeSong() {
                 : "irealb://";
             restored = viewer.parseIRealCollection(`${protocol}${encodeURIComponent(originalRecord.body)}`).songs?.[0] || null;
         } catch (error) {
-            console.warn("Original iReal chart could not be restored", error);
+            throw new Error("The original iReal chart could not be restored. The edited chart has been kept.");
         }
     }
+
+    // Remove legacy duplicate copies from the Viewer library before deleting
+    // the authoritative native record. A reload must not resurrect overrides.
+    await viewer.saveLibraryAfterNativeRemoval(song.id, restored);
+    await deleteNativeRecord(identity);
+    nativeSongs.delete(identity);
+    removeSongSettings(identity);
 
     if (restored) {
         if (currentIndex >= 0) viewer.state.songs.splice(currentIndex, 1, restored);
@@ -2698,19 +2745,21 @@ export async function deleteCurrentNativeSong() {
 export async function revertCurrentSong() {
     if (!embeddedMode) return await requestEmbedded("revertCurrentSong", {}, 10000);
     const song = currentSong();
-    if (!song) return getBootstrap();
-    if (!window.confirm("Revert changes?")) return getBootstrap();
-    setToolbarState(false, false, false);
-    removeSongSettings(songIdentity(song));
+    if (!song) return { changed: false, bootstrap: getBootstrap() };
+    if (!window.confirm("Revert changes?")) return { changed: false, bootstrap: getBootstrap() };
     if (song.source === "native" && hasOriginalChart(song)) {
-        return await deleteCurrentNativeSong();
+        const bootstrap = await deleteCurrentNativeSong();
+        setToolbarState(false, false, false);
+        return { changed: true, bootstrap };
     }
+    removeSongSettings(songIdentity(song));
+    setToolbarState(false, false, false);
     restoreStoredTranspose();
     forceRender();
     annotateRenderedBars();
     rememberSelectedSong(song);
     queueBootstrapNotification();
-    return getBootstrap();
+    return { changed: true, bootstrap: getBootstrap() };
 }
 
 function resolvedMeterAt(bars, sourceIndex) {
@@ -2784,6 +2833,8 @@ export function saveMixerPreferences(value) {
 }
 
 export function dispose() {
+    if (viewer && viewerDeleteSong) viewer.deleteSongById = viewerDeleteSong;
+    viewerDeleteSong = null;
     const activeDocument = doc;
     const activeWindow = win || window;
     observer?.disconnect();

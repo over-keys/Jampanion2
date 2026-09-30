@@ -37,6 +37,8 @@ public sealed record JazzChartBootstrap(
     string ViewMode,
     int SemitoneShift);
 
+public sealed record JazzChartActionResult(bool Changed, JazzChartBootstrap Bootstrap);
+
 public sealed record JazzChordEventDto(
     long StartTick,
     string Symbol);

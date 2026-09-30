@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-jampanion-local-bundle="v11">
+<html lang="en" data-jampanion-local-bundle="v13">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -3097,7 +3097,7 @@ textarea:focus-visible {
 
         <div class="utility-group">
           <button id="fullscreen" class="icon-button utility" type="button" title="Fullscreen" aria-label="Fullscreen">⛶</button>
-          <a id="helpButton" class="icon-button utility help-button" href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=49" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
+          <a id="helpButton" class="icon-button utility help-button" href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=51" target="_blank" rel="noopener" title="Help" aria-label="Help">?</a>
           <button id="settingsButton" class="icon-button utility" type="button" title="Settings" aria-label="Settings">⚙︎</button>
         </div>
         </div>
@@ -3132,6 +3132,10 @@ textarea:focus-visible {
       </section>
       <section>
         <h3>Song library</h3>
+        <p id="currentSongDeleteTitle" class="settings-hint"></p>
+        <div class="action-row">
+          <button id="deleteCurrentSong" type="button" class="danger">Delete current song</button>
+        </div>
         <div class="action-row">
           <button id="openImport" type="button" class="primary">Import iReal data</button>
           <button id="deleteAll" type="button" class="danger">Delete all imported songs</button>
@@ -3139,12 +3143,11 @@ textarea:focus-visible {
         <div class="action-row">
           <button id="deleteCustomized" type="button" class="danger">Revert all customized songs</button>
         </div>
-        <p class="settings-hint" data-jampanion-customized-songs-layout="v2">Revert all customized songs restores their original imported state. Delete all imported songs removes the entire imported library.</p>
       </section>
       <section class="about-section">
         <h3>About</h3>
         <p>Jazz Chart Viewer is licensed under the MIT License. MuseJazz Text is loaded from a pinned MuseScore source under the SIL Open Font License 1.1, with a Unicode fallback when unavailable.</p>
-        <p><a href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=49" target="_blank" rel="noopener" lang="en">Help</a> · <a href="https://over-keys.github.io/Jampanion2/viewer/help.en.html?v=49" target="_blank" rel="noopener" lang="en">English help</a></p>
+        <p><a href="https://over-keys.github.io/Jampanion2/viewer/help.html?v=51" target="_blank" rel="noopener" lang="en">Help</a> · <a href="https://over-keys.github.io/Jampanion2/viewer/help.en.html?v=51" target="_blank" rel="noopener" lang="en">English help</a></p>
         <p><a href="./LICENSE" target="_blank" rel="noopener">Application license</a> · <a href="./THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Third-party notices</a></p>
       </section>
     </form>
@@ -3306,6 +3309,22 @@ const { transposeKey, formatChord } = __music;
 
 const __expand = (() => {
 'use strict';
+const MAX_REPEAT_PASSES = 64;
+const MAX_EXPANDED_BARS = 8192;
+
+function validateRepeatCount(count) {
+  if (!Number.isSafeInteger(count) || count < 2 || count > MAX_REPEAT_PASSES) {
+    throw new Error(`Repeat count must be between 2 and ${MAX_REPEAT_PASSES}.`);
+  }
+  return count;
+}
+
+function appendLinearBars(output, bars) {
+  if (output.length + bars.length > MAX_EXPANDED_BARS) {
+    throw new Error(`Expanded chart exceeds ${MAX_EXPANDED_BARS} bars. Reduce the repeats or use Original view.`);
+  }
+  output.push(...bars);
+}
 /**
  * Convert a notated iReal chart into a linear, top-to-bottom play order.
  *
@@ -3319,6 +3338,7 @@ const __expand = (() => {
 function expandChartBars(sourceBars) {
   const source = Array.isArray(sourceBars) ? sourceBars : [];
   if (!source.length) return [];
+  if (source.length > MAX_EXPANDED_BARS) appendLinearBars([], source);
 
   const directives = findJumpDirectives(source);
   // A To Coda/Coda pair without D.C. or D.S. is notation only. It must not be
@@ -3335,7 +3355,7 @@ function expandChartBars(sourceBars) {
 
     const terminalIndex = findJumpTerminal(source, jump.index, jump.symbol);
     if (terminalIndex >= cursor) {
-      output.push(...expandWrittenRepeats(source.slice(cursor, terminalIndex + 1), cursor));
+      appendLinearBars(output, expandWrittenRepeats(source.slice(cursor, terminalIndex + 1), cursor));
     }
 
     const lower = jump.symbol.toLowerCase();
@@ -3352,11 +3372,11 @@ function expandChartBars(sourceBars) {
         // and place an independent Coda section after the printed directive.
         // In that structure, complete the requested ending (Fine is not a stop
         // unless the directive says al Fine), then continue at the Coda.
-        output.push(...pathToEnding(source, jumpStart, targetEnding));
+        appendLinearBars(output, pathToEnding(source, jumpStart, targetEnding));
         cursor = independentCodaStart;
       } else {
         const endingPath = pathToEndingAndFine(source, jumpStart, targetEnding);
-        output.push(...endingPath);
+        appendLinearBars(output, endingPath);
         // When the numbered ending is printed after the D.C./D.S. instruction,
         // the ordinary tail pass would append that same ending a second time.
         // Resume after the furthest source bar already emitted by the return
@@ -3375,7 +3395,7 @@ function expandChartBars(sourceBars) {
       // from being mistaken for the destination.
       const codaStart = source.findIndex((bar, index) => index > jump.index && bar.codaStart);
       if (toCoda >= jumpStart) {
-        output.push(...pathToCodaOnReturn(source, jumpStart, toCoda));
+        appendLinearBars(output, pathToCodaOnReturn(source, jumpStart, toCoda));
       }
       consumedCodaNavigation = true;
       // Continue normal reading from the Coda destination. This permits a
@@ -3386,9 +3406,9 @@ function expandChartBars(sourceBars) {
 
     if (lower.includes('al fine')) {
       const fine = source.findIndex((bar, index) => index >= jumpStart && hasSymbol(bar, 'Fine'));
-      output.push(...(fine >= jumpStart
+      appendLinearBars(output, fine >= jumpStart
         ? pathToIndex(source, jumpStart, fine)
-        : copyRange(source, jumpStart, source.length - 1)));
+        : copyRange(source, jumpStart, source.length - 1));
       cursor = terminalIndex + 1;
       continue;
     }
@@ -3396,12 +3416,12 @@ function expandChartBars(sourceBars) {
     const fine = source.findIndex((bar, index) => index >= jumpStart && hasSymbol(bar, 'Fine'));
     const codaStart = source.findIndex((bar, index) => index > jump.index && bar.codaStart);
     const stop = fine >= jumpStart ? fine : (codaStart > jumpStart ? codaStart - 1 : source.length - 1);
-    output.push(...pathToIndex(source, jumpStart, stop));
+    appendLinearBars(output, pathToIndex(source, jumpStart, stop));
     cursor = terminalIndex + 1;
   }
 
   if (cursor < source.length) {
-    output.push(...expandWrittenRepeats(source.slice(cursor), cursor));
+    appendLinearBars(output, expandWrittenRepeats(source.slice(cursor), cursor));
   }
 
   return finishLinearBars(output, {
@@ -3428,11 +3448,11 @@ function deriveEndingNumbers(bars) {
     const closesFirst = active === 1 && bar.endRepeat;
     const closesLater = active > 1 && (
       bar.endRepeat || bar.doubleEnd || bar.final ||
-      !next || Number.isFinite(next.ending) || next.section || next.doubleStart || next.systemBreak
+      !next || Number.isFinite(next.ending) || next.section || next.doubleStart
     );
     const closesUnnumbered = active === 0 && (
       bar.endRepeat || bar.doubleEnd || bar.final ||
-      !next || Number.isFinite(next.ending) || next.section || next.doubleStart || next.systemBreak
+      !next || Number.isFinite(next.ending) || next.section || next.doubleStart
     );
     if (closesFirst || closesLater || closesUnnumbered) active = null;
   }
@@ -3493,12 +3513,12 @@ function expandRepeatRange(bars, start, end, sourceOffset, endings, pairByStart,
     const pair = cursor === ignoredStart ? null : pairByStart.get(cursor);
     if (pair && pair.end <= end) {
       const expanded = expandRepeatPair(bars, pair, sourceOffset, endings, pairByStart);
-      output.push(...expanded.bars);
+      appendLinearBars(output, expanded.bars);
       cursor = expanded.nextIndex;
       continue;
     }
 
-    output.push(cloneForLinear(bars[cursor], cursor + sourceOffset));
+    appendLinearBars(output, [cloneForLinear(bars[cursor], cursor + sourceOffset)]);
     cursor += 1;
   }
   return output;
@@ -3516,7 +3536,7 @@ function expandRepeatPair(bars, pair, sourceOffset, endings, pairByStart) {
         bars, start, end, sourceOffset, endings, pairByStart, start
       );
       if (pass > 0) suppressRepeatedCodaMarkers(passBars);
-      output.push(...passBars);
+      appendLinearBars(output, passBars);
     }
     return { bars: output, nextIndex: end + 1 };
   }
@@ -3547,7 +3567,7 @@ function expandRepeatPair(bars, pair, sourceOffset, endings, pairByStart) {
         ...expandRepeatRange(bars, range.start, range.end, sourceOffset, endings, pairByStart)
       ];
       suppressRepeatedCodaMarkers(passBars);
-      output.push(...passBars);
+      appendLinearBars(output, passBars);
     });
     return { bars: output, nextIndex: look };
   }
@@ -3557,14 +3577,14 @@ function expandRepeatPair(bars, pair, sourceOffset, endings, pairByStart) {
     bars, start, end, sourceOffset, endings, pairByStart, start
   );
   suppressRepeatedCodaMarkers(fallback);
-  output.push(...fallback);
+  appendLinearBars(output, fallback);
   return { bars: output, nextIndex: end + 1 };
 }
 
 function repeatPassCount(bars, start, end) {
   for (let index = Math.min(end, bars.length - 1); index >= Math.max(0, start); index -= 1) {
     const count = Number(bars[index]?.repeatCount);
-    if (Number.isFinite(count) && count >= 2) return count;
+    if (Number.isFinite(count) && count >= 2) return validateRepeatCount(count);
   }
   return 2;
 }
@@ -3610,7 +3630,7 @@ function pathToEnding(source, start, targetEnding) {
   }
 
   return [
-    ...copyRange(source, start, firstEndingStart - 1),
+    ...pathToIndex(source, start, firstEndingStart - 1),
     ...copyRange(source, targetStart, targetEnd)
   ];
 }
@@ -3636,7 +3656,7 @@ function pathToEndingAndFine(source, start, targetEnding) {
   const fine = source.findIndex((bar, index) => index >= targetStart && hasSymbol(bar, 'Fine'));
   const targetStop = fine >= targetStart && fine <= targetEnd ? fine : targetEnd;
   const output = [
-    ...copyRange(source, start, firstEndingStart - 1),
+    ...pathToIndex(source, start, firstEndingStart - 1),
     ...copyRange(source, targetStart, targetStop)
   ];
   if (fine < 0 || fine <= targetEnd) return output;
@@ -3646,25 +3666,42 @@ function pathToEndingAndFine(source, start, targetEnding) {
   for (let index = targetEnd + 1; index <= fine; index += 1) {
     const ending = endings[index];
     if (ending != null && ending > 0 && ending !== targetEnding) continue;
-    output.push(cloneForLinear(source[index], index));
+    appendLinearBars(output, [cloneForLinear(source[index], index)]);
   }
   return output;
 }
 
 function pathToIndex(source, start, target) {
   const endings = deriveEndingNumbers(source);
-  const targetEnding = endings[target];
-  if (targetEnding && targetEnding > 1) {
-    const endingPath = pathToEnding(source, start, targetEnding);
-    return endingPath.filter((bar) => bar._sourceIndex <= target);
+  const skipped = new Set();
+  // Numbered endings are local to their repeat, not global destinations.
+  // Walk every repeat group on the return, including the group containing Fine.
+  for (const pair of analyseRepeatStructure(source).pairs) {
+    const first = findEndingStart(endings, 1, pair.start, pair.end);
+    if (first < 0) continue;
+    const later = [];
+    let cursor = pair.end + 1;
+    while (cursor < source.length && endings[cursor] > 1) {
+      const number = endings[cursor];
+      const rangeStart = cursor;
+      while (cursor + 1 < source.length && endings[cursor + 1] === number) cursor++;
+      later.push({ start: rangeStart, end: cursor });
+      cursor++;
+    }
+    const chosen = later.find(range => range.start <= target && target <= range.end)
+      || later.filter(range => range.start <= target).at(-1);
+    if (!chosen) continue;
+    for (let index = first; index <= pair.end; index++) skipped.add(index);
+    for (const range of later) {
+      if (range === chosen) continue;
+      for (let index = range.start; index <= range.end; index++) skipped.add(index);
+    }
   }
 
   const output = [];
   for (let i = start; i <= target && i < source.length; i += 1) {
-    // On a D.C./D.S. return, do not take a first ending when a later ending is
-    // available before the target. This matches standard navigation practice.
-    if (endings[i] === 1 && endings.slice(i + 1, target + 1).some((value) => value > 1)) continue;
-    output.push(cloneForLinear(source[i], i));
+    if (skipped.has(i)) continue;
+    appendLinearBars(output, [cloneForLinear(source[i], i)]);
   }
   return output;
 }
@@ -3748,7 +3785,7 @@ function copyRange(bars, start, end, sourceOffset = 0) {
   if (end < start) return [];
   const output = [];
   for (let i = Math.max(0, start); i <= end && i < bars.length; i += 1) {
-    output.push(cloneForLinear(bars[i], i + sourceOffset));
+    appendLinearBars(output, [cloneForLinear(bars[i], i + sourceOffset)]);
   }
   return output;
 }
@@ -3790,6 +3827,7 @@ function finishLinearBars(
     suppressCodaNavigation = false
   } = {}
 ) {
+  if (bars.length > MAX_EXPANDED_BARS) appendLinearBars([], bars);
   const result = bars.map((bar) => ({
     ...bar,
     symbols: [...(bar.symbols || [])],
@@ -3885,9 +3923,9 @@ function retainFinalEndMarkerOccurrences(bars) {
     if (lastBySource.get(sourceIndex) !== index) bar.endMarker = false;
   });
 }
-return { expandChartBars, deriveEndingNumbers, analyseRepeatStructure, analyseNavigationStructure };
+return { expandChartBars, deriveEndingNumbers, analyseRepeatStructure, analyseNavigationStructure, validateRepeatCount };
 })();
-const { expandChartBars, deriveEndingNumbers, analyseRepeatStructure, analyseNavigationStructure } = __expand;
+const { expandChartBars, deriveEndingNumbers, analyseRepeatStructure, analyseNavigationStructure, validateRepeatCount } = __expand;
 
 const __ireal = (() => {
 'use strict';
@@ -4314,7 +4352,7 @@ function parseChart(raw, initialTimeSignature = '4/4') {
       const staffText = normaliseStaffText(comment[1]);
       const repeatCount = staffText.match(/^(\d+)x$/i);
       if (repeatCount) {
-        current.repeatCount = Math.max(2, Number(repeatCount[1]));
+        current.repeatCount = validateRepeatCount(Math.max(2, Number(repeatCount[1])));
         current.symbols.push(`${current.repeatCount}x`);
       } else {
         const grouping = staffText.match(/^(2\+3|3\+2|3\+4|4\+3)$/);
@@ -4810,7 +4848,15 @@ async function runTransaction(mode, operation) {
 }
 
 function compactLibrary(songs, preservedEntries = []) {
-  const entries = songs.map((song) => {
+  const entries = songs.flatMap((song) => {
+    // Native edits have one authoritative store owned by the host. Importing
+    // another chart must not save a draft or make a second copy of a new song.
+    if (song?.source === 'native') {
+      if (song.originalSourceSong) song = song.originalSourceSong;
+      else if (song.originalSourceRecord) song = { ...song, source: 'ireal', sourceRecord: song.originalSourceRecord };
+      else return [];
+    }
+    if (song?.source === 'demo') return [];
     const record = song?.sourceRecord;
     if (
       song?.source === 'ireal' &&
@@ -4818,17 +4864,17 @@ function compactLibrary(songs, preservedEntries = []) {
       /^(?:irealb|irealbook):\/\/$/i.test(record.protocol || '') &&
       typeof record.body === 'string'
     ) {
-      return {
+      return [{
         kind: 'ireal',
         protocol: record.protocol,
         body: record.body,
         importedAt: Number(song.importedAt) || Date.now()
-      };
+      }];
     }
     // Old releases stored only parsed objects. Keep those entries intact
     // until the user reimports the same charts, at which point they are
     // replaced by compact source records without data loss.
-    return { kind: 'legacy', song };
+    return [{ kind: 'legacy', song }];
   });
 
   const currentKeys = new Set(entries.map(libraryEntryIdentity).filter(Boolean));
@@ -5429,7 +5475,9 @@ function resolveMusicalCellLayout(bar, chordSlots, fallbackMeter = '4/4') {
       rawCell: Math.max(0, Number(alternate.cell) || 0)
     }))
   );
-  const leadingOffset = originalRawCells.length ? Math.min(...originalRawCells) : 0;
+  const fixedGridCells = Number(bar.jampanionGridCells);
+  const hasFixedGrid = Number.isFinite(fixedGridCells) && fixedGridCells > 0;
+  const leadingOffset = hasFixedGrid ? 0 : originalRawCells.length ? Math.min(...originalRawCells) : 0;
   const rawCells = originalRawCells.map((cell) => cell - leadingOffset);
   const alternateRawCells = alternateSources.map((alternate) => Math.max(0, alternate.rawCell - leadingOffset));
   const rawMaximum = Math.max(0, ...rawCells, ...alternateRawCells);
@@ -5443,6 +5491,7 @@ function resolveMusicalCellLayout(bar, chordSlots, fallbackMeter = '4/4') {
   }
 
   const mapRawCell = (rawCell) => {
+    if (hasFixedGrid) return Math.max(0, Math.min(totalCells - 1, Math.round(rawCell * totalCells / fixedGridCells)));
     const groupPosition = rawCell / sourceResolution;
     const scaled = gridPositionToCell(groupPosition, meterGrid, subdivisionsPerUnit);
     return Math.max(0, Math.min(totalCells - 1, scaled));
@@ -5465,12 +5514,12 @@ function resolveMusicalCellLayout(bar, chordSlots, fallbackMeter = '4/4') {
     (_, index) => Math.round(index * totalCells / count)
   );
 
-  if (!hasExplicitHold && !hasMeasureRepeat && chordSlots.length === 1) {
+  if (!hasFixedGrid && !hasExplicitHold && !hasMeasureRepeat && chordSlots.length === 1) {
     // A lone harmony always begins on beat 1. Whitespace before it is only
     // source-layout padding and must never move the chord into the measure.
     starts = [0];
   } else if (
-    !hasExplicitHold && !hasMeasureRepeat && chordSlots.length === 2 &&
+    !hasFixedGrid && !hasExplicitHold && !hasMeasureRepeat && chordSlots.length === 2 &&
     rawCells[0] === 0 && rawCells[1] === 1
   ) {
     // A comma-packed two-chord bar occupies adjacent source cells but still
@@ -5481,7 +5530,7 @@ function resolveMusicalCellLayout(bar, chordSlots, fallbackMeter = '4/4') {
       : Math.floor(totalCells / 2);
     starts = [0, secondStart];
   } else if (
-    meterTop === 4 && meterBottom === 4 && chordSlots.length === 3 &&
+    !hasFixedGrid && meterTop === 4 && meterBottom === 4 && chordSlots.length === 3 &&
     !hasMeasureRepeat && rawCells[0] === 0 && rawCells[1] === 1 && rawCells[2] === 3
   ) {
     // Some iReal exports use XyQ plus compact spacing for a three-chord bar.
@@ -5489,14 +5538,14 @@ function resolveMusicalCellLayout(bar, chordSlots, fallbackMeter = '4/4') {
     // 1, 3, and 4 (the same final-beat placement used by the iReal chart).
     starts = [0, Math.floor(totalCells / 2), Math.floor(totalCells * 3 / 4)];
   } else if (
-    meterTop === 3 && meterBottom === 4 && chordSlots.length === 2 &&
+    !hasFixedGrid && meterTop === 3 && meterBottom === 4 && chordSlots.length === 2 &&
     rawCells[0] === 0 && rawCells[1] * 2 === sourceCellCount
   ) {
     // A four-cell 3/4 source bar split into two equal halves represents
     // 1.5 beats per chord: beat 1 and the second half of beat 2.
     starts = [0, Math.floor(totalCells / 2)];
   } else if (
-    meterTop === 3 && meterBottom === 4 && chordSlots.length === 3 &&
+    !hasFixedGrid && meterTop === 3 && meterBottom === 4 && chordSlots.length === 3 &&
     !hasMeasureRepeat
   ) {
     // Three occupied harmony cells in 3/4 are one event per beat. iReal source
@@ -5504,7 +5553,7 @@ function resolveMusicalCellLayout(bar, chordSlots, fallbackMeter = '4/4') {
     // event onto an eighth-note subdivision.
     starts = evenlySpacedBeatStarts(3);
   } else if (
-    meterTop === 5 && meterBottom === 4 && chordSlots.length === 5 &&
+    !hasFixedGrid && meterTop === 5 && meterBottom === 4 && chordSlots.length === 5 &&
     !hasMeasureRepeat
   ) {
     // Five occupied harmony cells in 5/4 represent beats 1 through 5. Meter
@@ -5900,6 +5949,7 @@ function render() {
     el.search.disabled = false;
     el.search.removeAttribute('aria-busy');
   }
+  updateCurrentSongDeleteButton();
   renderToolbar();
   renderSearchOptions();
   renderChart();
@@ -5991,9 +6041,15 @@ function closeSearch({ restore = true } = {}) {
 function renderChart() {
   const song = currentSong();
   const columns = responsiveColumns();
-  const rawDisplayBars = state.viewMode === 'expanded'
-    ? expandChartBars(song.bars)
-    : song.bars.map((bar) => ({ ...bar }));
+  let rawDisplayBars;
+  try {
+    rawDisplayBars = state.viewMode === 'expanded'
+      ? expandChartBars(song.bars)
+      : song.bars.map((bar) => ({ ...bar }));
+  } catch (error) {
+    el.chartPage.innerHTML = `<p class="chart-warning" role="alert">${escapeHtml(error instanceof Error ? error.message : String(error))}</p>`;
+    return;
+  }
   const displayBars = resolveTimeSignatures(rawDisplayBars, song.timeSignature || '4/4');
   const rows = buildRows(displayBars, columns, { expanded: state.viewMode === 'expanded' });
   const notation = {
@@ -6210,6 +6266,7 @@ el.settingsButton.addEventListener('click', () => {
   el.minorStyle.value = state.settings.minor;
   el.halfDimStyle.value = state.settings.halfDim;
   el.dimStyle.value = state.settings.dim;
+  updateCurrentSongDeleteButton();
   el.settingsDialog.showModal();
 });
 el.settingsClose.addEventListener('click', () => el.settingsDialog.close());
@@ -6263,6 +6320,62 @@ el.importConfirm.addEventListener('click', async () => {
     saveLastSong(currentSong());
   } catch (error) {
     el.importError.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+
+async function saveLibraryAfterNativeRemoval(songId, restoredSong) {
+  const nextSongs = state.songs.flatMap(song => String(song.id) === String(songId)
+    ? (restoredSong ? [restoredSong] : [])
+    : [song]);
+  await saveSongLibrary(nextSongs, state.preservedLibraryEntries);
+}
+
+function updateCurrentSongDeleteButton() {
+  const song = currentSong();
+  document.getElementById('currentSongDeleteTitle').textContent = `Current song: ${song.title || 'Untitled'}`;
+  document.getElementById('deleteCurrentSong').disabled = state.libraryLoading || song.source === 'demo' || document.body.classList.contains('jampanion-playback');
+}
+
+async function deleteSongById(songId, removeOverrides = async () => {}) {
+  const song = state.songs.find(item => String(item.id) === String(songId));
+  if (!song || song.source === 'demo') return false;
+  const nextSongs = state.songs.filter(item => String(item.id) !== String(songId));
+  const identity = `${song.title || ''}\n${song.composer || ''}`;
+  const nextEntries = state.preservedLibraryEntries.filter(entry => {
+    if (entry?.kind !== 'ireal' || typeof entry.body !== 'string') return true;
+    const fields = entry.body.split('=');
+    return `${fields[0] || ''}\n${fields[1] || ''}` !== identity;
+  });
+  await saveSongLibrary(nextSongs, nextEntries);
+  await removeOverrides();
+  state.songs = nextSongs.length ? nextSongs : [DEMO_SONG];
+  state.preservedLibraryEntries = nextEntries;
+  if (!nextEntries.length) state.libraryWarnings = [];
+  if (String(state.selectedId) === String(songId)) {
+    state.selectedId = state.songs[0].id;
+    state.semitones = 0;
+  }
+  saveLastSong(currentSong());
+  render();
+  return true;
+}
+
+async function deleteCurrentSongWithConfirmation() {
+  const song = currentSong();
+  if (song.source === 'demo' || document.body.classList.contains('jampanion-playback')) return false;
+  if (!confirm(`Delete “${song.title || 'Untitled'}”?`)) return false;
+  return await window.__chartViewer.deleteSongById(song.id);
+}
+
+document.getElementById('deleteCurrentSong').addEventListener('click', async () => {
+  const button = document.getElementById('deleteCurrentSong');
+  button.disabled = true;
+  try {
+    if (await deleteCurrentSongWithConfirmation()) el.settingsDialog.close();
+  } catch (error) {
+    alert(error instanceof Error ? error.message : String(error));
+  } finally {
+    updateCurrentSongDeleteButton();
   }
 });
 
@@ -6392,7 +6505,7 @@ detectMuseJazzText();
 const libraryReady = initialiseLibrary();
 // JAMPANION_LIBRARY_STARTUP_V1
 // JAMPANION_LIBRARY_SEARCH_UNLOCK_V1
-window.__chartViewer = { state, parseIRealCollection, buildRows, expandChartBars, deriveEndingNumbers, displayComposer, normaliseStaffText, libraryReady, restoreSongsByIds };
+window.__chartViewer = { state, parseIRealCollection, buildRows, expandChartBars, deriveEndingNumbers, displayComposer, normaliseStaffText, libraryReady, restoreSongsByIds, saveLibraryAfterNativeRemoval, deleteSongById, deleteCurrentSongWithConfirmation };
 // JAMPANION_CUSTOMIZED_SONGS_V1
 
 function responsiveColumns() {
@@ -6406,7 +6519,7 @@ function responsiveColumns() {
     if (isStandaloneViewer) {
       document.documentElement.classList.remove("jampanion-startup-pending");
     } else {
-      import("../js/jazz-chart-host.js?v=49").then(({ initializeEmbeddedViewer }) => {
+      import("../js/jazz-chart-host.js?v=51").then(({ initializeEmbeddedViewer }) => {
         return initializeEmbeddedViewer();
       }).catch(error => {
         console.error("Jampanion embedded bridge failed", error);

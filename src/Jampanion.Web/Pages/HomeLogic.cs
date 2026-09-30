@@ -40,6 +40,8 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
 
     [Inject] public IJSRuntime JS { get; set; } = default!;
 
+    protected bool CurrentSongIsDemo { get; private set; }
+    protected string CurrentSongTitle { get; private set; } = string.Empty;
     protected string SelectedIdentity { get; set; } = string.Empty;
     protected string CurrentKey { get; set; } = "C";
     protected string CurrentMeter { get; set; } = "4/4";
@@ -53,6 +55,7 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
     protected AccompanimentStyle SelectedStyle { get; set; } = AccompanimentStyle.Swing;
     protected string StatusText { get; set; } = "Loading Jazz Chart Viewer";
     protected string? PlaybackErrorText { get; private set; }
+    protected string? ChartActionErrorText { get; private set; }
 
     protected bool IsPlaying { get; set; }
     protected bool IsLoading { get; set; }
@@ -187,7 +190,7 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
         try
         {
             _self ??= DotNetObjectReference.Create(this);
-            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=49");
+            _chartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jazz-chart-host.js?v=51");
             try { await _chartModule.InvokeVoidAsync("initializeMobileControlsScrollHint"); } catch { }
             var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("initialize", "jcv-frame", _self);
             ApplyBootstrap(bootstrap);
@@ -235,8 +238,11 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
     }
 
     [JSInvokable]
-    public async Task ChartEdited(string message)
+    public async Task ChartEdited(string message, JazzChartBootstrap bootstrap)
     {
+        // Editing can finish before the debounced selection notification. Apply
+        // that selection first so a later notification cannot clear this draft.
+        ApplyBootstrap(bootstrap);
         HasUnsavedChartChanges = true;
         PlaybackErrorText = null;
         _preservePlaybackError = false;
@@ -288,6 +294,8 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
         var previousMeter = CurrentMeter;
 
         SelectedIdentity = incomingIdentity;
+        CurrentSongTitle = bootstrap.Title ?? string.Empty;
+        CurrentSongIsDemo = bootstrap.SelectedId == "demo-autumn-leaves" && !bootstrap.IsNative;
         CurrentKey = bootstrap.Key ?? "C";
         CurrentSemitoneShift = bootstrap.SemitoneShift;
         CurrentMeter = bootstrap.TimeSignature ?? "4/4";
@@ -302,6 +310,7 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
         // controls when the selected song actually changes (or on first bootstrap).
         if (identityChanged)
         {
+            ChartActionErrorText = null;
             if (!AccompanimentStyleNames.TryParseExplicit(bootstrap.AccompanimentStyle, out var incomingStyle))
             {
                 incomingStyle = AccompanimentStyleNames.Parse(bootstrap.AccompanimentStyle, CurrentMeter);
@@ -1516,6 +1525,7 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
     protected async Task SaveAccompanimentSettingsAsync()
     {
         if (IsPlaying || IsLoading || _chartModule is null) return;
+        ChartActionErrorText = null;
         try
         {
             // Key changes are reported by the embedded Viewer asynchronously.
@@ -1552,6 +1562,7 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
         catch (Exception exception)
         {
             StatusText = $"Changes could not be saved: {exception.Message}";
+            ChartActionErrorText = StatusText.Split(['\r', '\n'])[0];
         }
     }
 
@@ -1613,22 +1624,56 @@ public class HomeLogic : ComponentBase, IAsyncDisposable
     protected async Task RevertCurrentSongAsync()
     {
         if (IsPlaying || IsLoading || !CanRevertCurrentSong || _chartModule is null) return;
-        var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("revertCurrentSong");
-        ApplyBootstrap(bootstrap, forceAccompanimentSettings: true);
-        StatusText = "Changes reverted";
+        ChartActionErrorText = null;
+        try
+        {
+            var result = await _chartModule.InvokeAsync<JazzChartActionResult>("revertCurrentSong");
+            if (!result.Changed) return;
+            ApplyBootstrap(result.Bootstrap, forceAccompanimentSettings: true);
+            StatusText = "Changes reverted";
+        }
+        catch (Exception exception)
+        {
+            ChartActionErrorText = $"Changes could not be reverted: {exception.Message}".Split(['\r', '\n'])[0];
+        }
+    }
+
+    protected async Task DeleteDisplayedSongAsync()
+    {
+        if (IsPlaying || IsLoading || !ChartReady || CurrentSongIsDemo || _chartModule is null) return;
+        ChartActionErrorText = null;
+        try
+        {
+            var result = await _chartModule.InvokeAsync<JazzChartActionResult>("deleteDisplayedSong");
+            if (!result.Changed) return;
+            ApplyBootstrap(result.Bootstrap, forceAccompanimentSettings: true);
+            StatusText = "Song deleted";
+        }
+        catch (Exception exception)
+        {
+            ChartActionErrorText = $"Song could not be deleted: {exception.Message}".Split(['\r', '\n'])[0];
+        }
     }
 
     protected async Task DeleteCurrentNativeSongAsync()
     {
         if (IsPlaying || IsLoading || !CurrentSongIsNative || CurrentNativeHasOriginalSource || _chartModule is null) return;
-        var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("deleteCurrentNativeSong");
-        ApplyBootstrap(bootstrap);
-        HasUnsavedChartChanges = false;
-        StatusText = "Native song deleted";
+        ChartActionErrorText = null;
+        try
+        {
+            var bootstrap = await _chartModule.InvokeAsync<JazzChartBootstrap>("deleteCurrentNativeSong");
+            ApplyBootstrap(bootstrap);
+            HasUnsavedChartChanges = false;
+            StatusText = "Native song deleted";
+        }
+        catch (Exception exception)
+        {
+            ChartActionErrorText = $"Song could not be deleted: {exception.Message}".Split(['\r', '\n'])[0];
+        }
     }
 
     private async Task<IJSObjectReference> EnsureAudioModuleAsync() =>
-            _audioModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-audio.js?v=49");
+            _audioModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/jampanion-audio.js?v=51");
 
     private static string FormatTime(double seconds)
     {

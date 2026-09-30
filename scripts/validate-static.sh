@@ -54,6 +54,7 @@ if (( viewer_icon_bytes >= 100000 )); then
 fi
 
 node "$ROOT/scripts/test-jazz-timing.mjs" "$HOST"
+node "$ROOT/scripts/test-review-regressions.mjs"
 python3 "$ROOT/scripts/test-app-invariants.py"
 "$ROOT/scripts/test-tempo-state.sh"
 "$ROOT/scripts/test-chart-bridge.sh"
@@ -78,9 +79,9 @@ if [[ -n "$legacy_hits" ]]; then
   exit 1
 fi
 
-grep -q 'const APP_VERSION = "49"' "$INDEX"
+grep -q 'const APP_VERSION = "51"' "$INDEX"
 test -s "$WEB/wwwroot/app-version.json"
-grep -q '"version": "49"' "$WEB/wwwroot/app-version.json"
+grep -q '"version": "51"' "$WEB/wwwroot/app-version.json"
 grep -q 'The app could not start after automatic cache recovery. Press Reload to try again.' "$INDEX"
 grep -q 'web-src/jazz-chart-host.js' "$WEB/scripts/build-audio.mjs"
 grep -q 'url("assets/MuseJazzText.otf")' "$WEB/wwwroot/viewer/index.html"

@@ -95,3 +95,11 @@ scripts/build.sh
 ```
 
 The published static site is written to `dist/`.
+
+Static validation includes regression checks for chart navigation, editing,
+storage failures, and audio initialization retries. The build also runs the C#
+Save/Revert state tests; run `scripts/test-home-state.sh` to check those separately.
+
+Expanded charts allow up to 64 repeat passes and 8192 expanded bars. Excessive
+repeat counts are rejected during import; older stored charts that exceed the
+expanded-size limit can still be viewed in Original mode.

@@ -30,6 +30,8 @@ dotnet publish "$WEB/Jampanion.Web.csproj" \
   -c Release \
   -o "$PUBLISH"
 
+dotnet run --project "$ROOT/scripts/HomeStateTests/HomeStateTests.csproj" -c Release
+
 cp -R "$PUBLISH/wwwroot" "$ROOT/dist"
 touch "$ROOT/dist/.nojekyll"
 

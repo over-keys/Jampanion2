@@ -50,6 +50,11 @@ async function ensureSynthesizer() {
     try {
         return await synthesizerPromise;
     } catch (error) {
+        if (synthesizer) {
+            try { synthesizer.disconnect(); } catch {}
+            try { synthesizer.destroy(); } catch {}
+            synthesizer = null;
+        }
         synthesizerPromise = null;
         throw error;
     }
@@ -71,8 +76,11 @@ async function initializeSynthesizer() {
     processorUrl.searchParams.set("v", AUDIO_BUILD_ID);
     await audioContext.audioWorklet.addModule(processorUrl.href);
 
+    let pendingSynthesizer;
     try {
-        synthesizer = new WorkletSynthesizer(audioContext, {
+        // Publish only a fully initialized synth, so concurrent callers wait
+        // for the sound bank and a failed download can be retried.
+        pendingSynthesizer = new WorkletSynthesizer(audioContext, {
             oneOutput: false,
             eventsEnabled: false
         });
@@ -82,17 +90,20 @@ async function initializeSynthesizer() {
         throw new Error(`AudioWorkletNode creation failed: ${detail}`);
     }
 
-    synthesizer.connect(audioContext.destination);
-    synthesizer.setLogLevel(false, true, false);
-
-    const soundFontUrl = new URL("../soundfonts/FluidR3_Jampanion.sf3", import.meta.url);
-    const response = await fetch(soundFontUrl, { cache: "force-cache" });
-    if (!response.ok) {
-        throw new Error(`SoundFont download failed (${response.status}).`);
+    try {
+        pendingSynthesizer.connect(audioContext.destination);
+        pendingSynthesizer.setLogLevel(false, true, false);
+        const soundFontUrl = new URL("../soundfonts/FluidR3_Jampanion.sf3", import.meta.url);
+        const response = await fetch(soundFontUrl, { cache: "force-cache" });
+        if (!response.ok) throw new Error(`SoundFont download failed (${response.status}).`);
+        await pendingSynthesizer.soundBankManager.addSoundBank(await response.arrayBuffer(), "jampanion");
+        await pendingSynthesizer.isReady;
+    } catch (error) {
+        try { pendingSynthesizer.disconnect(); } catch {}
+        try { pendingSynthesizer.destroy(); } catch {}
+        throw error;
     }
-
-    await synthesizer.soundBankManager.addSoundBank(await response.arrayBuffer(), "jampanion");
-    await synthesizer.isReady;
+    synthesizer = pendingSynthesizer;
     synthesizer.setSystemParameter("gain", WEB_MASTER_GAIN);
     configurePrograms();
     setMixer(mixerState);

@@ -3,7 +3,7 @@
 @implements IAsyncDisposable
 
 <PageTitle>Jampanion2</PageTitle>
-<link rel="stylesheet" href="css/jazz-integration.css?v=49" />
+<link rel="stylesheet" href="css/jazz-integration.css?v=51" />
 
 <div class="jamp-shell @(IsPlaying ? "is-playing" : string.Empty)">
     <aside class="jamp-sidebar">
@@ -41,6 +41,10 @@
         {
             <p class="jamp-playback-error" role="alert"><strong>Playback error</strong><br />@PlaybackErrorText</p>
         }
+        @if (!string.IsNullOrWhiteSpace(ChartActionErrorText))
+        {
+            <p class="jamp-playback-error" role="alert">@ChartActionErrorText</p>
+        }
 
         <section class="jamp-panel mix-panel">
             <div class="jamp-heading-row"><h2>Mix</h2><button class="tiny" @onclick="ToggleSettingsAsync">Settings</button></div>
@@ -55,12 +59,12 @@
         </section>
 
         <section class="jamp-brand-row">
-            <img src="icons/jampanion-32.png?v=49" alt="" width="22" height="22" />
+            <img src="icons/jampanion-32.png?v=51" alt="" width="22" height="22" />
             <strong>Jampanion2</strong>
         </section>
         <section class="jamp-mode-row">
             <a href="viewer/" title="Open Viewer mode" aria-label="Open Viewer mode">
-                <img src="icons/jampanion-viewer.png?v=49" alt="" width="16" height="16" />
+                <img src="icons/jampanion-viewer.png?v=51" alt="" width="16" height="16" />
                 <span>Viewer Mode</span>
             </a>
         </section>
@@ -70,7 +74,7 @@
     <main class="jamp-chart-area">
         <iframe id="jcv-frame"
                 title="Jazz chart"
-                src="viewer/index.html?integrated=49"
+                src="viewer/index.html?integrated=51"
                 allow="fullscreen"
                 referrerpolicy="no-referrer"></iframe>
     </main>
@@ -97,6 +101,12 @@
             </label>
             <p class="dialog-note">@MidiStatusText</p>
             <p class="dialog-note">MIDI input is used only for MIDI Thru. Performance-energy analysis is disabled.</p>
+        </section>
+        <section>
+            <h3>Current song</h3>
+            <p>@CurrentSongTitle</p>
+            <button type="button" class="danger" @onclick="DeleteDisplayedSongAsync" disabled="@(IsPlaying || IsLoading || !ChartReady || CurrentSongIsDemo)">Delete current song</button>
+            @if (!string.IsNullOrWhiteSpace(ChartActionErrorText)) { <p class="validation" role="alert">@ChartActionErrorText</p> }
         </section>
         <footer><button @onclick="ToggleSettingsAsync">Close</button></footer>
     </section>
